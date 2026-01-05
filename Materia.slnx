@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="Materia.ApiService/Materia.ApiService.csproj" />
+  <Project Path="Materia.AppHost/Materia.AppHost.csproj" />
+  <Project Path="Materia.ServiceDefaults/Materia.ServiceDefaults.csproj" />
+  <Project Path="Materia.Tests/Materia.Tests.csproj" />
+  <Project Path="Materia.Web/Materia.Web.csproj" />
+</Solution>
