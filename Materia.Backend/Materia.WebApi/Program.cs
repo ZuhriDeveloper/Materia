@@ -1,4 +1,5 @@
 using Materia.Application;
+using Materia.Domain.Common;
 using Materia.Infrastructure;
 using Materia.Infrastructure.Persistence;
 
@@ -32,6 +33,18 @@ if (app.Environment.IsDevelopment())
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Return domain rule violations as 400 Bad Request instead of 500
+app.Use(async (ctx, next) =>
+{
+    try { await next(ctx); }
+    catch (DomainException ex)
+    {
+        ctx.Response.StatusCode = 400;
+        await ctx.Response.WriteAsJsonAsync(new { errors = new[] { ex.Message } });
+    }
+});
+
 app.MapControllers();
 
 app.Run();

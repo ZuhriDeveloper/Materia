@@ -304,23 +304,18 @@ else
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 
     [SupplyParameterFromForm(FormName = "edit-info")]
-    private EditInfoForm _editForm { get; set; } = default!;
+    private EditInfoForm _editForm { get; set; } = new();
 
     [SupplyParameterFromForm(FormName = "add-conversion")]
-    private AddConvForm _addConvForm { get; set; } = default!;
+    private AddConvForm _addConvForm { get; set; } = new();
 
     [SupplyParameterFromForm(FormName = "assign-category")]
-    private AssignCatForm _assignCatForm { get; set; } = default!;
+    private AssignCatForm _assignCatForm { get; set; } = new();
 
     private readonly StatusForm _statusForm = new();
     private StockAdjustForm _stockForm = new();
 
-    protected override void OnParametersSet()
-    {
-        _editForm ??= new();
-        _addConvForm ??= new();
-        _assignCatForm ??= new();
-    }
+    protected override void OnParametersSet() { }
 
     private ProductDto? _product;
     private StockDto? _stock;
@@ -332,12 +327,16 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (HttpContext.Request.Query.ContainsKey("created"))
+        if (HttpContext?.Request.Query.ContainsKey("created") == true)
             _notice = "Produk berhasil dibuat.";
 
         await LoadAsync();
 
-        if (!HttpMethods.IsPost(HttpContext.Request.Method) && _product is not null)
+        // Populate the edit form when not handling a POST submission.
+        // HttpContext is null when rendered outside SSR (enhanced navigation, etc.),
+        // which is never a POST, so the form should always be pre-filled in that case.
+        var isPost = HttpContext is not null && HttpMethods.IsPost(HttpContext.Request.Method);
+        if (!isPost && _product is not null)
         {
             _editForm.Name = _product.Name;
             _editForm.Description = _product.Description;

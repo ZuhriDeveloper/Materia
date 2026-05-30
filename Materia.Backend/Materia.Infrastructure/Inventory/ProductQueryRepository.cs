@@ -86,5 +86,10 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             : context.ProductReadModels.AnyAsync(p => p.Name == trimmed, ct);
     }
 
-    private record ConversionJson(string Value, string ToUnit, decimal Factor);
+    // JSON is written as { "Value": "...", "toUnit": "...", "Factor": ... } — mixed casing.
+    // Use explicit [JsonPropertyName] attributes so case-sensitive deserialization works correctly.
+    private record ConversionJson(
+        [property: System.Text.Json.Serialization.JsonPropertyName("Value")]  string Value,
+        [property: System.Text.Json.Serialization.JsonPropertyName("toUnit")] string ToUnit,
+        decimal Factor);
 }
