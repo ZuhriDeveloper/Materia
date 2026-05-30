@@ -1,0 +1,132 @@
+@page "/categories"
+@attribute [Authorize(Roles = "Admin")]
+@using Materia.WebUi.Services
+@inject InventoryApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Categories — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Categories</h4>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger alert-dismissible">@_error</div>
+}
+@if (!string.IsNullOrEmpty(_success))
+{
+    <div class="alert alert-success">@_success</div>
+}
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header fw-semibold">New Category</div>
+            <div class="card-body">
+                <EditForm Model="_form" OnValidSubmit="HandleCreate" FormName="create-category" method="post">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">Name <span class="text-danger">*</span></label>
+                        <InputText class="form-control" @bind-Value="_form.Name" placeholder="e.g. Bahan Bangunan" />
+                        <ValidationMessage For="() => _form.Name" class="small text-danger" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <InputTextArea class="form-control" @bind-Value="_form.Description" rows="2" placeholder="Optional description" />
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Create</button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header fw-semibold">All Categories</div>
+            <div class="card-body p-0">
+                @if (_categories is null)
+                {
+                    <div class="p-3 text-muted">Loading…</div>
+                }
+                else if (_categories.Count == 0)
+                {
+                    <div class="p-3 text-muted">No categories yet.</div>
+                }
+                else
+                {
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Name</th>
+                                <th>Description</th>
+                                <th>Created by</th>
+                                <th>Created at</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var cat in _categories)
+                            {
+                                <tr>
+                                    <td class="fw-semibold">@cat.Name</td>
+                                    <td class="text-muted small">@(cat.Description ?? "—")</td>
+                                    <td class="small">@cat.CreatedBy</td>
+                                    <td class="small">@cat.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
+                                    <td>
+                                        @if (cat.IsActive)
+                                        {
+                                            <span class="badge bg-success">Active</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "create-category")]
+    private CreateForm _form { get; set; } = default!;
+
+    protected override void OnParametersSet() => _form ??= new();
+
+    private List<CategoryDto>? _categories;
+    private string? _error;
+    private string? _success;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Request.Query.ContainsKey("created"))
+            _success = "Category created successfully.";
+
+        _categories = await Api.GetCategoriesAsync() ?? [];
+    }
+
+    private async Task HandleCreate()
+    {
+        var (_, error) = await Api.CreateCategoryAsync(_form.Name, _form.Description);
+        if (error is not null) { _error = error; return; }
+        Navigation.NavigateTo("/categories?created=1", forceLoad: true);
+    }
+
+    private sealed class CreateForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.MaxLength(500)]
+        public string? Description { get; set; }
+    }
+}

@@ -1,0 +1,131 @@
+@page "/products"
+@attribute [Authorize(Roles = "Admin")]
+@using Materia.WebUi.Services
+@inject InventoryApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Products — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Products</h4>
+    <a href="/products/new" class="btn btn-primary btn-sm">+ New Product</a>
+</div>
+
+@if (!string.IsNullOrEmpty(_notice))
+{
+    <div class="alert alert-success">@_notice</div>
+}
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="btn-group btn-group-sm" role="group">
+            <a href="/products" class="btn @(_filter == null ? "btn-dark" : "btn-outline-secondary")">All</a>
+            <a href="/products?active=true" class="btn @(_filter == true ? "btn-success" : "btn-outline-secondary")">Active</a>
+            <a href="/products?active=false" class="btn @(_filter == false ? "btn-outline-secondary active" : "btn-outline-secondary")">Inactive</a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        @if (_products is null)
+        {
+            <div class="p-3 text-muted">Loading…</div>
+        }
+        else if (_products.Items.Count == 0)
+        {
+            <div class="p-3 text-muted">No products found.</div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Name</th>
+                        <th>Base Unit</th>
+                        <th>Categories</th>
+                        <th>Status</th>
+                        <th>Updated</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _products.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@p.Name</td>
+                            <td><span class="badge bg-light text-dark border">@p.BaseUnit</span></td>
+                            <td class="small text-muted">
+                                @if (p.Categories.Count == 0)
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    @string.Join(", ", p.Categories.Select(c => c.Name))
+                                }
+                            </td>
+                            <td>
+                                @if (p.IsActive)
+                                {
+                                    <span class="badge bg-success">Active</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Inactive</span>
+                                }
+                            </td>
+                            <td class="small text-muted">
+                                @(p.UpdatedAt?.ToLocalTime().ToString("dd MMM yyyy") ?? p.CreatedAt.ToLocalTime().ToString("dd MMM yyyy"))
+                            </td>
+                            <td class="text-end">
+                                <a href="/products/@p.Id" class="btn btn-sm btn-outline-primary me-1">Manage</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            @if (_products.TotalPages > 1)
+            {
+                <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
+                    <small class="text-muted">
+                        Showing @((_products.Page - 1) * _products.PageSize + 1)–@(Math.Min(_products.Page * _products.PageSize, _products.TotalCount)) of @_products.TotalCount
+                    </small>
+                    <div class="btn-group btn-group-sm">
+                        @if (_products.Page > 1)
+                        {
+                            <a href="@($"/products?page={_products.Page - 1}{FilterQuery}")" class="btn btn-outline-secondary">‹ Prev</a>
+                        }
+                        @if (_products.Page < _products.TotalPages)
+                        {
+                            <a href="@($"/products?page={_products.Page + 1}{FilterQuery}")" class="btn btn-outline-secondary">Next ›</a>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    private PagedProductsDto? _products;
+    private bool? _filter;
+    private string? _notice;
+
+    private string FilterQuery => _filter.HasValue ? $"&active={_filter.Value}" : "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Request.Query.ContainsKey("created"))
+            _notice = "Product created successfully.";
+
+        var activeParam = HttpContext.Request.Query["active"].ToString();
+        _filter = activeParam == "true" ? true : activeParam == "false" ? false : null;
+
+        var page = int.TryParse(HttpContext.Request.Query["page"], out var p) ? p : 1;
+        _products = await Api.GetProductsAsync(page, 20, _filter);
+    }
+}

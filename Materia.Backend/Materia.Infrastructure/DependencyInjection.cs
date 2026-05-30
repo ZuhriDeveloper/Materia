@@ -3,6 +3,7 @@ using Materia.Application.Contracts.Auth;
 using Materia.Infrastructure.Auth;
 using Materia.Infrastructure.Identity;
 using Materia.Infrastructure.Persistence;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -19,7 +20,7 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+            options.UseNpgsql(configuration.GetConnectionString("materiadb")));
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
@@ -57,6 +58,13 @@ public static class DependencyInjection
 
         services.AddScoped<IUserAuthRepository, UserAuthRepository>();
         services.AddScoped<ITokenService, JwtTokenService>();
+        services.AddScoped<DatabaseInitializer>();
+
+        // Inventory repositories
+        services.AddScoped<Application.Contracts.Inventory.IProductRepository, Inventory.ProductRepository>();
+        services.AddScoped<Application.Contracts.Inventory.ICategoryRepository, Inventory.CategoryRepository>();
+        services.AddScoped<Application.Contracts.Inventory.IProductQueryRepository, Inventory.ProductQueryRepository>();
+        services.AddScoped<Application.Contracts.Inventory.ICategoryQueryRepository, Inventory.CategoryQueryRepository>();
 
         return services;
     }

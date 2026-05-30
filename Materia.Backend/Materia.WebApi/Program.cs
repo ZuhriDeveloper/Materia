@@ -1,5 +1,6 @@
 using Materia.Application;
 using Materia.Infrastructure;
+using Materia.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,12 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+    await initializer.InitialiseAsync();
+}
 
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();

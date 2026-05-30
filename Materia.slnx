@@ -10,4 +10,5 @@
     <Project Path="Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj" />
   </Folder>
   <Project Path="Materia.AppHost/Materia.AppHost.csproj" />
+  <Project Path="Materia.Tests/Materia.Tests.csproj" />
 </Solution>

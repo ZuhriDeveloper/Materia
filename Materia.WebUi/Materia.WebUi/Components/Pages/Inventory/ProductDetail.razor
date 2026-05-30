@@ -1,0 +1,330 @@
+@page "/products/{id:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@using Materia.WebUi.Services
+@inject InventoryApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(_product?.Name ?? "Product") — Materia</PageTitle>
+
+@if (_product is null)
+{
+    <div class="text-muted">Loading…</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <a href="/products" class="btn btn-sm btn-outline-secondary">← Back</a>
+        <h4 class="mb-0 fw-bold">@_product.Name</h4>
+        @if (_product.IsActive)
+        {
+            <span class="badge bg-success">Active</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary">Inactive</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_notice))
+    {
+        <div class="alert alert-success alert-dismissible mb-3">@_notice</div>
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger mb-3">@_error</div>
+    }
+
+    <div class="row g-4">
+
+        {{!-- ── Basic Info ──────────────────────────────────────────────────────── --}}
+        <div class="col-lg-6">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Basic Information</span>
+                    <small class="text-muted">Base unit: <strong>@_product.BaseUnit</strong></small>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="_editForm" OnValidSubmit="HandleEdit" FormName="edit-info" method="post">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_editForm.Name" />
+                            <ValidationMessage For="() => _editForm.Name" class="small text-danger" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Description</label>
+                            <InputTextArea class="form-control" @bind-Value="_editForm.Description" rows="3" />
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                    </EditForm>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        Created by <strong>@_product.CreatedBy</strong>
+                        on @_product.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                    </small>
+                    @if (_product.UpdatedBy is not null)
+                    {
+                        <small class="text-muted">
+                            Updated by <strong>@_product.UpdatedBy</strong>
+                            on @_product.UpdatedAt!.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                        </small>
+                    }
+                </div>
+            </div>
+        </div>
+
+        {{!-- ── Status ──────────────────────────────────────────────────────────── --}}
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header fw-semibold">Status</div>
+                <div class="card-body d-flex align-items-center gap-3">
+                    <p class="mb-0 text-muted small flex-grow-1">
+                        @(_product.IsActive
+                            ? "This product is active and visible in the system."
+                            : "This product is inactive and hidden from operations.")
+                    </p>
+                    <EditForm Model="_statusForm" OnValidSubmit="HandleToggleStatus" FormName="toggle-status" method="post">
+                        @if (_product.IsActive)
+                        {
+                            <button type="submit" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                        }
+                        else
+                        {
+                            <button type="submit" class="btn btn-outline-success btn-sm">Activate</button>
+                        }
+                    </EditForm>
+                </div>
+            </div>
+
+            {{!-- ── Categories ────────────────────────────────────────────────────── --}}
+            <div class="card mt-3">
+                <div class="card-header fw-semibold">Categories</div>
+                <div class="card-body">
+                    @if (_product.Categories.Count == 0)
+                    {
+                        <p class="text-muted small">No categories assigned.</p>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap gap-2 mb-3">
+                            @foreach (var cat in _product.Categories)
+                            {
+                                <div class="d-inline-flex align-items-center gap-1">
+                                    <span class="badge bg-primary fs-6 fw-normal px-2">@cat.Name</span>
+                                    <EditForm Model="@(new RemoveCatForm { CategoryId = cat.Id })"
+                                              OnValidSubmit="@(() => HandleRemoveCategory(cat.Id))"
+                                              FormName="@($"remove-cat-{cat.Id}")"
+                                              method="post">
+                                        <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Remove">✕</button>
+                                    </EditForm>
+                                </div>
+                            }
+                        </div>
+                    }
+
+                    @if (_availableCategories.Count > 0)
+                    {
+                        <EditForm Model="_assignCatForm" OnValidSubmit="HandleAssignCategory" FormName="assign-category" method="post">
+                            <div class="input-group input-group-sm">
+                                <InputSelect class="form-select" @bind-Value="_assignCatForm.CategoryId">
+                                    <option value="">— select category —</option>
+                                    @foreach (var cat in _availableCategories)
+                                    {
+                                        <option value="@cat.Id">@cat.Name</option>
+                                    }
+                                </InputSelect>
+                                <button type="submit" class="btn btn-outline-primary" disabled="@(_assignCatForm.CategoryId == Guid.Empty)">Add</button>
+                            </div>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+
+        {{!-- ── Unit Conversions ─────────────────────────────────────────────────── --}}
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header fw-semibold">Unit Conversions</div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Define how many units of another measure equal one <strong>@_product.BaseUnit</strong>.
+                        Example: 1 sak = 5 bungkus.
+                    </p>
+
+                    @if (_product.UnitConversions.Count > 0)
+                    {
+                        <table class="table table-sm table-bordered mb-3" style="max-width:500px">
+                            <thead class="table-light">
+                                <tr><th>1 @_product.BaseUnit =</th><th>Unit</th><th></th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var conv in _product.UnitConversions)
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@conv.Factor</td>
+                                        <td>@conv.ToUnit</td>
+                                        <td class="text-end">
+                                            <EditForm Model="@(new RemoveConvForm { ToUnit = conv.ToUnit })"
+                                                      OnValidSubmit="@(() => HandleRemoveConversion(conv.ToUnit))"
+                                                      FormName="@($"remove-conv-{conv.ToUnit}")"
+                                                      method="post">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                            </EditForm>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
+
+                    <EditForm Model="_addConvForm" OnValidSubmit="HandleAddConversion" FormName="add-conversion" method="post">
+                        <DataAnnotationsValidator />
+                        <div class="d-flex align-items-start gap-2" style="max-width:420px">
+                            <div class="flex-grow-1">
+                                <InputText class="form-control form-control-sm" @bind-Value="_addConvForm.ToUnit" placeholder="Unit name (e.g. bungkus)" />
+                                <ValidationMessage For="() => _addConvForm.ToUnit" class="small text-danger" />
+                            </div>
+                            <div style="width:100px">
+                                <InputNumber class="form-control form-control-sm" @bind-Value="_addConvForm.Factor" placeholder="Factor" />
+                                <ValidationMessage For="() => _addConvForm.Factor" class="small text-danger" />
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">Add</button>
+                        </div>
+                        <div class="form-text">1 @_product.BaseUnit = [factor] [unit]</div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
+
+    // ── Form models ───────────────────────────────────────────────────────────
+
+    [SupplyParameterFromForm(FormName = "edit-info")]
+    private EditInfoForm _editForm { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "add-conversion")]
+    private AddConvForm _addConvForm { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "assign-category")]
+    private AssignCatForm _assignCatForm { get; set; } = default!;
+
+    private readonly StatusForm _statusForm = new();
+
+    protected override void OnParametersSet()
+    {
+        _editForm ??= new();
+        _addConvForm ??= new();
+        _assignCatForm ??= new();
+    }
+
+    // ── State ─────────────────────────────────────────────────────────────────
+
+    private ProductDto? _product;
+    private List<CategoryDto> _availableCategories = [];
+    private string? _error;
+    private string? _notice;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (HttpContext.Request.Query.ContainsKey("created"))
+            _notice = "Product created successfully.";
+
+        await LoadAsync();
+
+        // Pre-fill edit form with current values (only on GET)
+        if (!HttpMethods.IsPost(HttpContext.Request.Method) && _product is not null)
+        {
+            _editForm.Name = _product.Name;
+            _editForm.Description = _product.Description;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _product = await Api.GetProductByIdAsync(Id);
+        if (_product is null) { Navigation.NavigateTo("/products"); return; }
+
+        var allCats = await Api.GetCategoriesAsync() ?? [];
+        var assignedIds = _product.Categories.Select(c => c.Id).ToHashSet();
+        _availableCategories = allCats.Where(c => c.IsActive && !assignedIds.Contains(c.Id)).ToList();
+    }
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
+
+    private async Task HandleEdit()
+    {
+        _error = await Api.UpdateProductAsync(Id, _editForm.Name, _editForm.Description);
+        if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    private async Task HandleToggleStatus()
+    {
+        _error = await Api.SetProductStatusAsync(Id, !_product!.IsActive);
+        if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    private async Task HandleAssignCategory()
+    {
+        if (_assignCatForm.CategoryId == Guid.Empty) return;
+        _error = await Api.AssignCategoryAsync(Id, _assignCatForm.CategoryId);
+        if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    private async Task HandleRemoveCategory(Guid categoryId)
+    {
+        _error = await Api.RemoveCategoryAsync(Id, categoryId);
+        if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    private async Task HandleAddConversion()
+    {
+        _error = await Api.AddUnitConversionAsync(Id, _addConvForm.ToUnit, _addConvForm.Factor);
+        if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    private async Task HandleRemoveConversion(string toUnit)
+    {
+        _error = await Api.RemoveUnitConversionAsync(Id, toUnit);
+        if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    // ── Form classes ──────────────────────────────────────────────────────────
+
+    private sealed class EditInfoForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.MaxLength(1000)]
+        public string? Description { get; set; }
+    }
+
+    private sealed class AddConvForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Unit name is required.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(50)]
+        public string ToUnit { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(0.0001, double.MaxValue, ErrorMessage = "Factor must be greater than zero.")]
+        public decimal Factor { get; set; }
+    }
+
+    private sealed class AssignCatForm
+    {
+        public Guid CategoryId { get; set; }
+    }
+
+    private sealed class StatusForm { }
+    private sealed class RemoveCatForm { public Guid CategoryId { get; set; } }
+    private sealed class RemoveConvForm { public string ToUnit { get; set; } = ""; }
+}

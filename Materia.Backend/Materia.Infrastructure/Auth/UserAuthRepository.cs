@@ -37,4 +37,11 @@ public class UserAuthRepository(UserManager<ApplicationUser> userManager) : IUse
         if (user is not null)
             await userManager.ResetAccessFailedCountAsync(user);
     }
+
+    public async Task<IReadOnlyList<string>> GetRolesAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var user = await userManager.FindByIdAsync(userId);
+        if (user is null) return [];
+        return (IReadOnlyList<string>)await userManager.GetRolesAsync(user);
+    }
 }

@@ -24,7 +24,7 @@ public class AuthService(HttpClient httpClient)
     }
 }
 
-public record LoginResponse(string Token, string Email, string? FullName);
+public record LoginResponse(string Token, string Email, string? FullName, IReadOnlyList<string> Roles);
 public record ErrorResponse(string Message);
 
 public class LoginResult

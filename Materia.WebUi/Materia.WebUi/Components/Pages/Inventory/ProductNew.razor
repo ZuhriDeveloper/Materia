@@ -1,0 +1,78 @@
+@page "/products/new"
+@attribute [Authorize(Roles = "Admin")]
+@using Materia.WebUi.Services
+@inject InventoryApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>New Product — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/products" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h4 class="mb-0 fw-bold">New Product</h4>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card" style="max-width:560px">
+    <div class="card-body">
+        <EditForm Model="_form" OnValidSubmit="HandleCreate" FormName="create-product" method="post">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label class="form-label">Name <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="_form.Name" placeholder="e.g. Semen Padang" />
+                <ValidationMessage For="() => _form.Name" class="small text-danger" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <InputTextArea class="form-control" @bind-Value="_form.Description" rows="3" placeholder="Optional description" />
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">Base Unit <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="_form.BaseUnit" placeholder="e.g. sak, batang, pcs, kg" />
+                <div class="form-text">The primary unit of measurement for this product.</div>
+                <ValidationMessage For="() => _form.BaseUnit" class="small text-danger" />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Create Product</button>
+                <a href="/products" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromForm(FormName = "create-product")]
+    private CreateForm _form { get; set; } = default!;
+
+    protected override void OnParametersSet() => _form ??= new();
+
+    private string? _error;
+
+    private async Task HandleCreate()
+    {
+        var (id, error) = await Api.CreateProductAsync(_form.Name, _form.Description, _form.BaseUnit);
+        if (error is not null) { _error = error; return; }
+        Navigation.NavigateTo($"/products/{id}?created=1", forceLoad: true);
+    }
+
+    private sealed class CreateForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.MaxLength(1000)]
+        public string? Description { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Base unit is required.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(50)]
+        public string BaseUnit { get; set; } = string.Empty;
+    }
+}

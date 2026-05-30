@@ -24,7 +24,8 @@ public class LoginCommandHandler(
 
         await userRepository.ResetAccessFailedCountAsync(user.Id);
 
-        var token = tokenService.GenerateToken(user);
-        return LoginResult.Ok(token, user.Email, user.FullName);
+        var roles = await userRepository.GetRolesAsync(user.Id, cancellationToken);
+        var token = tokenService.GenerateToken(user, roles);
+        return LoginResult.Ok(token, user.Email, user.FullName, roles);
     }
 }

@@ -22,6 +22,6 @@ public class AuthController(
         if (!result.Succeeded)
             return Unauthorized(new { message = result.ErrorMessage });
 
-        return Ok(new { result.Token, result.Email, result.FullName });
+        return Ok(new { result.Token, result.Email, result.FullName, result.Roles });
     }
 }

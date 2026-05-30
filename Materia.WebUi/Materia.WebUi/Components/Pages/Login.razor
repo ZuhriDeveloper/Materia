@@ -1,8 +1,11 @@
 @page "/login"
+@layout LoginLayout
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Authentication.Cookies
 @using Materia.WebUi.Services
 @inject AuthService AuthService
 @inject NavigationManager Navigation
-@rendermode InteractiveServer
 
 <PageTitle>Login — Materia</PageTitle>
 
@@ -12,25 +15,24 @@
             <h4 class="card-title mb-1 fw-bold">Materia</h4>
             <p class="text-muted mb-4 small">Point of Sale — sign in to continue</p>
 
-            @if (!string.IsNullOrEmpty(_errorMessage))
+            @if (!string.IsNullOrEmpty(ErrorMessage))
             {
                 <div class="alert alert-danger py-2 small" role="alert">
-                    @_errorMessage
+                    @ErrorMessage
                 </div>
             }
 
-            <EditForm Model="_model" OnValidSubmit="HandleLogin" FormName="login">
+            <EditForm Model="Model" OnValidSubmit="HandleLoginAsync" FormName="login" method="post">
                 <DataAnnotationsValidator />
 
                 <div class="mb-3">
                     <label class="form-label" for="email">Email</label>
                     <InputText id="email"
                                class="form-control"
-                               @bind-Value="_model.Email"
+                               @bind-Value="Model.Email"
                                autocomplete="email"
-                               placeholder="you@example.com"
-                               disabled="@_loading" />
-                    <ValidationMessage For="() => _model.Email" class="small text-danger" />
+                               placeholder="you@example.com" />
+                    <ValidationMessage For="() => Model.Email" class="small text-danger" />
                 </div>
 
                 <div class="mb-4">
@@ -38,61 +40,73 @@
                     <InputText id="password"
                                type="password"
                                class="form-control"
-                               @bind-Value="_model.Password"
+                               @bind-Value="Model.Password"
                                autocomplete="current-password"
-                               placeholder="••••••••"
-                               disabled="@_loading" />
-                    <ValidationMessage For="() => _model.Password" class="small text-danger" />
+                               placeholder="••••••••" />
+                    <ValidationMessage For="() => Model.Password" class="small text-danger" />
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
-                    @if (_loading)
-                    {
-                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                        <span>Signing in…</span>
-                    }
-                    else
-                    {
-                        <span>Sign in</span>
-                    }
-                </button>
+                <button type="submit" class="btn btn-primary w-100">Sign in</button>
             </EditForm>
         </div>
     </div>
 </div>
 
 @code {
-    private readonly LoginModel _model = new();
-    private string? _errorMessage;
-    private bool _loading;
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
 
-    private async Task HandleLogin()
+    [SupplyParameterFromForm]
+    private LoginFormModel Model { get; set; } = default!;
+
+    protected override void OnParametersSet() => Model ??= new();
+
+    private string? ErrorMessage { get; set; }
+
+    protected override void OnInitialized()
     {
-        _errorMessage = null;
-        _loading = true;
-
-        var result = await AuthService.LoginAsync(_model.Email, _model.Password);
-
-        if (result.Succeeded)
-        {
-            Navigation.NavigateTo("/");
-        }
-        else
-        {
-            _errorMessage = result.ErrorMessage;
-        }
-
-        _loading = false;
+        if (HttpContext.User.Identity?.IsAuthenticated == true)
+            Navigation.NavigateTo("/", forceLoad: true);
     }
 
-    private sealed class LoginModel
+    private async Task HandleLoginAsync()
+    {
+        ErrorMessage = null;
+
+        var result = await AuthService.LoginAsync(Model.Email, Model.Password);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.ErrorMessage;
+            return;
+        }
+
+        var data = result.Data!;
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.Email, data.Email),
+            new(ClaimTypes.Name, data.FullName ?? data.Email),
+            new("access_token", data.Token),
+        };
+        claims.AddRange(data.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
+
+        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+        var principal = new ClaimsPrincipal(identity);
+
+        await HttpContext.SignInAsync(
+            CookieAuthenticationDefaults.AuthenticationScheme,
+            principal,
+            new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
+
+        Navigation.NavigateTo("/", forceLoad: true);
+    }
+
+    private sealed class LoginFormModel
     {
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required.")]
         [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address.")]
         public string Email { get; set; } = string.Empty;
 
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required.")]
-        [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
         public string Password { get; set; } = string.Empty;
     }
 }
