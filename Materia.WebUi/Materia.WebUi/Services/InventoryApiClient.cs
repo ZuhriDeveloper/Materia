@@ -18,10 +18,10 @@ public class InventoryApiClient(HttpClient http)
         => http.GetFromJsonAsync<ProductDto>($"api/products/{id}", ct);
 
     public async Task<(Guid? Id, string? Error)> CreateProductAsync(
-        string name, string? description, string baseUnit, CancellationToken ct = default)
+        string name, string? description, string baseUnit, List<Guid>? categoryIds = null, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/products",
-            new { name, description, baseUnit }, ct);
+            new { name, description, baseUnit, categoryIds }, ct);
 
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
@@ -70,6 +70,49 @@ public class InventoryApiClient(HttpClient http)
     {
         var response = await http.DeleteAsync(
             $"api/products/{productId}/unit-conversions/{Uri.EscapeDataString(toUnit)}", ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    // ── Stock ─────────────────────────────────────────────────────────────────
+
+    public Task<StockDto?> GetStockByProductIdAsync(Guid productId, CancellationToken ct = default)
+        => http.GetFromJsonAsync<StockDto>($"api/products/{productId}/stock", ct);
+
+    public async Task<string?> AdjustStockAsync(
+        Guid productId, decimal delta, string? reason = null, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync(
+            $"api/products/{productId}/stock/adjust", new { delta, reason }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    // ── Units ─────────────────────────────────────────────────────────────────
+
+    public Task<List<UnitDto>?> GetUnitsAsync(CancellationToken ct = default)
+        => http.GetFromJsonAsync<List<UnitDto>>("api/units", ct);
+
+    public async Task<(Guid? Id, string? Error)> CreateUnitAsync(
+        string name, string? symbol, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("api/units", new { name, symbol }, ct);
+
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorAsync(response));
+
+        var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);
+        return (result?.Id, null);
+    }
+
+    public async Task<string?> UpdateUnitAsync(
+        Guid id, string name, string? symbol, CancellationToken ct = default)
+    {
+        var response = await http.PutAsJsonAsync($"api/units/{id}", new { name, symbol }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    public async Task<string?> SetUnitStatusAsync(Guid id, bool isActive, CancellationToken ct = default)
+    {
+        var response = await http.PatchAsJsonAsync($"api/units/{id}/status", new { isActive }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

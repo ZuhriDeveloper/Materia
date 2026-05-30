@@ -156,6 +156,71 @@ else
 
         <div class="col-12">
             <div class="card">
+                <div class="card-header fw-semibold">Stok</div>
+                <div class="card-body">
+                    @if (_stock is null)
+                    {
+                        <p class="text-muted small">Belum ada data stok.</p>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-baseline gap-2 mb-3">
+                            <span class="fs-3 fw-bold">@_stock.Quantity.ToString("G29")</span>
+                            <span class="text-muted">@_stock.Unit</span>
+                        </div>
+
+                        @if (_product.UnitConversions.Count > 0)
+                        {
+                            <div class="d-flex flex-wrap gap-2 mb-3">
+                                @foreach (var conv in _product.UnitConversions)
+                                {
+                                    var converted = _stock.Quantity * conv.Factor;
+                                    <span class="badge text-bg-light border fs-6 fw-normal">
+                                        @converted.ToString("G29") @conv.ToUnit
+                                    </span>
+                                }
+                            </div>
+                        }
+
+                        @if (_stock.LastAdjustedAt.HasValue)
+                        {
+                            <p class="text-muted small mb-3">
+                                Terakhir disesuaikan: @_stock.LastAdjustedAt.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                oleh @_stock.LastAdjustedBy
+                            </p>
+                        }
+                    }
+
+                    <hr class="my-2" />
+                    <p class="fw-semibold mb-2">Sesuaikan Stok</p>
+                    @if (!string.IsNullOrEmpty(_stockError))
+                    {
+                        <div class="alert alert-danger py-2 small">@_stockError</div>
+                    }
+                    <EditForm Model="_stockForm" OnValidSubmit="HandleAdjustStock">
+                        <DataAnnotationsValidator />
+                        <div class="d-flex align-items-start gap-2" style="max-width:440px">
+                            <div class="flex-grow-1">
+                                <InputNumber class="form-control form-control-sm" @bind-Value="_stockForm.Delta"
+                                             placeholder="cth. 10 atau -5" />
+                                <ValidationMessage For="() => _stockForm.Delta" class="small text-danger" />
+                            </div>
+                            <div class="flex-grow-1">
+                                <InputText class="form-control form-control-sm" @bind-Value="_stockForm.Reason"
+                                           placeholder="Alasan (opsional)" />
+                            </div>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-arrow-repeat me-1"></i> Sesuaikan
+                            </button>
+                        </div>
+                        <div class="form-text">Masukkan nilai positif untuk menambah, negatif untuk mengurangi.</div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
                 <div class="card-header fw-semibold">Konversi Satuan</div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
@@ -197,9 +262,24 @@ else
 
                     <EditForm Model="_addConvForm" OnValidSubmit="HandleAddConversion" FormName="add-conversion" method="post">
                         <DataAnnotationsValidator />
-                        <div class="d-flex align-items-start gap-2" style="max-width:440px">
+                        <div class="d-flex align-items-start gap-2" style="max-width:480px">
                             <div class="flex-grow-1">
-                                <InputText class="form-control form-control-sm" @bind-Value="_addConvForm.ToUnit" placeholder="Nama satuan (cth. bungkus)" />
+                                @if (_availableConvUnits.Count > 0)
+                                {
+                                    <InputSelect class="form-select form-select-sm" @bind-Value="_addConvForm.ToUnit">
+                                        <option value="">— pilih satuan —</option>
+                                        @foreach (var u in _availableConvUnits)
+                                        {
+                                            <option value="@u.Name">
+                                                @u.Name@(u.Symbol is not null ? $" ({u.Symbol})" : "")
+                                            </option>
+                                        }
+                                    </InputSelect>
+                                }
+                                else
+                                {
+                                    <InputText class="form-control form-control-sm" @bind-Value="_addConvForm.ToUnit" placeholder="Nama satuan (cth. bungkus)" />
+                                }
                                 <ValidationMessage For="() => _addConvForm.ToUnit" class="small text-danger" />
                             </div>
                             <div style="width:110px">
@@ -233,6 +313,7 @@ else
     private AssignCatForm _assignCatForm { get; set; } = default!;
 
     private readonly StatusForm _statusForm = new();
+    private StockAdjustForm _stockForm = new();
 
     protected override void OnParametersSet()
     {
@@ -242,8 +323,11 @@ else
     }
 
     private ProductDto? _product;
+    private StockDto? _stock;
     private List<CategoryDto> _availableCategories = [];
+    private List<UnitDto> _availableConvUnits = [];
     private string? _error;
+    private string? _stockError;
     private string? _notice;
 
     protected override async Task OnInitializedAsync()
@@ -268,6 +352,18 @@ else
         var allCats = await Api.GetCategoriesAsync() ?? [];
         var assignedIds = _product.Categories.Select(c => c.Id).ToHashSet();
         _availableCategories = allCats.Where(c => c.IsActive && !assignedIds.Contains(c.Id)).ToList();
+
+        _stock = await Api.GetStockByProductIdAsync(Id);
+
+        // Units available for new conversions: active units, excluding the base unit
+        // and any unit already used in an existing conversion
+        var alreadyUsed = _product.UnitConversions.Select(c => c.ToUnit).ToHashSet();
+        alreadyUsed.Add(_product.BaseUnit);
+        var allUnits = await Api.GetUnitsAsync() ?? [];
+        _availableConvUnits = allUnits
+            .Where(u => u.IsActive && !alreadyUsed.Contains(u.Name))
+            .OrderBy(u => u.Name)
+            .ToList();
     }
 
     private async Task HandleEdit()
@@ -307,6 +403,17 @@ else
         if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
     }
 
+    private async Task HandleAdjustStock()
+    {
+        _stockError = null;
+        _stockError = await Api.AdjustStockAsync(Id, _stockForm.Delta, _stockForm.Reason);
+        if (_stockError is null)
+        {
+            _stockForm = new();
+            Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+        }
+    }
+
     private sealed class EditInfoForm
     {
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama produk wajib diisi.")]
@@ -335,4 +442,14 @@ else
     private sealed class StatusForm { }
     private sealed class RemoveCatForm { public Guid CategoryId { get; set; } }
     private sealed class RemoveConvForm { public string ToUnit { get; set; } = ""; }
+
+    private sealed class StockAdjustForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Delta wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.Range(double.MinValue, double.MaxValue, ErrorMessage = "Masukkan angka yang valid.")]
+        public decimal Delta { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(500)]
+        public string? Reason { get; set; }
+    }
 }

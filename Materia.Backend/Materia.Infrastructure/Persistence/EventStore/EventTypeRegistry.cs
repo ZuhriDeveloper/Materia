@@ -22,6 +22,18 @@ public static class EventTypeRegistry
         [nameof(CategoryCreated)]            = typeof(CategoryCreated),
         [nameof(CategoryNameUpdated)]        = typeof(CategoryNameUpdated),
         [nameof(CategoryDescriptionUpdated)] = typeof(CategoryDescriptionUpdated),
+        [nameof(CategoryActivated)]          = typeof(CategoryActivated),
+        [nameof(CategoryDeactivated)]        = typeof(CategoryDeactivated),
+
+        // Unit events
+        [nameof(UnitCreated)]     = typeof(UnitCreated),
+        [nameof(UnitUpdated)]     = typeof(UnitUpdated),
+        [nameof(UnitActivated)]   = typeof(UnitActivated),
+        [nameof(UnitDeactivated)] = typeof(UnitDeactivated),
+
+        // Stock events
+        [nameof(StockInitialized)] = typeof(StockInitialized),
+        [nameof(StockAdjusted)]    = typeof(StockAdjusted),
     };
 
     public static Type Resolve(string eventType) =>

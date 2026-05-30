@@ -33,3 +33,20 @@ public record PagedProductsDto(
     int Page,
     int PageSize,
     int TotalPages);
+
+public record UnitDto(
+    Guid Id,
+    string Name,
+    string? Symbol,
+    bool IsActive,
+    string CreatedBy,
+    DateTime CreatedAt,
+    string? UpdatedBy,
+    DateTime? UpdatedAt);
+
+public record StockDto(
+    Guid ProductId,
+    decimal Quantity,
+    string Unit,
+    DateTime? LastAdjustedAt,
+    string? LastAdjustedBy);

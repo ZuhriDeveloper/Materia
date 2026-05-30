@@ -78,5 +78,13 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             categories);
     }
 
+    public Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null, CancellationToken ct = default)
+    {
+        var trimmed = name.Trim();
+        return excludeId.HasValue
+            ? context.ProductReadModels.AnyAsync(p => p.Name == trimmed && p.Id != excludeId.Value, ct)
+            : context.ProductReadModels.AnyAsync(p => p.Name == trimmed, ct);
+    }
+
     private record ConversionJson(string Value, string ToUnit, decimal Factor);
 }

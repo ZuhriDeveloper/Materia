@@ -14,6 +14,8 @@ public static class EventSerializer
         {
             new ProductIdConverter(),
             new CategoryIdConverter(),
+            new UnitIdConverter(),
+            new StockIdConverter(),
         },
     };
 
@@ -41,6 +43,22 @@ public static class EventSerializer
         public override CategoryId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
             => CategoryId.From(reader.GetGuid());
         public override void Write(Utf8JsonWriter writer, CategoryId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class UnitIdConverter : JsonConverter<UnitId>
+    {
+        public override UnitId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => UnitId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, UnitId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class StockIdConverter : JsonConverter<StockId>
+    {
+        public override StockId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => StockId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, StockId value, JsonSerializerOptions o)
             => writer.WriteStringValue(value.Value);
     }
 }

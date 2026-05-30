@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using FluentValidation;
 using Materia.Application.Commands.Inventory.AddUnitConversion;
+using Materia.Application.Commands.Inventory.AdjustStock;
 using Materia.Application.Commands.Inventory.AssignCategory;
 using Materia.Application.Commands.Inventory.CreateProduct;
 using Materia.Application.Commands.Inventory.RemoveCategory;
@@ -26,11 +27,14 @@ public class ProductsController(
     SyncProductCategoriesCommandHandler syncCategoriesHandler,
     AddUnitConversionCommandHandler addConversionHandler,
     RemoveUnitConversionCommandHandler removeConversionHandler,
+    AdjustStockCommandHandler adjustStockHandler,
     GetProductByIdQueryHandler getByIdHandler,
     GetProductsQueryHandler getPagedHandler,
+    GetStockByProductIdQueryHandler getStockHandler,
     IValidator<CreateProductCommand> createValidator,
     IValidator<UpdateProductCommand> updateValidator,
-    IValidator<AddUnitConversionCommand> addConversionValidator) : ControllerBase
+    IValidator<AddUnitConversionCommand> addConversionValidator,
+    IValidator<AdjustStockCommand> adjustStockValidator) : ControllerBase
 {
     private string CurrentUser =>
         User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
@@ -62,7 +66,7 @@ public class ProductsController(
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken ct)
     {
-        var command = new CreateProductCommand(request.Name, request.Description, request.BaseUnit, CurrentUser);
+        var command = new CreateProductCommand(request.Name, request.Description, request.BaseUnit, request.CategoryIds ?? [], CurrentUser);
         var validation = await createValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -132,10 +136,32 @@ public class ProductsController(
         await removeConversionHandler.HandleAsync(new RemoveUnitConversionCommand(id, toUnit, CurrentUser), ct);
         return NoContent();
     }
+
+    // ── Stock ─────────────────────────────────────────────────────────────────
+
+    [HttpGet("{id:guid}/stock")]
+    public async Task<IActionResult> GetStock(Guid id, CancellationToken ct)
+    {
+        var result = await getStockHandler.HandleAsync(new GetStockByProductIdQuery(id), ct);
+        return result is null ? NotFound() : Ok(result);
+    }
+
+    [HttpPost("{id:guid}/stock/adjust")]
+    public async Task<IActionResult> AdjustStock(Guid id, [FromBody] AdjustStockRequest request, CancellationToken ct)
+    {
+        var command = new AdjustStockCommand(id, request.Delta, request.Reason, CurrentUser);
+        var validation = await adjustStockValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        await adjustStockHandler.HandleAsync(command, ct);
+        return NoContent();
+    }
 }
 
-public record CreateProductRequest(string Name, string? Description, string BaseUnit);
+public record CreateProductRequest(string Name, string? Description, string BaseUnit, List<Guid>? CategoryIds);
 public record UpdateProductRequest(string Name, string? Description);
 public record SetStatusRequest(bool IsActive);
 public record AddUnitConversionRequest(string ToUnit, decimal Factor);
 public record SyncCategoriesRequest(List<Guid> CategoryIds);
+public record AdjustStockRequest(decimal Delta, string? Reason);

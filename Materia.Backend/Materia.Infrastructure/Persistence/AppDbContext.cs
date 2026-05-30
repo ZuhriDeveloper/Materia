@@ -12,6 +12,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<StoredEvent> StoredEvents => Set<StoredEvent>();
     public DbSet<ProductReadModel> ProductReadModels => Set<ProductReadModel>();
     public DbSet<CategoryReadModel> CategoryReadModels => Set<CategoryReadModel>();
+    public DbSet<UnitReadModel> UnitReadModels => Set<UnitReadModel>();
+    public DbSet<StockReadModel> StockReadModels => Set<StockReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -35,6 +37,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        builder.Entity<UnitReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Name).IsUnique();
+        });
+
+        builder.Entity<StockReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ProductId).IsUnique();
         });
     }
 }

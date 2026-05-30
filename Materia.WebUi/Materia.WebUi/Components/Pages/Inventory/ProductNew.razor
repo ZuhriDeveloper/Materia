@@ -1,5 +1,6 @@
 @page "/products/new"
 @attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
 @inject NavigationManager Navigation
@@ -20,7 +21,7 @@
 
 <div class="card" style="max-width:560px">
     <div class="card-body">
-        <EditForm Model="_form" OnValidSubmit="HandleCreate" FormName="create-product" method="post">
+        <EditForm Model="_form" OnValidSubmit="HandleCreate">
             <DataAnnotationsValidator />
 
             <div class="mb-3">
@@ -34,15 +35,72 @@
                 <InputTextArea class="form-control" @bind-Value="_form.Description" rows="3" placeholder="Deskripsi opsional" />
             </div>
 
-            <div class="mb-4">
+            <div class="mb-3">
                 <label class="form-label">Satuan Dasar <span class="text-danger">*</span></label>
-                <InputText class="form-control" @bind-Value="_form.BaseUnit" placeholder="cth. sak, batang, pcs, kg" />
+                @if (_units is null)
+                {
+                    <div class="text-muted small">Memuat satuan…</div>
+                }
+                else if (_units.Count == 0)
+                {
+                    <div class="alert alert-warning py-2 small">
+                        Belum ada satuan aktif. <a href="/units">Buat satuan</a> terlebih dahulu.
+                    </div>
+                }
+                else
+                {
+                    <InputSelect class="form-select" @bind-Value="_form.BaseUnit">
+                        <option value="">— pilih satuan —</option>
+                        @foreach (var unit in _units)
+                        {
+                            <option value="@unit.Name">
+                                @unit.Name@(unit.Symbol is not null ? $" ({unit.Symbol})" : "")
+                            </option>
+                        }
+                    </InputSelect>
+                }
                 <div class="form-text">Satuan ukur utama untuk produk ini.</div>
                 <ValidationMessage For="() => _form.BaseUnit" class="small text-danger" />
             </div>
 
+            <div class="mb-4">
+                <label class="form-label">Kategori</label>
+                @if (_categories is null)
+                {
+                    <div class="text-muted small">Memuat kategori…</div>
+                }
+                else if (_categories.Count == 0)
+                {
+                    <div class="text-muted small">Belum ada kategori tersedia.</div>
+                }
+                else
+                {
+                    <div class="border rounded p-2" style="max-height:180px;overflow-y:auto">
+                        @foreach (var cat in _categories)
+                        {
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="cat-@cat.Id"
+                                       checked="@_selectedIds.Contains(cat.Id)"
+                                       @onchange="e => ToggleCategory(cat.Id, (bool)e.Value!)" />
+                                <label class="form-check-label" for="cat-@cat.Id">@cat.Name</label>
+                            </div>
+                        }
+                    </div>
+                    @if (_selectedIds.Count > 0)
+                    {
+                        <div class="mt-1 d-flex flex-wrap gap-1">
+                            @foreach (var id in _selectedIds)
+                            {
+                                var name = _categories.FirstOrDefault(c => c.Id == id)?.Name ?? id.ToString();
+                                <span class="badge text-bg-secondary">@name</span>
+                            }
+                        </div>
+                    }
+                }
+            </div>
+
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">
+                <button type="submit" class="btn btn-primary" disabled="@_saving">
                     <i class="bi bi-check-lg me-1"></i> Buat Produk
                 </button>
                 <a href="/products" class="btn btn-outline-secondary">Batal</a>
@@ -52,16 +110,43 @@
 </div>
 
 @code {
-    [SupplyParameterFromForm(FormName = "create-product")]
-    private CreateForm _form { get; set; } = default!;
-
-    protected override void OnParametersSet() => _form ??= new();
-
+    private readonly CreateForm _form = new();
     private string? _error;
+    private bool _saving;
+    private List<CategoryDto>? _categories;
+    private List<UnitDto>? _units;
+    private readonly HashSet<Guid> _selectedIds = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categoriesTask = Api.GetCategoriesAsync();
+        var unitsTask = Api.GetUnitsAsync();
+
+        _categories = (await categoriesTask)
+            ?.Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToList() ?? [];
+
+        _units = (await unitsTask)
+            ?.Where(u => u.IsActive)
+            .OrderBy(u => u.Name)
+            .ToList() ?? [];
+    }
+
+    private void ToggleCategory(Guid id, bool selected)
+    {
+        if (selected) _selectedIds.Add(id);
+        else _selectedIds.Remove(id);
+    }
 
     private async Task HandleCreate()
     {
-        var (id, error) = await Api.CreateProductAsync(_form.Name, _form.Description, _form.BaseUnit);
+        _saving = true;
+        _error = null;
+        var (id, error) = await Api.CreateProductAsync(
+            _form.Name, _form.Description, _form.BaseUnit,
+            _selectedIds.Count > 0 ? [.. _selectedIds] : null);
+        _saving = false;
         if (error is not null) { _error = error; return; }
         Navigation.NavigateTo($"/products/{id}?created=1", forceLoad: true);
     }
