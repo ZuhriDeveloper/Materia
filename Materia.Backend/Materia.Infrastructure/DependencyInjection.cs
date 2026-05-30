@@ -70,6 +70,10 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Inventory.IStockRepository, Inventory.StockRepository>();
         services.AddScoped<Application.Contracts.Inventory.IStockQueryRepository, Inventory.StockQueryRepository>();
 
+        // Customer repositories
+        services.AddScoped<Application.Contracts.Customers.ICustomerRepository, Customers.CustomerRepository>();
+        services.AddScoped<Application.Contracts.Customers.ICustomerQueryRepository, Customers.CustomerQueryRepository>();
+
         return services;
     }
 }

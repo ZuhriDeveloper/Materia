@@ -1,0 +1,165 @@
+@page "/customers"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject CustomerApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Pelanggan — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Pelanggan</h4>
+    <a href="/customers/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-person-plus me-1"></i> Pelanggan Baru
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input class="form-control" placeholder="Cari nama atau telepon…"
+                           @bind="_search" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+                    @if (!string.IsNullOrEmpty(_search))
+                    {
+                        <button class="btn btn-outline-secondary" @onclick="ClearSearch">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+            <div class="col-auto">
+                <select class="form-select form-select-sm" @bind="_isActiveFilter" @bind:after="LoadAsync">
+                    <option value="">Semua Status</option>
+                    <option value="true">Aktif</option>
+                    <option value="false">Tidak Aktif</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_customers is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else if (_customers.Items.Count == 0)
+{
+    <div class="alert alert-info">Tidak ada pelanggan ditemukan.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nama</th>
+                        <th>Telepon</th>
+                        <th>Email</th>
+                        <th>Alamat Utama</th>
+                        <th>Status</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var c in _customers.Items)
+                    {
+                        var def = c.Addresses.FirstOrDefault(a => a.IsDefault);
+                        <tr>
+                            <td class="fw-semibold">@c.Name</td>
+                            <td>@c.Phone</td>
+                            <td class="text-muted small">@(c.Email ?? "—")</td>
+                            <td class="small text-muted">
+                                @if (def is not null)
+                                {
+                                    <span>@def.Label — @def.Street, @def.City</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">Belum ada</span>
+                                }
+                            </td>
+                            <td>
+                                @if (c.IsActive)
+                                {
+                                    <span class="badge bg-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Tidak Aktif</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a href="/customers/@c.Id" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-person-lines-fill"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_customers.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+                @((_page - 1) * _pageSize + 1)–@(Math.Min(_page * _pageSize, _customers.TotalCount))
+                dari @_customers.TotalCount pelanggan
+            </small>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" disabled="@(_page <= 1)"
+                        @onclick="() => ChangePage(_page - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="btn btn-outline-secondary" disabled="@(_page >= _customers.TotalPages)"
+                        @onclick="() => ChangePage(_page + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private PagedCustomersDto? _customers;
+    private string  _search        = string.Empty;
+    private string  _isActiveFilter = string.Empty;
+    private int     _page    = 1;
+    private const int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        bool? isActive = _isActiveFilter switch
+        {
+            "true"  => true,
+            "false" => false,
+            _       => null,
+        };
+        _customers = await Api.GetCustomersAsync(_page, _pageSize, _search, isActive);
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") { _page = 1; await LoadAsync(); }
+    }
+
+    private async Task ClearSearch()
+    {
+        _search = string.Empty;
+        _page   = 1;
+        await LoadAsync();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+}

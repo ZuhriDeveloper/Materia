@@ -1,0 +1,407 @@
+@page "/customers/{id:guid}"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject CustomerApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(_customer?.Name ?? "Pelanggan") — Materia</PageTitle>
+
+@if (_customer is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <a href="/customers" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
+        <h4 class="mb-0 fw-bold">@_customer.Name</h4>
+        @if (_customer.IsActive)
+        {
+            <span class="badge bg-success">Aktif</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary">Tidak Aktif</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_notice))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_notice
+            <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_error
+            <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        @* Info card *@
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header fw-semibold">Informasi Pelanggan</div>
+                <div class="card-body">
+                    <EditForm Model="_editForm" OnValidSubmit="HandleEdit">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Nama <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_editForm.Name"
+                                       disabled="@(!_customer.IsActive)" />
+                            <ValidationMessage For="() => _editForm.Name" class="small text-danger" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Telepon <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_editForm.Phone"
+                                       disabled="@(!_customer.IsActive)" />
+                            <ValidationMessage For="() => _editForm.Phone" class="small text-danger" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <InputText class="form-control" @bind-Value="_editForm.Email"
+                                       disabled="@(!_customer.IsActive)" />
+                        </div>
+                        @if (_customer.IsActive)
+                        {
+                            <button type="submit" class="btn btn-primary btn-sm" disabled="@_saving">
+                                <i class="bi bi-check-lg me-1"></i> Simpan
+                            </button>
+                        }
+                    </EditForm>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <small class="text-muted">
+                        Dibuat @_customer.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
+                        oleh @_customer.CreatedBy
+                    </small>
+                    <button class="btn btn-sm @(_customer.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                            @onclick="HandleToggleStatus" disabled="@_saving">
+                        @if (_customer.IsActive)
+                        {
+                            <i class="bi bi-toggle-on me-1"></i>
+                            <span>Nonaktifkan</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-toggle-off me-1"></i>
+                            <span>Aktifkan</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @* Addresses card *@
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span>Alamat Pengiriman</span>
+                    <span class="badge text-bg-secondary">@_customer.Addresses.Count alamat</span>
+                </div>
+                <div class="card-body">
+
+                    @if (_customer.Addresses.Count == 0)
+                    {
+                        <p class="text-muted small">Belum ada alamat.</p>
+                    }
+                    else
+                    {
+                        @foreach (var addr in _customer.Addresses)
+                        {
+                            <div class="border rounded p-3 mb-2 @(addr.IsDefault ? "border-primary" : "")">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>@addr.Label</strong>
+                                        @if (addr.IsDefault)
+                                        {
+                                            <span class="badge bg-primary ms-1 small">Utama</span>
+                                        }
+                                        <div class="small text-muted mt-1">
+                                            @addr.Street<br />
+                                            @addr.City, @addr.Province @addr.PostalCode
+                                        </div>
+                                        <div class="small text-muted mt-1">
+                                            <i class="bi bi-geo-alt me-1"></i>
+                                            @addr.Latitude.ToString("F6"), @addr.Longitude.ToString("F6")
+                                            <a href="https://www.google.com/maps?q=@addr.Latitude,@addr.Longitude"
+                                               target="_blank" class="ms-1 small">
+                                                <i class="bi bi-box-arrow-up-right"></i> Maps
+                                            </a>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex gap-1 flex-shrink-0 ms-2">
+                                        @if (!addr.IsDefault)
+                                        {
+                                            <button class="btn btn-xs btn-outline-primary"
+                                                    title="Jadikan alamat utama"
+                                                    @onclick="() => HandleSetDefault(addr.Id)">
+                                                <i class="bi bi-house"></i>
+                                            </button>
+                                        }
+                                        <button class="btn btn-xs btn-outline-secondary"
+                                                title="Ubah"
+                                                @onclick="() => StartEditAddress(addr)">
+                                            <i class="bi bi-pencil"></i>
+                                        </button>
+                                        <button class="btn btn-xs btn-outline-danger"
+                                                title="Hapus"
+                                                @onclick="() => HandleRemoveAddress(addr.Id)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+
+                    @if (_customer.IsActive)
+                    {
+                        <hr class="my-3" />
+                        <p class="fw-semibold small mb-2">
+                            @(_editingAddressId.HasValue ? "Ubah Alamat" : "Tambah Alamat")
+                        </p>
+                        <EditForm Model="_addrForm" OnValidSubmit="HandleSaveAddress">
+                            <DataAnnotationsValidator />
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <label class="form-label small">Label <span class="text-danger">*</span></label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.Label" placeholder="cth. Rumah, Proyek A" />
+                                    <ValidationMessage For="() => _addrForm.Label" class="small text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Kode Pos</label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.PostalCode" placeholder="cth. 12345" />
+                                </div>
+                                <div class="col-12">
+                                    <label class="form-label small">Jalan <span class="text-danger">*</span></label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.Street" placeholder="Jl. Merdeka No. 1" />
+                                    <ValidationMessage For="() => _addrForm.Street" class="small text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Kota <span class="text-danger">*</span></label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.City" placeholder="Jakarta" />
+                                    <ValidationMessage For="() => _addrForm.City" class="small text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Provinsi <span class="text-danger">*</span></label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.Province" placeholder="DKI Jakarta" />
+                                    <ValidationMessage For="() => _addrForm.Province" class="small text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Latitude <span class="text-danger">*</span></label>
+                                    <InputNumber class="form-control form-control-sm"
+                                                 @bind-Value="_addrForm.Latitude" />
+                                    <ValidationMessage For="() => _addrForm.Latitude" class="small text-danger" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Longitude <span class="text-danger">*</span></label>
+                                    <InputNumber class="form-control form-control-sm"
+                                                 @bind-Value="_addrForm.Longitude" />
+                                    <ValidationMessage For="() => _addrForm.Longitude" class="small text-danger" />
+                                </div>
+                                <div class="col-12">
+                                    <small class="text-muted">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        Koordinat dari Google Maps: klik kanan pada peta → salin koordinat.
+                                    </small>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 mt-3">
+                                <button type="submit" class="btn btn-sm btn-primary" disabled="@_saving">
+                                    <i class="bi bi-check-lg me-1"></i>
+                                    @(_editingAddressId.HasValue ? "Simpan Perubahan" : "Tambah Alamat")
+                                </button>
+                                @if (_editingAddressId.HasValue)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                                            @onclick="CancelEditAddress">
+                                        Batal
+                                    </button>
+                                }
+                            </div>
+                        </EditForm>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private CustomerDto?  _customer;
+    private Guid?         _editingAddressId;
+    private string?       _error;
+    private string?       _notice;
+    private bool          _saving;
+
+    private readonly EditInfoForm   _editForm  = new();
+    private          AddressForm    _addrForm  = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+        if (_customer is not null)
+        {
+            _editForm.Name  = _customer.Name;
+            _editForm.Phone = _customer.Phone;
+            _editForm.Email = _customer.Email;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _customer = await Api.GetCustomerByIdAsync(Id);
+        if (_customer is null) Navigation.NavigateTo("/customers");
+    }
+
+    private async Task HandleEdit()
+    {
+        _saving = true;
+        _error  = null;
+        var error = await Api.UpdateCustomerAsync(
+            Id, _editForm.Name, _editForm.Phone,
+            string.IsNullOrWhiteSpace(_editForm.Email) ? null : _editForm.Email);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _notice = "Data pelanggan berhasil diperbarui.";
+        await LoadAsync();
+    }
+
+    private async Task HandleToggleStatus()
+    {
+        _saving = true;
+        _error  = null;
+        var error = await Api.SetCustomerStatusAsync(Id, !_customer!.IsActive);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _notice = $"Pelanggan berhasil {(_customer.IsActive ? "dinonaktifkan" : "diaktifkan")}.";
+        await LoadAsync();
+    }
+
+    private async Task HandleSaveAddress()
+    {
+        _saving = true;
+        _error  = null;
+
+        string? error;
+        if (_editingAddressId.HasValue)
+        {
+            error = await Api.UpdateAddressAsync(
+                Id, _editingAddressId.Value,
+                _addrForm.Label, _addrForm.Street, _addrForm.City,
+                _addrForm.Province, _addrForm.PostalCode,
+                _addrForm.Latitude, _addrForm.Longitude);
+        }
+        else
+        {
+            var (_, err) = await Api.AddAddressAsync(
+                Id, _addrForm.Label, _addrForm.Street, _addrForm.City,
+                _addrForm.Province, _addrForm.PostalCode,
+                _addrForm.Latitude, _addrForm.Longitude);
+            error = err;
+        }
+
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _notice           = "Alamat berhasil disimpan.";
+        _addrForm         = new();
+        _editingAddressId = null;
+        await LoadAsync();
+    }
+
+    private void StartEditAddress(CustomerAddressDto addr)
+    {
+        _editingAddressId   = addr.Id;
+        _addrForm.Label     = addr.Label;
+        _addrForm.Street    = addr.Street;
+        _addrForm.City      = addr.City;
+        _addrForm.Province  = addr.Province;
+        _addrForm.PostalCode = addr.PostalCode;
+        _addrForm.Latitude  = addr.Latitude;
+        _addrForm.Longitude = addr.Longitude;
+        _error  = null;
+    }
+
+    private void CancelEditAddress()
+    {
+        _editingAddressId = null;
+        _addrForm         = new();
+        _error            = null;
+    }
+
+    private async Task HandleRemoveAddress(Guid addressId)
+    {
+        _error = null;
+        var error = await Api.RemoveAddressAsync(Id, addressId);
+        if (error is not null) { _error = error; return; }
+        _notice = "Alamat berhasil dihapus.";
+        await LoadAsync();
+    }
+
+    private async Task HandleSetDefault(Guid addressId)
+    {
+        _error = null;
+        var error = await Api.SetDefaultAddressAsync(Id, addressId);
+        if (error is not null) { _error = error; return; }
+        _notice = "Alamat utama berhasil diubah.";
+        await LoadAsync();
+    }
+
+    private sealed class EditInfoForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nomor telepon wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(20)]
+        public string Phone { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.EmailAddress]
+        public string? Email { get; set; }
+    }
+
+    private sealed class AddressForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Label wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string Label { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Jalan wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(500)]
+        public string Street { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kota wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string City { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Provinsi wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string Province { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.MaxLength(10)]
+        public string? PostalCode { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(-90.0, 90.0, ErrorMessage = "Latitude harus antara -90 dan 90.")]
+        public decimal Latitude { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(-180.0, 180.0, ErrorMessage = "Longitude harus antara -180 dan 180.")]
+        public decimal Longitude { get; set; }
+    }
+}

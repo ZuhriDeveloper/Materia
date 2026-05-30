@@ -1,5 +1,13 @@
 using FluentValidation;
 using Materia.Application.Commands.Auth;
+using Materia.Application.Commands.Customers.AddCustomerAddress;
+using Materia.Application.Commands.Customers.CreateCustomer;
+using Materia.Application.Commands.Customers.RemoveCustomerAddress;
+using Materia.Application.Commands.Customers.SetCustomerStatus;
+using Materia.Application.Commands.Customers.SetDefaultAddress;
+using Materia.Application.Commands.Customers.UpdateCustomer;
+using Materia.Application.Commands.Customers.UpdateCustomerAddress;
+using Materia.Application.Queries.Customers;
 using Materia.Application.Commands.Inventory.AddUnitConversion;
 using Materia.Application.Commands.Inventory.AdjustStock;
 using Materia.Application.Commands.Inventory.AssignCategory;
@@ -56,6 +64,19 @@ public static class DependencyInjection
         services.AddScoped<GetCategoriesQueryHandler>();
         services.AddScoped<GetUnitsQueryHandler>();
         services.AddScoped<GetStockByProductIdQueryHandler>();
+
+        // Customer commands
+        services.AddScoped<CreateCustomerCommandHandler>();
+        services.AddScoped<UpdateCustomerCommandHandler>();
+        services.AddScoped<SetCustomerStatusCommandHandler>();
+        services.AddScoped<AddCustomerAddressCommandHandler>();
+        services.AddScoped<UpdateCustomerAddressCommandHandler>();
+        services.AddScoped<RemoveCustomerAddressCommandHandler>();
+        services.AddScoped<SetDefaultAddressCommandHandler>();
+
+        // Customer queries
+        services.AddScoped<GetCustomersQueryHandler>();
+        services.AddScoped<GetNearbyCustomersQueryHandler>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();

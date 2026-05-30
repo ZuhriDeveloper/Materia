@@ -14,6 +14,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<CategoryReadModel> CategoryReadModels => Set<CategoryReadModel>();
     public DbSet<UnitReadModel> UnitReadModels => Set<UnitReadModel>();
     public DbSet<StockReadModel> StockReadModels => Set<StockReadModel>();
+    public DbSet<CustomerReadModel> CustomerReadModels => Set<CustomerReadModel>();
+    public DbSet<CustomerAddressReadModel> CustomerAddressReadModels => Set<CustomerAddressReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -49,6 +51,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         {
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.ProductId).IsUnique();
+        });
+
+        builder.Entity<CustomerReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.Phone).IsUnique();
+            e.HasIndex(x => x.Name);
+            e.HasIndex(x => x.IsActive);
+            e.HasMany(x => x.Addresses)
+             .WithOne()
+             .HasForeignKey(a => a.CustomerId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<CustomerAddressReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.CustomerId);
+            e.HasIndex(x => new { x.Latitude, x.Longitude });
+            e.Property(x => x.Latitude).HasColumnType("decimal(11,8)");
+            e.Property(x => x.Longitude).HasColumnType("decimal(11,8)");
         });
     }
 }

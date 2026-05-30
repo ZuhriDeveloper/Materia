@@ -1,0 +1,16 @@
+using Materia.Domain.Common;
+
+namespace Materia.Domain.Customers.Events;
+
+public record CustomerAddressUpdated(
+    CustomerId CustomerId,
+    AddressId  AddressId,
+    string     Label,
+    string     Street,
+    string     City,
+    string     Province,
+    string?    PostalCode,
+    decimal    Latitude,
+    decimal    Longitude,
+    string     UpdatedBy,
+    DateTime   OccurredAt) : IDomainEvent;

@@ -1,0 +1,88 @@
+@page "/customers/new"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject CustomerApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Pelanggan Baru — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/customers" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Pelanggan Baru</h4>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card" style="max-width:560px">
+    <div class="card-body">
+        <EditForm Model="_form" OnValidSubmit="HandleCreate">
+            <DataAnnotationsValidator />
+
+            <div class="mb-3">
+                <label class="form-label">Nama <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="_form.Name"
+                           placeholder="cth. Budi Santoso" />
+                <ValidationMessage For="() => _form.Name" class="small text-danger" />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Nomor Telepon <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="_form.Phone"
+                           placeholder="cth. 08123456789" />
+                <ValidationMessage For="() => _form.Phone" class="small text-danger" />
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label">Email</label>
+                <InputText class="form-control" @bind-Value="_form.Email"
+                           placeholder="cth. budi@email.com" />
+                <ValidationMessage For="() => _form.Email" class="small text-danger" />
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary" disabled="@_saving">
+                    <i class="bi bi-check-lg me-1"></i> Buat Pelanggan
+                </button>
+                <a href="/customers" class="btn btn-outline-secondary">Batal</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly CustomerForm _form = new();
+    private string? _error;
+    private bool    _saving;
+
+    private async Task HandleCreate()
+    {
+        _saving = true;
+        _error  = null;
+        var (id, error) = await Api.CreateCustomerAsync(
+            _form.Name, _form.Phone, string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        Navigation.NavigateTo($"/customers/{id}?created=1", forceLoad: true);
+    }
+
+    private sealed class CustomerForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nomor telepon wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(20)]
+        public string Phone { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Format email tidak valid.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string? Email { get; set; }
+    }
+}

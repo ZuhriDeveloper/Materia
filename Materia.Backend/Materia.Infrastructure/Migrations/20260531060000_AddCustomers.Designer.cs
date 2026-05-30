@@ -3,6 +3,7 @@ using System;
 using Materia.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Materia.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260531060000_AddCustomers")]
+    partial class AddCustomers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -280,17 +283,18 @@ namespace Materia.Infrastructure.Migrations
                     b.ToTable("StockReadModels");
                 });
 
+
             modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerReadModel", b =>
                 {
                     b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
                     b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
                     b.Property<string>("CreatedBy").IsRequired().HasColumnType("text");
-                    b.Property<string?>("Email").HasColumnType("text");
+                    b.Property<string>("Email").HasColumnType("text");
                     b.Property<bool>("IsActive").HasColumnType("boolean");
                     b.Property<string>("Name").IsRequired().HasColumnType("text");
                     b.Property<string>("Phone").IsRequired().HasColumnType("text");
                     b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
-                    b.Property<string?>("UpdatedBy").HasColumnType("text");
+                    b.Property<string>("UpdatedBy").HasColumnType("text");
                     b.HasKey("Id");
                     b.HasIndex("IsActive");
                     b.HasIndex("Name");
@@ -308,14 +312,13 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<decimal>("Longitude").HasColumnType("decimal(11,8)");
                     b.Property<string>("City").IsRequired().HasColumnType("text");
                     b.Property<string>("Province").IsRequired().HasColumnType("text");
-                    b.Property<string?>("PostalCode").HasColumnType("text");
+                    b.Property<string>("PostalCode").HasColumnType("text");
                     b.Property<string>("Street").IsRequired().HasColumnType("text");
                     b.HasKey("Id");
                     b.HasIndex("CustomerId");
                     b.HasIndex("Latitude", "Longitude");
                     b.ToTable("CustomerAddressReadModels");
                 });
-
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -498,7 +501,17 @@ namespace Materia.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerAddressReadModel", b =>
+                {
+                    b.HasOne("Materia.Infrastructure.Persistence.Projections.CustomerReadModel", null)
+                        .WithMany("Addresses")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
 #pragma warning restore 612, 618
         }
     }
 }
+
