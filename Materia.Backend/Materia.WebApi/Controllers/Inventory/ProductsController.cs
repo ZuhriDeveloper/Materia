@@ -6,6 +6,7 @@ using Materia.Application.Commands.Inventory.CreateProduct;
 using Materia.Application.Commands.Inventory.RemoveCategory;
 using Materia.Application.Commands.Inventory.RemoveUnitConversion;
 using Materia.Application.Commands.Inventory.SetProductStatus;
+using Materia.Application.Commands.Inventory.SyncProductCategories;
 using Materia.Application.Commands.Inventory.UpdateProduct;
 using Materia.Application.Queries.Inventory;
 using Microsoft.AspNetCore.Authorization;
@@ -22,6 +23,7 @@ public class ProductsController(
     SetProductStatusCommandHandler statusHandler,
     AssignCategoryToProductCommandHandler assignCategoryHandler,
     RemoveCategoryFromProductCommandHandler removeCategoryHandler,
+    SyncProductCategoriesCommandHandler syncCategoriesHandler,
     AddUnitConversionCommandHandler addConversionHandler,
     RemoveUnitConversionCommandHandler removeConversionHandler,
     GetProductByIdQueryHandler getByIdHandler,
@@ -31,7 +33,9 @@ public class ProductsController(
     IValidator<AddUnitConversionCommand> addConversionValidator) : ControllerBase
 {
     private string CurrentUser =>
-        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+        User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
+        User.FindFirstValue(ClaimTypes.Email) ??
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
 
     // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -100,6 +104,16 @@ public class ProductsController(
         return NoContent();
     }
 
+    /// <summary>Replace the product's full category set in one call.</summary>
+    [HttpPut("{id:guid}/categories")]
+    public async Task<IActionResult> SyncCategories(
+        Guid id, [FromBody] SyncCategoriesRequest request, CancellationToken ct)
+    {
+        await syncCategoriesHandler.HandleAsync(
+            new SyncProductCategoriesCommand(id, request.CategoryIds, CurrentUser), ct);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/unit-conversions")]
     public async Task<IActionResult> AddUnitConversion(Guid id, [FromBody] AddUnitConversionRequest request, CancellationToken ct)
     {
@@ -124,3 +138,4 @@ public record CreateProductRequest(string Name, string? Description, string Base
 public record UpdateProductRequest(string Name, string? Description);
 public record SetStatusRequest(bool IsActive);
 public record AddUnitConversionRequest(string ToUnit, decimal Factor);
+public record SyncCategoriesRequest(List<Guid> CategoryIds);

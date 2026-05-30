@@ -21,7 +21,9 @@ public class CategoriesController(
     IValidator<UpdateCategoryCommand> updateValidator) : ControllerBase
 {
     private string CurrentUser =>
-        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue(ClaimTypes.Email) ?? "unknown";
+        User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
+        User.FindFirstValue(ClaimTypes.Email) ??
+        User.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown";
 
     [HttpGet]
     public async Task<IActionResult> GetAll(CancellationToken ct)

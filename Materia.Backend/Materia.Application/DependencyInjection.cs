@@ -9,6 +9,7 @@ using Materia.Application.Commands.Inventory.UpdateCategory;
 using Materia.Application.Commands.Inventory.RemoveCategory;
 using Materia.Application.Commands.Inventory.RemoveUnitConversion;
 using Materia.Application.Commands.Inventory.SetProductStatus;
+using Materia.Application.Commands.Inventory.SyncProductCategories;
 using Materia.Application.Commands.Inventory.UpdateProduct;
 using Materia.Application.Queries.Inventory;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +31,7 @@ public static class DependencyInjection
         services.AddScoped<RemoveCategoryFromProductCommandHandler>();
         services.AddScoped<AddUnitConversionCommandHandler>();
         services.AddScoped<RemoveUnitConversionCommandHandler>();
+        services.AddScoped<SyncProductCategoriesCommandHandler>();
         services.AddScoped<CreateCategoryCommandHandler>();
         services.AddScoped<UpdateCategoryCommandHandler>();
         services.AddScoped<SetCategoryStatusCommandHandler>();
