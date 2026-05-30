@@ -17,6 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Materia.Backend\Materia.WebApi\Materia.WebApi.csproj" />
     <ProjectReference Include="..\Materia.WebUi\Materia.WebUi\Materia.WebUi.csproj" />
   </ItemGroup>
 

@@ -1,6 +1,9 @@
 <Solution>
   <Folder Name="/Materia.Backend/">
+    <Project Path="Materia.Backend/Materia.Application/Materia.Application.csproj" Id="8349c75d-49e4-4137-bfb6-66fc7a2f5f96" />
     <Project Path="Materia.Backend/Materia.Domain/Materia.Domain.csproj" Id="391a1172-6827-4ec4-af4c-87e1cf1dba81" />
+    <Project Path="Materia.Backend/Materia.Infrastructure/Materia.Infrastructure.csproj" Id="5df78d87-3a9a-409d-8c2c-7f4035483ceb" />
+    <Project Path="Materia.Backend/Materia.WebApi/Materia.WebApi.csproj" Id="d509516c-513f-4c69-99e6-a299a25bc75a" />
   </Folder>
   <Folder Name="/Materia.WebUi/">
     <Project Path="Materia.WebUi/Materia.WebUi.Client/Materia.WebUi.Client.csproj" />

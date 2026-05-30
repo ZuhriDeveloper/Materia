@@ -1,17 +1,26 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
-var cache = builder.AddRedis("cache");
+// ── Databases ──────────────────────────────────────────────────────────────────
+// Pass the password via Aspire's parameter system so it is used consistently
+// in BOTH the container env var (POSTGRES_PASSWORD) AND the injected connection strings.
+// Using WithEnvironment("POSTGRES_PASSWORD", ...) alone only sets the container side
+// and causes a mismatch with Aspire's generated connection strings.
+var pgPassword = builder.AddParameter("postgres-password", "YYYjzk}ppk*CUP.65!X}!~!", secret: true);
 
-var postgres = builder.AddPostgres("postgres")
+var postgres = builder.AddPostgres("postgres", password: pgPassword)
     .WithDataVolume()
-    .AddDatabase("materia");
+    .WithHostPort(54049)
+    .WithLifetime(ContainerLifetime.Persistent);
 
-var apiService = builder.AddProject<Projects.Materia_ApiService>("apiservice")
+var materiadb = postgres.AddDatabase("materiadb");
+
+var webApi = builder.AddProject<Projects.Materia_WebApi>("webapi")
     .WithReference(postgres)
-    .WaitFor(postgres);
+    .WithReference(materiadb)
+    .WaitFor(materiadb);
 
 builder.AddProject<Projects.Materia_WebUi>("webui")
-    .WithReference(apiService)
-    .WaitFor(apiService);
+    .WithReference(webApi)
+    .WaitFor(webApi);
 
 builder.Build().Run();
