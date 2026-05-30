@@ -78,6 +78,21 @@ public class InventoryApiClient(HttpClient http)
     public Task<List<CategoryDto>?> GetCategoriesAsync(CancellationToken ct = default)
         => http.GetFromJsonAsync<List<CategoryDto>>("api/categories", ct);
 
+    public async Task<string?> UpdateCategoryAsync(
+        Guid id, string name, string? description, CancellationToken ct = default)
+    {
+        var response = await http.PutAsJsonAsync($"api/categories/{id}",
+            new { name, description }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    public async Task<string?> SetCategoryStatusAsync(Guid id, bool isActive, CancellationToken ct = default)
+    {
+        var response = await http.PatchAsJsonAsync($"api/categories/{id}/status",
+            new { isActive }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
     public async Task<(Guid? Id, string? Error)> CreateCategoryAsync(
         string name, string? description, CancellationToken ct = default)
     {

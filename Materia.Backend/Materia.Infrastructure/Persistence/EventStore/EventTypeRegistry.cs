@@ -1,4 +1,4 @@
-using Materia.Domain.Common;
+﻿using Materia.Domain.Common;
 using Materia.Domain.Inventory.Events;
 
 namespace Materia.Infrastructure.Persistence.EventStore;

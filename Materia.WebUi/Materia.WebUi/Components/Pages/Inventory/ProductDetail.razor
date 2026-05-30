@@ -4,30 +4,32 @@
 @inject InventoryApiClient Api
 @inject NavigationManager Navigation
 
-<PageTitle>@(_product?.Name ?? "Product") — Materia</PageTitle>
+<PageTitle>@(_product?.Name ?? "Produk") — Materia</PageTitle>
 
 @if (_product is null)
 {
-    <div class="text-muted">Loading…</div>
+    <div class="text-muted">Memuat…</div>
 }
 else
 {
     <div class="d-flex align-items-center gap-2 mb-4">
-        <a href="/products" class="btn btn-sm btn-outline-secondary">← Back</a>
+        <a href="/products" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
         <h4 class="mb-0 fw-bold">@_product.Name</h4>
         @if (_product.IsActive)
         {
-            <span class="badge bg-success">Active</span>
+            <span class="badge bg-success">Aktif</span>
         }
         else
         {
-            <span class="badge bg-secondary">Inactive</span>
+            <span class="badge bg-secondary">Tidak Aktif</span>
         }
     </div>
 
     @if (!string.IsNullOrEmpty(_notice))
     {
-        <div class="alert alert-success alert-dismissible mb-3">@_notice</div>
+        <div class="alert alert-success mb-3">@_notice</div>
     }
     @if (!string.IsNullOrEmpty(_error))
     {
@@ -36,74 +38,81 @@ else
 
     <div class="row g-4">
 
-        {{!-- ── Basic Info ──────────────────────────────────────────────────────── --}}
+        {{!-- ── Informasi Dasar ─────────────────────────────────────────────────── --}}
         <div class="col-lg-6">
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
-                    <span class="fw-semibold">Basic Information</span>
-                    <small class="text-muted">Base unit: <strong>@_product.BaseUnit</strong></small>
+                    <span class="fw-semibold">Informasi Dasar</span>
+                    <small class="text-muted">Satuan dasar: <strong>@_product.BaseUnit</strong></small>
                 </div>
                 <div class="card-body">
                     <EditForm Model="_editForm" OnValidSubmit="HandleEdit" FormName="edit-info" method="post">
                         <DataAnnotationsValidator />
                         <div class="mb-3">
-                            <label class="form-label">Name <span class="text-danger">*</span></label>
+                            <label class="form-label">Nama Produk <span class="text-danger">*</span></label>
                             <InputText class="form-control" @bind-Value="_editForm.Name" />
                             <ValidationMessage For="() => _editForm.Name" class="small text-danger" />
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Description</label>
+                            <label class="form-label">Deskripsi</label>
                             <InputTextArea class="form-control" @bind-Value="_editForm.Description" rows="3" />
                         </div>
-                        <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+                        <button type="submit" class="btn btn-primary btn-sm">
+                            <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
+                        </button>
                     </EditForm>
                 </div>
-                <div class="card-footer d-flex justify-content-between align-items-center">
-                    <small class="text-muted">
-                        Created by <strong>@_product.CreatedBy</strong>
-                        on @_product.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                <div class="card-footer">
+                    <small class="text-muted d-block">
+                        Dibuat oleh <strong>@_product.CreatedBy</strong>
+                        pada @_product.CreatedAt.ToLocalTime().ToString("dd MMM yyyy, HH:mm")
                     </small>
                     @if (_product.UpdatedBy is not null)
                     {
-                        <small class="text-muted">
-                            Updated by <strong>@_product.UpdatedBy</strong>
-                            on @_product.UpdatedAt!.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                        <small class="text-muted d-block mt-1">
+                            Diperbarui oleh <strong>@_product.UpdatedBy</strong>
+                            pada @_product.UpdatedAt!.Value.ToLocalTime().ToString("dd MMM yyyy, HH:mm")
                         </small>
                     }
                 </div>
             </div>
         </div>
 
-        {{!-- ── Status ──────────────────────────────────────────────────────────── --}}
-        <div class="col-lg-6">
+        <div class="col-lg-6 d-flex flex-column gap-3">
+
+            {{!-- ── Status ─────────────────────────────────────────────────────────── --}}
             <div class="card">
-                <div class="card-header fw-semibold">Status</div>
+                <div class="card-header fw-semibold">Status Produk</div>
                 <div class="card-body d-flex align-items-center gap-3">
                     <p class="mb-0 text-muted small flex-grow-1">
                         @(_product.IsActive
-                            ? "This product is active and visible in the system."
-                            : "This product is inactive and hidden from operations.")
+                            ? "Produk ini aktif dan tersedia dalam sistem."
+                            : "Produk ini tidak aktif dan disembunyikan dari operasional.")
                     </p>
                     <EditForm Model="_statusForm" OnValidSubmit="HandleToggleStatus" FormName="toggle-status" method="post">
                         @if (_product.IsActive)
                         {
-                            <button type="submit" class="btn btn-outline-danger btn-sm">Deactivate</button>
+                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                <i class="bi bi-toggle-off me-1"></i> Nonaktifkan
+                            </button>
                         }
                         else
                         {
-                            <button type="submit" class="btn btn-outline-success btn-sm">Activate</button>
+                            <button type="submit" class="btn btn-outline-success btn-sm">
+                                <i class="bi bi-toggle-on me-1"></i> Aktifkan
+                            </button>
                         }
                     </EditForm>
                 </div>
             </div>
 
-            {{!-- ── Categories ────────────────────────────────────────────────────── --}}
-            <div class="card mt-3">
-                <div class="card-header fw-semibold">Categories</div>
+            {{!-- ── Kategori ────────────────────────────────────────────────────────── --}}
+            <div class="card flex-grow-1">
+                <div class="card-header fw-semibold">Kategori</div>
                 <div class="card-body">
                     @if (_product.Categories.Count == 0)
                     {
-                        <p class="text-muted small">No categories assigned.</p>
+                        <p class="text-muted small">Belum ada kategori yang ditetapkan.</p>
                     }
                     else
                     {
@@ -116,7 +125,9 @@ else
                                               OnValidSubmit="@(() => HandleRemoveCategory(cat.Id))"
                                               FormName="@($"remove-cat-{cat.Id}")"
                                               method="post">
-                                        <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Remove">✕</button>
+                                        <button type="submit" class="btn btn-link btn-sm text-danger p-0 ms-1" title="Hapus kategori">
+                                            <i class="bi bi-x-circle"></i>
+                                        </button>
                                     </EditForm>
                                 </div>
                             }
@@ -128,35 +139,45 @@ else
                         <EditForm Model="_assignCatForm" OnValidSubmit="HandleAssignCategory" FormName="assign-category" method="post">
                             <div class="input-group input-group-sm">
                                 <InputSelect class="form-select" @bind-Value="_assignCatForm.CategoryId">
-                                    <option value="">— select category —</option>
+                                    <option value="">— pilih kategori —</option>
                                     @foreach (var cat in _availableCategories)
                                     {
                                         <option value="@cat.Id">@cat.Name</option>
                                     }
                                 </InputSelect>
-                                <button type="submit" class="btn btn-outline-primary" disabled="@(_assignCatForm.CategoryId == Guid.Empty)">Add</button>
+                                <button type="submit" class="btn btn-outline-primary" disabled="@(_assignCatForm.CategoryId == Guid.Empty)">
+                                    <i class="bi bi-plus-lg me-1"></i> Tambah
+                                </button>
                             </div>
                         </EditForm>
+                    }
+                    else if (_product.Categories.Count > 0)
+                    {
+                        <p class="text-muted small mb-0">Semua kategori sudah ditetapkan.</p>
                     }
                 </div>
             </div>
         </div>
 
-        {{!-- ── Unit Conversions ─────────────────────────────────────────────────── --}}
+        {{!-- ── Konversi Satuan ─────────────────────────────────────────────────── --}}
         <div class="col-12">
             <div class="card">
-                <div class="card-header fw-semibold">Unit Conversions</div>
+                <div class="card-header fw-semibold">Konversi Satuan</div>
                 <div class="card-body">
                     <p class="text-muted small mb-3">
-                        Define how many units of another measure equal one <strong>@_product.BaseUnit</strong>.
-                        Example: 1 sak = 5 bungkus.
+                        Tentukan berapa banyak satuan lain yang setara dengan 1 <strong>@_product.BaseUnit</strong>.
+                        Contoh: 1 sak = 5 bungkus.
                     </p>
 
                     @if (_product.UnitConversions.Count > 0)
                     {
-                        <table class="table table-sm table-bordered mb-3" style="max-width:500px">
+                        <table class="table table-sm table-bordered mb-3" style="max-width:480px">
                             <thead class="table-light">
-                                <tr><th>1 @_product.BaseUnit =</th><th>Unit</th><th></th></tr>
+                                <tr>
+                                    <th>1 @_product.BaseUnit =</th>
+                                    <th>Satuan</th>
+                                    <th></th>
+                                </tr>
                             </thead>
                             <tbody>
                                 @foreach (var conv in _product.UnitConversions)
@@ -169,7 +190,9 @@ else
                                                       OnValidSubmit="@(() => HandleRemoveConversion(conv.ToUnit))"
                                                       FormName="@($"remove-conv-{conv.ToUnit}")"
                                                       method="post">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-trash me-1"></i> Hapus
+                                                </button>
                                             </EditForm>
                                         </td>
                                     </tr>
@@ -180,18 +203,20 @@ else
 
                     <EditForm Model="_addConvForm" OnValidSubmit="HandleAddConversion" FormName="add-conversion" method="post">
                         <DataAnnotationsValidator />
-                        <div class="d-flex align-items-start gap-2" style="max-width:420px">
+                        <div class="d-flex align-items-start gap-2" style="max-width:440px">
                             <div class="flex-grow-1">
-                                <InputText class="form-control form-control-sm" @bind-Value="_addConvForm.ToUnit" placeholder="Unit name (e.g. bungkus)" />
+                                <InputText class="form-control form-control-sm" @bind-Value="_addConvForm.ToUnit" placeholder="Nama satuan (cth. bungkus)" />
                                 <ValidationMessage For="() => _addConvForm.ToUnit" class="small text-danger" />
                             </div>
-                            <div style="width:100px">
-                                <InputNumber class="form-control form-control-sm" @bind-Value="_addConvForm.Factor" placeholder="Factor" />
+                            <div style="width:110px">
+                                <InputNumber class="form-control form-control-sm" @bind-Value="_addConvForm.Factor" placeholder="Faktor" />
                                 <ValidationMessage For="() => _addConvForm.Factor" class="small text-danger" />
                             </div>
-                            <button type="submit" class="btn btn-sm btn-outline-primary">Add</button>
+                            <button type="submit" class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-plus-lg me-1"></i> Tambah
+                            </button>
                         </div>
-                        <div class="form-text">1 @_product.BaseUnit = [factor] [unit]</div>
+                        <div class="form-text">1 @_product.BaseUnit = [faktor] [satuan]</div>
                     </EditForm>
                 </div>
             </div>
@@ -203,8 +228,6 @@ else
 @code {
     [Parameter] public Guid Id { get; set; }
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
-
-    // ── Form models ───────────────────────────────────────────────────────────
 
     [SupplyParameterFromForm(FormName = "edit-info")]
     private EditInfoForm _editForm { get; set; } = default!;
@@ -224,23 +247,18 @@ else
         _assignCatForm ??= new();
     }
 
-    // ── State ─────────────────────────────────────────────────────────────────
-
     private ProductDto? _product;
     private List<CategoryDto> _availableCategories = [];
     private string? _error;
     private string? _notice;
 
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
     protected override async Task OnInitializedAsync()
     {
         if (HttpContext.Request.Query.ContainsKey("created"))
-            _notice = "Product created successfully.";
+            _notice = "Produk berhasil dibuat.";
 
         await LoadAsync();
 
-        // Pre-fill edit form with current values (only on GET)
         if (!HttpMethods.IsPost(HttpContext.Request.Method) && _product is not null)
         {
             _editForm.Name = _product.Name;
@@ -257,8 +275,6 @@ else
         var assignedIds = _product.Categories.Select(c => c.Id).ToHashSet();
         _availableCategories = allCats.Where(c => c.IsActive && !assignedIds.Contains(c.Id)).ToList();
     }
-
-    // ── Handlers ──────────────────────────────────────────────────────────────
 
     private async Task HandleEdit()
     {
@@ -297,11 +313,9 @@ else
         if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
     }
 
-    // ── Form classes ──────────────────────────────────────────────────────────
-
     private sealed class EditInfoForm
     {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required.")]
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama produk wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(200)]
         public string Name { get; set; } = string.Empty;
 
@@ -311,11 +325,11 @@ else
 
     private sealed class AddConvForm
     {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Unit name is required.")]
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama satuan wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(50)]
         public string ToUnit { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.Range(0.0001, double.MaxValue, ErrorMessage = "Factor must be greater than zero.")]
+        [System.ComponentModel.DataAnnotations.Range(0.0001, double.MaxValue, ErrorMessage = "Faktor harus lebih dari nol.")]
         public decimal Factor { get; set; }
     }
 

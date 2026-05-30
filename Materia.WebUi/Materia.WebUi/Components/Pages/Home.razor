@@ -1,8 +1,18 @@
 @page "/"
 @attribute [Authorize]
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Beranda — Materia</PageTitle>
 
-<h1>Hello, world!</h1>
+<h4 class="fw-bold mb-1">Selamat datang di Materia</h4>
+<p class="text-muted">Sistem Point of Sale untuk toko bahan bangunan.</p>
 
-Welcome to your new app.
+<AuthorizeView Roles="Admin">
+    <div class="d-flex gap-2 mt-3">
+        <a href="/products" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-box-seam me-1"></i> Kelola Produk
+        </a>
+        <a href="/categories" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-tags me-1"></i> Kelola Kategori
+        </a>
+    </div>
+</AuthorizeView>

@@ -4,11 +4,13 @@
 @inject InventoryApiClient Api
 @inject NavigationManager Navigation
 
-<PageTitle>New Product — Materia</PageTitle>
+<PageTitle>Produk Baru — Materia</PageTitle>
 
 <div class="d-flex align-items-center gap-2 mb-4">
-    <a href="/products" class="btn btn-sm btn-outline-secondary">← Back</a>
-    <h4 class="mb-0 fw-bold">New Product</h4>
+    <a href="/products" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Produk Baru</h4>
 </div>
 
 @if (!string.IsNullOrEmpty(_error))
@@ -22,26 +24,28 @@
             <DataAnnotationsValidator />
 
             <div class="mb-3">
-                <label class="form-label">Name <span class="text-danger">*</span></label>
-                <InputText class="form-control" @bind-Value="_form.Name" placeholder="e.g. Semen Padang" />
+                <label class="form-label">Nama Produk <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="_form.Name" placeholder="cth. Semen Padang" />
                 <ValidationMessage For="() => _form.Name" class="small text-danger" />
             </div>
 
             <div class="mb-3">
-                <label class="form-label">Description</label>
-                <InputTextArea class="form-control" @bind-Value="_form.Description" rows="3" placeholder="Optional description" />
+                <label class="form-label">Deskripsi</label>
+                <InputTextArea class="form-control" @bind-Value="_form.Description" rows="3" placeholder="Deskripsi opsional" />
             </div>
 
             <div class="mb-4">
-                <label class="form-label">Base Unit <span class="text-danger">*</span></label>
-                <InputText class="form-control" @bind-Value="_form.BaseUnit" placeholder="e.g. sak, batang, pcs, kg" />
-                <div class="form-text">The primary unit of measurement for this product.</div>
+                <label class="form-label">Satuan Dasar <span class="text-danger">*</span></label>
+                <InputText class="form-control" @bind-Value="_form.BaseUnit" placeholder="cth. sak, batang, pcs, kg" />
+                <div class="form-text">Satuan ukur utama untuk produk ini.</div>
                 <ValidationMessage For="() => _form.BaseUnit" class="small text-danger" />
             </div>
 
             <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Create Product</button>
-                <a href="/products" class="btn btn-outline-secondary">Cancel</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-lg me-1"></i> Buat Produk
+                </button>
+                <a href="/products" class="btn btn-outline-secondary">Batal</a>
             </div>
         </EditForm>
     </div>
@@ -64,14 +68,14 @@
 
     private sealed class CreateForm
     {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required.")]
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama produk wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(200)]
         public string Name { get; set; } = string.Empty;
 
         [System.ComponentModel.DataAnnotations.MaxLength(1000)]
         public string? Description { get; set; }
 
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Base unit is required.")]
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Satuan dasar wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(50)]
         public string BaseUnit { get; set; } = string.Empty;
     }

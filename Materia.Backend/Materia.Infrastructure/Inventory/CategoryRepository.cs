@@ -81,8 +81,10 @@ public class CategoryRepository(AppDbContext context) : ICategoryRepository
         {
             projection.UpdatedBy = newEvents.Last() switch
             {
-                Domain.Inventory.Events.CategoryNameUpdated e => e.UpdatedBy,
+                Domain.Inventory.Events.CategoryNameUpdated e        => e.UpdatedBy,
                 Domain.Inventory.Events.CategoryDescriptionUpdated e => e.UpdatedBy,
+                Domain.Inventory.Events.CategoryDeactivated e        => e.DeactivatedBy,
+                Domain.Inventory.Events.CategoryActivated e          => e.ActivatedBy,
                 _ => projection.UpdatedBy,
             };
             projection.UpdatedAt = newEvents.Last().OccurredAt;

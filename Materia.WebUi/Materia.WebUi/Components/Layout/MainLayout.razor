@@ -13,7 +13,9 @@
                     <span class="text-muted small">@context.User.Identity?.Name</span>
                     <form method="post" action="/account/logout" class="d-inline">
                         <AntiforgeryToken />
-                        <button type="submit" class="btn btn-sm btn-outline-secondary">Sign out</button>
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-box-arrow-right me-1"></i>Keluar
+                        </button>
                     </form>
                 </Authorized>
             </AuthorizeView>

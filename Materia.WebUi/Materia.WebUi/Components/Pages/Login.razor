@@ -7,13 +7,13 @@
 @inject AuthService AuthService
 @inject NavigationManager Navigation
 
-<PageTitle>Login — Materia</PageTitle>
+<PageTitle>Masuk — Materia</PageTitle>
 
 <div class="d-flex align-items-center justify-content-center min-vh-100 bg-light">
     <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
         <div class="card-body p-4">
             <h4 class="card-title mb-1 fw-bold">Materia</h4>
-            <p class="text-muted mb-4 small">Point of Sale — sign in to continue</p>
+            <p class="text-muted mb-4 small">Point of Sale — masuk untuk melanjutkan</p>
 
             @if (!string.IsNullOrEmpty(ErrorMessage))
             {
@@ -31,22 +31,40 @@
                                class="form-control"
                                @bind-Value="Model.Email"
                                autocomplete="email"
-                               placeholder="you@example.com" />
+                               placeholder="masukan username" />
                     <ValidationMessage For="() => Model.Email" class="small text-danger" />
                 </div>
 
                 <div class="mb-4">
-                    <label class="form-label" for="password">Password</label>
-                    <InputText id="password"
-                               type="password"
-                               class="form-control"
-                               @bind-Value="Model.Password"
-                               autocomplete="current-password"
-                               placeholder="••••••••" />
+                    <label class="form-label" for="password">Kata Sandi</label>
+                    <div class="input-group">
+                        <InputText id="password"
+                                   type="password"
+                                   class="form-control"
+                                   @bind-Value="Model.Password"
+                                   autocomplete="current-password"
+                                   placeholder="masukan password" />
+                        <button type="button"
+                                class="btn btn-outline-secondary"
+                                title="Tampilkan / sembunyikan kata sandi"
+                                onclick="(function(btn){
+                                    var inp = document.getElementById('password');
+                                    var ico = btn.querySelector('i');
+                                    if (inp.type === 'password') {
+                                        inp.type = 'text';
+                                        ico.className = 'bi bi-eye-slash';
+                                    } else {
+                                        inp.type = 'password';
+                                        ico.className = 'bi bi-eye';
+                                    }
+                                })(this)">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                    </div>
                     <ValidationMessage For="() => Model.Password" class="small text-danger" />
                 </div>
 
-                <button type="submit" class="btn btn-primary w-100">Sign in</button>
+                <button type="submit" class="btn btn-primary w-100">Masuk</button>
             </EditForm>
         </div>
     </div>
@@ -102,11 +120,11 @@
 
     private sealed class LoginFormModel
     {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required.")]
-        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Format email tidak valid.")]
         public string Email { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required.")]
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kata sandi wajib diisi.")]
         public string Password { get; set; } = string.Empty;
     }
 }

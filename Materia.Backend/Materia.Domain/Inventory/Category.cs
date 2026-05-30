@@ -1,4 +1,4 @@
-using Materia.Domain.Common;
+﻿using Materia.Domain.Common;
 using Materia.Domain.Inventory.Events;
 
 namespace Materia.Domain.Inventory;
@@ -39,6 +39,8 @@ public class Category : AggregateRoot<CategoryId>
 
     public void Update(string name, string? description, string updatedBy)
     {
+        if (!IsActive)
+            throw new DomainException("Cannot update an inactive category.");
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("Category name cannot be empty.");
 
@@ -47,6 +49,22 @@ public class Category : AggregateRoot<CategoryId>
 
         if (Description != description?.Trim())
             Raise(new CategoryDescriptionUpdated(Id, description?.Trim(), updatedBy, DateTime.UtcNow));
+    }
+
+    public void Deactivate(string deactivatedBy)
+    {
+        if (!IsActive)
+            throw new DomainException("Category is already inactive.");
+
+        Raise(new CategoryDeactivated(Id, deactivatedBy, DateTime.UtcNow));
+    }
+
+    public void Activate(string activatedBy)
+    {
+        if (IsActive)
+            throw new DomainException("Category is already active.");
+
+        Raise(new CategoryActivated(Id, activatedBy, DateTime.UtcNow));
     }
 
     // ── Event Application ─────────────────────────────────────────────────────
@@ -68,6 +86,14 @@ public class Category : AggregateRoot<CategoryId>
 
             case CategoryDescriptionUpdated e:
                 Description = e.Description;
+                break;
+
+            case CategoryDeactivated:
+                IsActive = false;
+                break;
+
+            case CategoryActivated:
+                IsActive = true;
                 break;
         }
     }

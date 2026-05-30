@@ -7,6 +7,8 @@ namespace Materia.Tests.Inventory;
 
 public class CategoryTests
 {
+    // ── Create ────────────────────────────────────────────────────────────────
+
     [Fact]
     public void Create_WithValidData_RaisesCategoryCreatedAndSetsState()
     {
@@ -30,9 +32,10 @@ public class CategoryTests
     {
         Action act = () => Category.Create(name, null, "user-1");
 
-        act.Should().Throw<DomainException>()
-            .WithMessage("*name*");
+        act.Should().Throw<DomainException>().WithMessage("*name*");
     }
+
+    // ── Update ────────────────────────────────────────────────────────────────
 
     [Fact]
     public void Update_WithNewName_RaisesCategoryNameUpdated()
@@ -58,16 +61,82 @@ public class CategoryTests
     }
 
     [Fact]
-    public void Reconstitute_FromEvents_RestoresStateWithNoUncommittedEvents()
+    public void Update_WhenInactive_ThrowsDomainException()
+    {
+        var category = Category.Create("Bahan", null, "user-1");
+        category.Deactivate("user-1");
+        category.ClearDomainEvents();
+
+        Action act = () => category.Update("Baru", null, "user-2");
+
+        act.Should().Throw<DomainException>();
+    }
+
+    // ── Deactivate / Activate ─────────────────────────────────────────────────
+
+    [Fact]
+    public void Deactivate_WhenActive_RaisesCategoryDeactivatedAndSetsInactive()
+    {
+        var category = Category.Create("Bahan", null, "user-1");
+        category.ClearDomainEvents();
+
+        category.Deactivate("user-1");
+
+        category.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<CategoryDeactivated>();
+        category.IsActive.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Deactivate_WhenAlreadyInactive_ThrowsDomainException()
+    {
+        var category = Category.Create("Bahan", null, "user-1");
+        category.Deactivate("user-1");
+
+        Action act = () => category.Deactivate("user-1");
+
+        act.Should().Throw<DomainException>().WithMessage("*already inactive*");
+    }
+
+    [Fact]
+    public void Activate_WhenInactive_RaisesCategoryActivatedAndSetsActive()
+    {
+        var category = Category.Create("Bahan", null, "user-1");
+        category.Deactivate("user-1");
+        category.ClearDomainEvents();
+
+        category.Activate("user-2");
+
+        category.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<CategoryActivated>();
+        category.IsActive.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Activate_WhenAlreadyActive_ThrowsDomainException()
+    {
+        var category = Category.Create("Bahan", null, "user-1");
+
+        Action act = () => category.Activate("user-1");
+
+        act.Should().Throw<DomainException>().WithMessage("*already active*");
+    }
+
+    // ── Event Sourcing Reconstruction ─────────────────────────────────────────
+
+    [Fact]
+    public void Reconstitute_FromEvents_RestoresFullStateWithNoUncommittedEvents()
     {
         var original = Category.Create("Bahan", null, "user-1");
         original.Update("Bahan Bangunan", "Updated", "user-2");
+        original.Deactivate("user-1");
 
         var restored = Category.Reconstitute(original.DomainEvents.ToList());
 
         restored.Id.Should().Be(original.Id);
         restored.Name.Should().Be("Bahan Bangunan");
         restored.Description.Should().Be("Updated");
+        restored.IsActive.Should().BeFalse();
         restored.DomainEvents.Should().BeEmpty();
     }
 }

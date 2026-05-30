@@ -4,6 +4,8 @@ using Materia.Application.Commands.Inventory.AddUnitConversion;
 using Materia.Application.Commands.Inventory.AssignCategory;
 using Materia.Application.Commands.Inventory.CreateCategory;
 using Materia.Application.Commands.Inventory.CreateProduct;
+using Materia.Application.Commands.Inventory.SetCategoryStatus;
+using Materia.Application.Commands.Inventory.UpdateCategory;
 using Materia.Application.Commands.Inventory.RemoveCategory;
 using Materia.Application.Commands.Inventory.RemoveUnitConversion;
 using Materia.Application.Commands.Inventory.SetProductStatus;
@@ -29,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<AddUnitConversionCommandHandler>();
         services.AddScoped<RemoveUnitConversionCommandHandler>();
         services.AddScoped<CreateCategoryCommandHandler>();
+        services.AddScoped<UpdateCategoryCommandHandler>();
+        services.AddScoped<SetCategoryStatusCommandHandler>();
 
         // Inventory — queries
         services.AddScoped<GetProductByIdQueryHandler>();

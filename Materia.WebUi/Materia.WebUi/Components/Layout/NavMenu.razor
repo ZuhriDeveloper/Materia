@@ -4,28 +4,28 @@
     </div>
 </div>
 
-<input type="checkbox" title="Navigation menu" class="navbar-toggler" />
+<input type="checkbox" title="Menu navigasi" class="navbar-toggler" />
 
 <div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
     <nav class="nav flex-column">
         <div class="nav-item px-3">
             <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Home
+                <i class="bi bi-house-door-fill me-2"></i> Beranda
             </NavLink>
         </div>
 
         <AuthorizeView Roles="Admin">
             <div class="nav-item px-3 mt-2">
-                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Inventory</small>
+                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Inventaris</small>
             </div>
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="products">
-                    <span class="bi bi-box-seam-fill-nav-menu" aria-hidden="true"></span> Products
+                    <i class="bi bi-box-seam me-2"></i> Produk
                 </NavLink>
             </div>
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="categories">
-                    <span class="bi bi-tags-fill-nav-menu" aria-hidden="true"></span> Categories
+                    <i class="bi bi-tags me-2"></i> Kategori
                 </NavLink>
             </div>
         </AuthorizeView>

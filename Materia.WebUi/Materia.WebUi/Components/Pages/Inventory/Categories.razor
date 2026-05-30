@@ -4,84 +4,176 @@
 @inject InventoryApiClient Api
 @inject NavigationManager Navigation
 
-<PageTitle>Categories — Materia</PageTitle>
+<PageTitle>Kategori — Materia</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0 fw-bold">Categories</h4>
+    <h4 class="mb-0 fw-bold">Kategori</h4>
 </div>
 
 @if (!string.IsNullOrEmpty(_error))
 {
-    <div class="alert alert-danger alert-dismissible">@_error</div>
+    <div class="alert alert-danger">@_error</div>
 }
-@if (!string.IsNullOrEmpty(_success))
+@if (!string.IsNullOrEmpty(_notice))
 {
-    <div class="alert alert-success">@_success</div>
+    <div class="alert alert-success">@_notice</div>
 }
 
 <div class="row g-4">
+
+    {{!-- ── Left panel: create or edit form ──────────────────────────────────── --}}
     <div class="col-lg-4">
-        <div class="card">
-            <div class="card-header fw-semibold">New Category</div>
-            <div class="card-body">
-                <EditForm Model="_form" OnValidSubmit="HandleCreate" FormName="create-category" method="post">
-                    <DataAnnotationsValidator />
-                    <div class="mb-3">
-                        <label class="form-label">Name <span class="text-danger">*</span></label>
-                        <InputText class="form-control" @bind-Value="_form.Name" placeholder="e.g. Bahan Bangunan" />
-                        <ValidationMessage For="() => _form.Name" class="small text-danger" />
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Description</label>
-                        <InputTextArea class="form-control" @bind-Value="_form.Description" rows="2" placeholder="Optional description" />
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Create</button>
-                </EditForm>
+        @if (_editingId is null)
+        {
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-plus-circle me-1"></i> Kategori Baru
+                </div>
+                <div class="card-body">
+                    <EditForm Model="_createForm" OnValidSubmit="HandleCreate"
+                              FormName="create-category" method="post">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Nama <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_createForm.Name"
+                                       placeholder="cth. Bahan Bangunan" />
+                            <ValidationMessage For="() => _createForm.Name" class="small text-danger" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Deskripsi</label>
+                            <InputTextArea class="form-control" @bind-Value="_createForm.Description"
+                                          rows="2" placeholder="Deskripsi opsional" />
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-check-lg me-1"></i> Simpan
+                        </button>
+                    </EditForm>
+                </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <div class="card border-warning">
+                <div class="card-header fw-semibold text-warning-emphasis bg-warning-subtle d-flex justify-content-between align-items-center">
+                    <span><i class="bi bi-pencil me-1"></i> Ubah Kategori</span>
+                    <a href="/categories" class="btn btn-sm btn-outline-secondary">
+                        <i class="bi bi-x-lg"></i>
+                    </a>
+                </div>
+                <div class="card-body">
+                    <EditForm Model="_editForm" OnValidSubmit="HandleEdit"
+                              FormName="edit-category" method="post">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Nama <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_editForm.Name" />
+                            <ValidationMessage For="() => _editForm.Name" class="small text-danger" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Deskripsi</label>
+                            <InputTextArea class="form-control" @bind-Value="_editForm.Description" rows="2" />
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-warning flex-grow-1">
+                                <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
+                            </button>
+                            <a href="/categories" class="btn btn-outline-secondary">Batal</a>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+        }
     </div>
 
+    {{!-- ── Right panel: category table ──────────────────────────────────────── --}}
     <div class="col-lg-8">
         <div class="card">
-            <div class="card-header fw-semibold">All Categories</div>
+            <div class="card-header fw-semibold">Semua Kategori</div>
             <div class="card-body p-0">
                 @if (_categories is null)
                 {
-                    <div class="p-3 text-muted">Loading…</div>
+                    <div class="p-3 text-muted">Memuat…</div>
                 }
                 else if (_categories.Count == 0)
                 {
-                    <div class="p-3 text-muted">No categories yet.</div>
+                    <div class="p-3 text-muted">Belum ada kategori.</div>
                 }
                 else
                 {
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Name</th>
-                                <th>Description</th>
-                                <th>Created by</th>
-                                <th>Created at</th>
+                                <th>Nama</th>
+                                <th>Deskripsi</th>
+                                <th>Diperbarui Oleh</th>
                                 <th>Status</th>
+                                <th class="text-end">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach (var cat in _categories)
                             {
-                                <tr>
+                                <tr class="@(_editingId == cat.Id ? "table-warning" : "")">
                                     <td class="fw-semibold">@cat.Name</td>
                                     <td class="text-muted small">@(cat.Description ?? "—")</td>
-                                    <td class="small">@cat.CreatedBy</td>
-                                    <td class="small">@cat.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</td>
-                                    <td>
-                                        @if (cat.IsActive)
+                                    <td class="small text-muted">
+                                        @if (cat.UpdatedBy is not null)
                                         {
-                                            <span class="badge bg-success">Active</span>
+                                            <span>@cat.UpdatedBy</span><br />
+                                            <span style="font-size:.75rem">@cat.UpdatedAt!.Value.ToLocalTime().ToString("dd MMM yyyy")</span>
                                         }
                                         else
                                         {
-                                            <span class="badge bg-secondary">Inactive</span>
+                                            <span>@cat.CreatedBy</span><br />
+                                            <span style="font-size:.75rem">@cat.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
                                         }
+                                    </td>
+                                    <td>
+                                        @if (cat.IsActive)
+                                        {
+                                            <span class="badge bg-success">Aktif</span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-secondary">Tidak Aktif</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="d-flex gap-1 justify-content-end">
+
+                                            {{!-- Edit: plain link, no form needed --}}
+                                            <a href="/categories?edit=@cat.Id"
+                                               class="btn btn-sm @(_editingId == cat.Id ? "btn-warning" : "btn-outline-secondary")"
+                                               title="Ubah">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+
+                                            {{!--
+                                                Toggle status: plain <form> — NOT EditForm.
+                                                EditForm with method="post" requires its Model to come from
+                                                a [SupplyParameterFromForm] property; an inline "new" expression
+                                                resolves to null during SSR POST processing and throws.
+                                                We pass the current status as a hidden field and read it in
+                                                OnInitializedAsync via HttpContext.Request.Form["_handler"].
+                                            --}}
+                                            <form method="post" @formname="@($"toggle-{cat.Id}")">
+                                                <AntiforgeryToken />
+                                                <input type="hidden" name="isCurrentlyActive" value="@cat.IsActive.ToString().ToLower()" />
+                                                @if (cat.IsActive)
+                                                {
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Nonaktifkan">
+                                                        <i class="bi bi-toggle-on"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Aktifkan">
+                                                        <i class="bi bi-toggle-off"></i>
+                                                    </button>
+                                                }
+                                            </form>
+
+                                        </div>
                                     </td>
                                 </tr>
                             }
@@ -91,38 +183,107 @@
             </div>
         </div>
     </div>
+
 </div>
 
 @code {
     [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 
-    [SupplyParameterFromForm(FormName = "create-category")]
-    private CreateForm _form { get; set; } = default!;
+    // ── SSR form models (must use [SupplyParameterFromForm] for POST binding) ──
 
-    protected override void OnParametersSet() => _form ??= new();
+    [SupplyParameterFromForm(FormName = "create-category")]
+    private CategoryFormModel _createForm { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "edit-category")]
+    private CategoryFormModel _editForm { get; set; } = default!;
+
+    protected override void OnParametersSet()
+    {
+        _createForm ??= new();
+        _editForm   ??= new();
+    }
+
+    // ── State ─────────────────────────────────────────────────────────────────
 
     private List<CategoryDto>? _categories;
+    private Guid? _editingId;
     private string? _error;
-    private string? _success;
+    private string? _notice;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     protected override async Task OnInitializedAsync()
     {
-        if (HttpContext.Request.Query.ContainsKey("created"))
-            _success = "Category created successfully.";
+        // ── Handle toggle-status POST early (plain form, no EditForm binding) ──
+        if (HttpMethods.IsPost(HttpContext.Request.Method))
+        {
+            var handler = HttpContext.Request.Form["_handler"].ToString();
 
+            if (handler.StartsWith("toggle-") &&
+                Guid.TryParse(handler.AsSpan("toggle-".Length), out var toggleId))
+            {
+                var isCurrentlyActive = HttpContext.Request.Form["isCurrentlyActive"].ToString() == "true";
+                var toggleError = await Api.SetCategoryStatusAsync(toggleId, !isCurrentlyActive);
+
+                if (toggleError is null)
+                {
+                    Navigation.NavigateTo("/categories?toggled=1", forceLoad: true);
+                    return; // stop — no need to load rest of page
+                }
+
+                _error = toggleError;
+            }
+        }
+
+        // ── Success banners from redirect query params ─────────────────────────
+        if (HttpContext.Request.Query.ContainsKey("created"))
+            _notice = "Kategori berhasil dibuat.";
+        else if (HttpContext.Request.Query.ContainsKey("updated"))
+            _notice = "Kategori berhasil diperbarui.";
+        else if (HttpContext.Request.Query.ContainsKey("toggled"))
+            _notice = "Status kategori berhasil diubah.";
+
+        // ── Edit mode from query param ─────────────────────────────────────────
+        if (Guid.TryParse(HttpContext.Request.Query["edit"], out var editId))
+            _editingId = editId;
+
+        // ── Load data ─────────────────────────────────────────────────────────
         _categories = await Api.GetCategoriesAsync() ?? [];
+
+        // Pre-fill edit form on GET only (on POST the form data already set it)
+        if (_editingId.HasValue && !HttpMethods.IsPost(HttpContext.Request.Method))
+        {
+            var target = _categories.FirstOrDefault(c => c.Id == _editingId);
+            if (target is not null)
+            {
+                _editForm.Name        = target.Name;
+                _editForm.Description = target.Description;
+            }
+        }
     }
+
+    // ── Handlers (called by EditForm.OnValidSubmit) ────────────────────────────
 
     private async Task HandleCreate()
     {
-        var (_, error) = await Api.CreateCategoryAsync(_form.Name, _form.Description);
+        var (_, error) = await Api.CreateCategoryAsync(_createForm.Name, _createForm.Description);
         if (error is not null) { _error = error; return; }
         Navigation.NavigateTo("/categories?created=1", forceLoad: true);
     }
 
-    private sealed class CreateForm
+    private async Task HandleEdit()
     {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Name is required.")]
+        if (!_editingId.HasValue) return;
+        var error = await Api.UpdateCategoryAsync(_editingId.Value, _editForm.Name, _editForm.Description);
+        if (error is not null) { _error = error; return; }
+        Navigation.NavigateTo("/categories?updated=1", forceLoad: true);
+    }
+
+    // ── Form model ─────────────────────────────────────────────────────────────
+
+    private sealed class CategoryFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(100)]
         public string Name { get; set; } = string.Empty;
 
