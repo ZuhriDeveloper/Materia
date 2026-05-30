@@ -1,8 +1,8 @@
 @page "/categories"
 @attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
-@inject NavigationManager Navigation
 
 <PageTitle>Kategori — Materia</PageTitle>
 
@@ -12,11 +12,17 @@
 
 @if (!string.IsNullOrEmpty(_error))
 {
-    <div class="alert alert-danger">@_error</div>
+    <div class="alert alert-danger alert-dismissible">
+        @_error
+        <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+    </div>
 }
 @if (!string.IsNullOrEmpty(_notice))
 {
-    <div class="alert alert-success">@_notice</div>
+    <div class="alert alert-success alert-dismissible">
+        @_notice
+        <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+    </div>
 }
 
 <div class="row g-4">
@@ -30,8 +36,7 @@
                     <i class="bi bi-plus-circle me-1"></i> Kategori Baru
                 </div>
                 <div class="card-body">
-                    <EditForm Model="_createForm" OnValidSubmit="HandleCreate"
-                              FormName="create-category" method="post">
+                    <EditForm Model="_createForm" OnValidSubmit="HandleCreate">
                         <DataAnnotationsValidator />
                         <div class="mb-3">
                             <label class="form-label">Nama <span class="text-danger">*</span></label>
@@ -44,8 +49,16 @@
                             <InputTextArea class="form-control" @bind-Value="_createForm.Description"
                                           rows="2" placeholder="Deskripsi opsional" />
                         </div>
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="bi bi-check-lg me-1"></i> Simpan
+                        <button type="submit" class="btn btn-primary w-100" disabled="@_saving">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-check-lg me-1"></i>
+                            }
+                            Simpan
                         </button>
                     </EditForm>
                 </div>
@@ -56,13 +69,12 @@
             <div class="card border-warning">
                 <div class="card-header fw-semibold text-warning-emphasis bg-warning-subtle d-flex justify-content-between align-items-center">
                     <span><i class="bi bi-pencil me-1"></i> Ubah Kategori</span>
-                    <a href="/categories" class="btn btn-sm btn-outline-secondary">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="CancelEdit">
                         <i class="bi bi-x-lg"></i>
-                    </a>
+                    </button>
                 </div>
                 <div class="card-body">
-                    <EditForm Model="_editForm" OnValidSubmit="HandleEdit"
-                              FormName="edit-category" method="post">
+                    <EditForm Model="_editForm" OnValidSubmit="HandleEdit">
                         <DataAnnotationsValidator />
                         <div class="mb-3">
                             <label class="form-label">Nama <span class="text-danger">*</span></label>
@@ -74,10 +86,20 @@
                             <InputTextArea class="form-control" @bind-Value="_editForm.Description" rows="2" />
                         </div>
                         <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-warning flex-grow-1">
-                                <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
+                            <button type="submit" class="btn btn-warning flex-grow-1" disabled="@_saving">
+                                @if (_saving)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-lg me-1"></i>
+                                }
+                                Simpan Perubahan
                             </button>
-                            <a href="/categories" class="btn btn-outline-secondary">Batal</a>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="CancelEdit">
+                                Batal
+                            </button>
                         </div>
                     </EditForm>
                 </div>
@@ -92,7 +114,9 @@
             <div class="card-body p-0">
                 @if (_categories is null)
                 {
-                    <div class="p-3 text-muted">Memuat…</div>
+                    <div class="p-3 text-muted">
+                        <span class="spinner-border spinner-border-sm me-1"></span> Memuat…
+                    </div>
                 }
                 else if (_categories.Count == 0)
                 {
@@ -120,12 +144,16 @@
                                         @if (cat.UpdatedBy is not null)
                                         {
                                             <span>@cat.UpdatedBy</span><br />
-                                            <span style="font-size:.75rem">@cat.UpdatedAt!.Value.ToLocalTime().ToString("dd MMM yyyy")</span>
+                                            <span style="font-size:.75rem">
+                                                @cat.UpdatedAt!.Value.ToLocalTime().ToString("dd MMM yyyy")
+                                            </span>
                                         }
                                         else
                                         {
                                             <span>@cat.CreatedBy</span><br />
-                                            <span style="font-size:.75rem">@cat.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")</span>
+                                            <span style="font-size:.75rem">
+                                                @cat.CreatedAt.ToLocalTime().ToString("dd MMM yyyy")
+                                            </span>
                                         }
                                     </td>
                                     <td>
@@ -140,39 +168,26 @@
                                     </td>
                                     <td class="text-end">
                                         <div class="d-flex gap-1 justify-content-end">
-
-                                            {{!-- Edit: plain link, no form needed --}}
-                                            <a href="/categories?edit=@cat.Id"
-                                               class="btn btn-sm @(_editingId == cat.Id ? "btn-warning" : "btn-outline-secondary")"
-                                               title="Ubah">
+                                            <button class="btn btn-sm @(_editingId == cat.Id ? "btn-warning" : "btn-outline-secondary")"
+                                                    title="Ubah" @onclick="() => StartEdit(cat)">
                                                 <i class="bi bi-pencil"></i>
-                                            </a>
-
-                                            {{!--
-                                                Toggle status: plain <form> — NOT EditForm.
-                                                EditForm with method="post" requires its Model to come from
-                                                a [SupplyParameterFromForm] property; an inline "new" expression
-                                                resolves to null during SSR POST processing and throws.
-                                                We pass the current status as a hidden field and read it in
-                                                OnInitializedAsync via HttpContext.Request.Form["_handler"].
-                                            --}}
-                                            <form method="post" @formname="@($"toggle-{cat.Id}")">
-                                                <AntiforgeryToken />
-                                                <input type="hidden" name="isCurrentlyActive" value="@cat.IsActive.ToString().ToLower()" />
-                                                @if (cat.IsActive)
-                                                {
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger" title="Nonaktifkan">
-                                                        <i class="bi bi-toggle-on"></i>
-                                                    </button>
-                                                }
-                                                else
-                                                {
-                                                    <button type="submit" class="btn btn-sm btn-outline-success" title="Aktifkan">
-                                                        <i class="bi bi-toggle-off"></i>
-                                                    </button>
-                                                }
-                                            </form>
-
+                                            </button>
+                                            @if (cat.IsActive)
+                                            {
+                                                <button class="btn btn-sm btn-outline-danger"
+                                                        title="Nonaktifkan"
+                                                        @onclick="() => HandleToggleStatus(cat)">
+                                                    <i class="bi bi-toggle-on"></i>
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button class="btn btn-sm btn-outline-success"
+                                                        title="Aktifkan"
+                                                        @onclick="() => HandleToggleStatus(cat)">
+                                                    <i class="bi bi-toggle-off"></i>
+                                                </button>
+                                            }
                                         </div>
                                     </td>
                                 </tr>
@@ -187,96 +202,89 @@
 </div>
 
 @code {
-    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
-
-    // ── SSR form models (must use [SupplyParameterFromForm] for POST binding) ──
-
-    [SupplyParameterFromForm(FormName = "create-category")]
-    private CategoryFormModel _createForm { get; set; } = default!;
-
-    [SupplyParameterFromForm(FormName = "edit-category")]
-    private CategoryFormModel _editForm { get; set; } = default!;
-
-    protected override void OnParametersSet()
-    {
-        _createForm ??= new();
-        _editForm   ??= new();
-    }
-
     // ── State ─────────────────────────────────────────────────────────────────
 
     private List<CategoryDto>? _categories;
     private Guid? _editingId;
     private string? _error;
     private string? _notice;
+    private bool _saving;
+
+    private CategoryFormModel _createForm = new();
+    private CategoryFormModel _editForm   = new();
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
     {
-        // ── Handle toggle-status POST early (plain form, no EditForm binding) ──
-        if (HttpMethods.IsPost(HttpContext.Request.Method))
-        {
-            var handler = HttpContext.Request.Form["_handler"].ToString();
-
-            if (handler.StartsWith("toggle-") &&
-                Guid.TryParse(handler.AsSpan("toggle-".Length), out var toggleId))
-            {
-                var isCurrentlyActive = HttpContext.Request.Form["isCurrentlyActive"].ToString() == "true";
-                var toggleError = await Api.SetCategoryStatusAsync(toggleId, !isCurrentlyActive);
-
-                if (toggleError is null)
-                {
-                    Navigation.NavigateTo("/categories?toggled=1", forceLoad: true);
-                    return; // stop — no need to load rest of page
-                }
-
-                _error = toggleError;
-            }
-        }
-
-        // ── Success banners from redirect query params ─────────────────────────
-        if (HttpContext.Request.Query.ContainsKey("created"))
-            _notice = "Kategori berhasil dibuat.";
-        else if (HttpContext.Request.Query.ContainsKey("updated"))
-            _notice = "Kategori berhasil diperbarui.";
-        else if (HttpContext.Request.Query.ContainsKey("toggled"))
-            _notice = "Status kategori berhasil diubah.";
-
-        // ── Edit mode from query param ─────────────────────────────────────────
-        if (Guid.TryParse(HttpContext.Request.Query["edit"], out var editId))
-            _editingId = editId;
-
-        // ── Load data ─────────────────────────────────────────────────────────
         _categories = await Api.GetCategoriesAsync() ?? [];
-
-        // Pre-fill edit form on GET only (on POST the form data already set it)
-        if (_editingId.HasValue && !HttpMethods.IsPost(HttpContext.Request.Method))
-        {
-            var target = _categories.FirstOrDefault(c => c.Id == _editingId);
-            if (target is not null)
-            {
-                _editForm.Name        = target.Name;
-                _editForm.Description = target.Description;
-            }
-        }
     }
 
-    // ── Handlers (called by EditForm.OnValidSubmit) ────────────────────────────
+    // ── Handlers ──────────────────────────────────────────────────────────────
 
     private async Task HandleCreate()
     {
+        _error  = null;
+        _saving = true;
+
         var (_, error) = await Api.CreateCategoryAsync(_createForm.Name, _createForm.Description);
+
+        _saving = false;
+
         if (error is not null) { _error = error; return; }
-        Navigation.NavigateTo("/categories?created=1", forceLoad: true);
+
+        _notice     = "Kategori berhasil dibuat.";
+        _createForm = new();
+        await LoadAsync();
     }
 
     private async Task HandleEdit()
     {
-        if (!_editingId.HasValue) return;
+        if (_editingId is null) return;
+
+        _error  = null;
+        _saving = true;
+
         var error = await Api.UpdateCategoryAsync(_editingId.Value, _editForm.Name, _editForm.Description);
+
+        _saving = false;
+
         if (error is not null) { _error = error; return; }
-        Navigation.NavigateTo("/categories?updated=1", forceLoad: true);
+
+        _notice    = "Kategori berhasil diperbarui.";
+        _editingId = null;
+        _editForm  = new();
+        await LoadAsync();
+    }
+
+    private async Task HandleToggleStatus(CategoryDto cat)
+    {
+        _error = null;
+
+        var error = await Api.SetCategoryStatusAsync(cat.Id, !cat.IsActive);
+
+        if (error is not null) { _error = error; return; }
+
+        _notice = $"Kategori '{cat.Name}' berhasil {(cat.IsActive ? "dinonaktifkan" : "diaktifkan")}.";
+        await LoadAsync();
+    }
+
+    private void StartEdit(CategoryDto cat)
+    {
+        _editingId         = cat.Id;
+        _editForm.Name        = cat.Name;
+        _editForm.Description = cat.Description;
+        _error  = null;
+        _notice = null;
+    }
+
+    private void CancelEdit()
+    {
+        _editingId = null;
+        _editForm  = new();
+        _error     = null;
     }
 
     // ── Form model ─────────────────────────────────────────────────────────────
