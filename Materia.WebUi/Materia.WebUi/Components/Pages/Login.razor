@@ -1,0 +1,98 @@
+@page "/login"
+@using Materia.WebUi.Services
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@rendermode InteractiveServer
+
+<PageTitle>Login — Materia</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center min-vh-100 bg-light">
+    <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-4">
+            <h4 class="card-title mb-1 fw-bold">Materia</h4>
+            <p class="text-muted mb-4 small">Point of Sale — sign in to continue</p>
+
+            @if (!string.IsNullOrEmpty(_errorMessage))
+            {
+                <div class="alert alert-danger py-2 small" role="alert">
+                    @_errorMessage
+                </div>
+            }
+
+            <EditForm Model="_model" OnValidSubmit="HandleLogin" FormName="login">
+                <DataAnnotationsValidator />
+
+                <div class="mb-3">
+                    <label class="form-label" for="email">Email</label>
+                    <InputText id="email"
+                               class="form-control"
+                               @bind-Value="_model.Email"
+                               autocomplete="email"
+                               placeholder="you@example.com"
+                               disabled="@_loading" />
+                    <ValidationMessage For="() => _model.Email" class="small text-danger" />
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label" for="password">Password</label>
+                    <InputText id="password"
+                               type="password"
+                               class="form-control"
+                               @bind-Value="_model.Password"
+                               autocomplete="current-password"
+                               placeholder="••••••••"
+                               disabled="@_loading" />
+                    <ValidationMessage For="() => _model.Password" class="small text-danger" />
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100" disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                        <span>Signing in…</span>
+                    }
+                    else
+                    {
+                        <span>Sign in</span>
+                    }
+                </button>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel _model = new();
+    private string? _errorMessage;
+    private bool _loading;
+
+    private async Task HandleLogin()
+    {
+        _errorMessage = null;
+        _loading = true;
+
+        var result = await AuthService.LoginAsync(_model.Email, _model.Password);
+
+        if (result.Succeeded)
+        {
+            Navigation.NavigateTo("/");
+        }
+        else
+        {
+            _errorMessage = result.ErrorMessage;
+        }
+
+        _loading = false;
+    }
+
+    private sealed class LoginModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email is required.")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Enter a valid email address.")]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Password is required.")]
+        [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

@@ -1,3 +1,10 @@
 <Solution>
+  <Folder Name="/Materia.Backend/">
+    <Project Path="Materia.Backend/Materia.Domain/Materia.Domain.csproj" Id="391a1172-6827-4ec4-af4c-87e1cf1dba81" />
+  </Folder>
+  <Folder Name="/Materia.WebUi/">
+    <Project Path="Materia.WebUi/Materia.WebUi.Client/Materia.WebUi.Client.csproj" />
+    <Project Path="Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj" />
+  </Folder>
   <Project Path="Materia.AppHost/Materia.AppHost.csproj" />
 </Solution>
