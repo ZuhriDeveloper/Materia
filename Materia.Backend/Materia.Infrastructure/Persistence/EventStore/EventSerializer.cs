@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Materia.Domain.Common;
 using Materia.Domain.Customers;
 using Materia.Domain.Inventory;
+using Materia.Domain.Sales;
 
 namespace Materia.Infrastructure.Persistence.EventStore;
 
@@ -19,6 +20,8 @@ public static class EventSerializer
             new StockIdConverter(),
             new CustomerIdConverter(),
             new AddressIdConverter(),
+            new SaleIdConverter(),
+            new SaleItemIdConverter(),
         },
     };
 
@@ -78,6 +81,22 @@ public static class EventSerializer
         public override AddressId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
             => AddressId.From(reader.GetGuid());
         public override void Write(Utf8JsonWriter writer, AddressId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class SaleIdConverter : JsonConverter<SaleId>
+    {
+        public override SaleId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => SaleId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, SaleId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class SaleItemIdConverter : JsonConverter<SaleItemId>
+    {
+        public override SaleItemId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => SaleItemId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, SaleItemId value, JsonSerializerOptions o)
             => writer.WriteStringValue(value.Value);
     }
 }

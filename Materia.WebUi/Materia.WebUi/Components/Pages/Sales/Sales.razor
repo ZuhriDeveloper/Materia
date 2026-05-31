@@ -1,0 +1,140 @@
+@page "/sales"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject SaleApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Penjualan — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Penjualan</h4>
+    <a href="/sales/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i> Penjualan Baru
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" style="width:auto"
+                    @bind="_statusFilter" @bind:after="LoadAsync">
+                <option value="">Semua Status</option>
+                <option value="Draft">Draft</option>
+                <option value="Confirmed">Dikonfirmasi</option>
+                <option value="Paid">Lunas</option>
+                <option value="Cancelled">Dibatalkan</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+@if (_sales is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else if (_sales.Items.Count == 0)
+{
+    <div class="alert alert-info">Belum ada penjualan.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>No. Referensi</th>
+                        <th>Pelanggan</th>
+                        <th>Tipe</th>
+                        <th class="text-end">Total</th>
+                        <th>Status</th>
+                        <th>Tanggal</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in _sales.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold font-monospace">@s.ReferenceNo</td>
+                            <td>@s.CustomerName</td>
+                            <td>
+                                @if (s.SaleType == SaleType.Delivery)
+                                {
+                                    <span class="badge text-bg-info">
+                                        <i class="bi bi-truck me-1"></i> Kirim
+                                    </span>
+                                }
+                                else
+                                {
+                                    <span class="badge text-bg-secondary">
+                                        <i class="bi bi-shop me-1"></i> Ambil
+                                    </span>
+                                }
+                            </td>
+                            <td class="text-end fw-semibold">Rp @s.GrandTotal.ToString("N0")</td>
+                            <td>@StatusBadge(s.Status)</td>
+                            <td class="small text-muted">
+                                @s.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                            </td>
+                            <td>
+                                <a href="/sales/@s.Id" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    @if (_sales.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+                @((_page - 1) * _pageSize + 1)–@(Math.Min(_page * _pageSize, _sales.TotalCount))
+                dari @_sales.TotalCount transaksi
+            </small>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" disabled="@(_page <= 1)"
+                        @onclick="() => ChangePage(_page - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="btn btn-outline-secondary"
+                        disabled="@(_page >= _sales.TotalPages)"
+                        @onclick="() => ChangePage(_page + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private PagedSalesDto? _sales;
+    private string _statusFilter = "";
+    private int    _page         = 1;
+    private const int _pageSize  = 20;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+        => _sales = await Api.GetSalesAsync(_page, _pageSize, string.IsNullOrEmpty(_statusFilter) ? null : _statusFilter);
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+
+    private static MarkupString StatusBadge(SaleStatus status) => status switch
+    {
+        SaleStatus.Draft     => (MarkupString)"<span class='badge bg-warning text-dark'>Draft</span>",
+        SaleStatus.Confirmed => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
+        SaleStatus.Paid      => (MarkupString)"<span class='badge bg-success'>Lunas</span>",
+        SaleStatus.Cancelled => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
+        _                    => (MarkupString)"<span class='badge bg-secondary'>—</span>",
+    };
+}

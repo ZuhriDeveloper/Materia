@@ -92,23 +92,51 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
             projection.UpdatedAt = newEvents.Last().OccurredAt;
         }
 
-        // Sync addresses — full replace to keep projection consistent
-        projection.Addresses.Clear();
+        // Sync addresses: update in-place, add new rows, delete removed rows.
+        // Never Clear() + re-add: EF Core would try to DELETE and INSERT the same PK
+        // in one SaveChanges when an address is updated, causing a concurrency exception.
+        MergeAddresses(projection, customer);
+    }
+
+    private void MergeAddresses(CustomerReadModel projection, Customer customer)
+    {
+        var tracked    = projection.Addresses.ToDictionary(a => a.Id);
+        var aggregateIds = customer.Addresses.Select(a => a.Id.Value).ToHashSet();
+
+        // Remove rows that are no longer in the aggregate
+        foreach (var stale in tracked.Values.Where(a => !aggregateIds.Contains(a.Id)).ToList())
+            context.CustomerAddressReadModels.Remove(stale);
+
+        // Update existing rows in-place; insert new rows
         foreach (var addr in customer.Addresses)
         {
-            projection.Addresses.Add(new CustomerAddressReadModel
+            if (tracked.TryGetValue(addr.Id.Value, out var row))
             {
-                Id         = addr.Id.Value,
-                CustomerId = customer.Id.Value,
-                Label      = addr.Label,
-                Street     = addr.Street,
-                City       = addr.City,
-                Province   = addr.Province,
-                PostalCode = addr.PostalCode,
-                Latitude   = addr.Coordinates.Latitude,
-                Longitude  = addr.Coordinates.Longitude,
-                IsDefault  = addr.IsDefault,
-            });
+                row.Label      = addr.Label;
+                row.Street     = addr.Street;
+                row.City       = addr.City;
+                row.Province   = addr.Province;
+                row.PostalCode = addr.PostalCode;
+                row.Latitude   = addr.Coordinates.Latitude;
+                row.Longitude  = addr.Coordinates.Longitude;
+                row.IsDefault  = addr.IsDefault;
+            }
+            else
+            {
+                context.CustomerAddressReadModels.Add(new CustomerAddressReadModel
+                {
+                    Id         = addr.Id.Value,
+                    CustomerId = customer.Id.Value,
+                    Label      = addr.Label,
+                    Street     = addr.Street,
+                    City       = addr.City,
+                    Province   = addr.Province,
+                    PostalCode = addr.PostalCode,
+                    Latitude   = addr.Coordinates.Latitude,
+                    Longitude  = addr.Coordinates.Longitude,
+                    IsDefault  = addr.IsDefault,
+                });
+            }
         }
     }
 }

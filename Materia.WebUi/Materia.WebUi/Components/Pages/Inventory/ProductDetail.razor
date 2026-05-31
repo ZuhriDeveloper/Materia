@@ -197,7 +197,8 @@ else
                     {
                         <div class="alert alert-danger py-2 small">@_stockError</div>
                     }
-                    <EditForm Model="_stockForm" OnValidSubmit="HandleAdjustStock">
+                    <EditForm Model="_stockForm" OnValidSubmit="HandleAdjustStock"
+                              FormName="adjust-stock" method="post">
                         <DataAnnotationsValidator />
                         <div class="d-flex align-items-start gap-2" style="max-width:440px">
                             <div class="flex-grow-1">
@@ -313,7 +314,9 @@ else
     private AssignCatForm _assignCatForm { get; set; } = new();
 
     private readonly StatusForm _statusForm = new();
-    private StockAdjustForm _stockForm = new();
+
+    [SupplyParameterFromForm(FormName = "adjust-stock")]
+    private StockAdjustForm _stockForm { get; set; } = new();
 
     protected override void OnParametersSet() { }
 

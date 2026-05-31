@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -20,7 +21,12 @@ public static class DependencyInjection
         IConfiguration configuration)
     {
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("materiadb")));
+            options
+                .UseNpgsql(configuration.GetConnectionString("materiadb"))
+                // Snapshot is maintained manually — suppress the mismatch warning
+                // that EF Core raises when the live model diverges from the snapshot.
+                .ConfigureWarnings(w =>
+                    w.Ignore(RelationalEventId.PendingModelChangesWarning)));
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {
@@ -73,6 +79,12 @@ public static class DependencyInjection
         // Customer repositories
         services.AddScoped<Application.Contracts.Customers.ICustomerRepository, Customers.CustomerRepository>();
         services.AddScoped<Application.Contracts.Customers.ICustomerQueryRepository, Customers.CustomerQueryRepository>();
+
+        // Sales
+        services.AddScoped<Application.Contracts.Sales.ISaleRepository, Sales.SaleRepository>();
+        services.AddScoped<Application.Contracts.Sales.ISaleQueryRepository, Sales.SaleQueryRepository>();
+        services.AddScoped<Application.Contracts.Sales.IStockDeductionService, Sales.StockDeductionService>();
+        services.AddScoped<Application.Contracts.Sales.IReferenceNumberGenerator, Sales.ReferenceNumberGenerator>();
 
         return services;
     }

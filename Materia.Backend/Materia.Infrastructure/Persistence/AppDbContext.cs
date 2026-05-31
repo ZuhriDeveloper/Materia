@@ -16,6 +16,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<StockReadModel> StockReadModels => Set<StockReadModel>();
     public DbSet<CustomerReadModel> CustomerReadModels => Set<CustomerReadModel>();
     public DbSet<CustomerAddressReadModel> CustomerAddressReadModels => Set<CustomerAddressReadModel>();
+    public DbSet<SaleReadModel> SaleReadModels => Set<SaleReadModel>();
+    public DbSet<SaleItemReadModel> SaleItemReadModels => Set<SaleItemReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -72,6 +74,29 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasIndex(x => new { x.Latitude, x.Longitude });
             e.Property(x => x.Latitude).HasColumnType("decimal(11,8)");
             e.Property(x => x.Longitude).HasColumnType("decimal(11,8)");
+        });
+
+        builder.Entity<SaleReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ReferenceNo).IsUnique();
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.CustomerId);
+            e.Property(x => x.SaleType).HasConversion<string>();
+            e.Property(x => x.Status).HasConversion<string>();
+            e.Property(x => x.PaymentMethod).HasConversion<string>();
+            e.HasMany(x => x.Items)
+             .WithOne()
+             .HasForeignKey(i => i.SaleId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SaleItemReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.SaleId);
+            e.HasIndex(x => x.ProductId);
         });
     }
 }

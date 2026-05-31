@@ -1,6 +1,7 @@
 ﻿using Materia.Domain.Common;
 using Materia.Domain.Customers.Events;
 using Materia.Domain.Inventory.Events;
+using Materia.Domain.Sales.Events;
 
 namespace Materia.Infrastructure.Persistence.EventStore;
 
@@ -45,6 +46,17 @@ public static class EventTypeRegistry
         [nameof(CustomerAddressUpdated)]        = typeof(CustomerAddressUpdated),
         [nameof(CustomerAddressRemoved)]        = typeof(CustomerAddressRemoved),
         [nameof(CustomerDefaultAddressChanged)] = typeof(CustomerDefaultAddressChanged),
+
+        // Sale events
+        [nameof(SaleCreated)]            = typeof(SaleCreated),
+        [nameof(SaleCustomerSet)]        = typeof(SaleCustomerSet),
+        [nameof(SaleTypeSetToPickup)]    = typeof(SaleTypeSetToPickup),
+        [nameof(SaleTypeSetToDelivery)]  = typeof(SaleTypeSetToDelivery),
+        [nameof(SaleItemAdded)]          = typeof(SaleItemAdded),
+        [nameof(SaleItemRemoved)]        = typeof(SaleItemRemoved),
+        [nameof(SaleConfirmed)]          = typeof(SaleConfirmed),
+        [nameof(SalePaid)]               = typeof(SalePaid),
+        [nameof(SaleCancelled)]          = typeof(SaleCancelled),
     };
 
     public static Type Resolve(string eventType) =>

@@ -1,5 +1,6 @@
 using FluentValidation;
 using Materia.Application.Commands.Auth;
+using Materia.Application.Services;
 using Materia.Application.Commands.Customers.AddCustomerAddress;
 using Materia.Application.Commands.Customers.CreateCustomer;
 using Materia.Application.Commands.Customers.RemoveCustomerAddress;
@@ -77,6 +78,9 @@ public static class DependencyInjection
         // Customer queries
         services.AddScoped<GetCustomersQueryHandler>();
         services.AddScoped<GetNearbyCustomersQueryHandler>();
+
+        // Sales
+        services.AddScoped<SaleService>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();
