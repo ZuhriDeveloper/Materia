@@ -1,6 +1,7 @@
 ﻿using Materia.Domain.Common;
 using Materia.Domain.Customers.Events;
 using Materia.Domain.Inventory.Events;
+using Materia.Domain.Purchasing.Events;
 using Materia.Domain.Sales.Events;
 
 namespace Materia.Infrastructure.Persistence.EventStore;
@@ -34,8 +35,9 @@ public static class EventTypeRegistry
         [nameof(UnitDeactivated)] = typeof(UnitDeactivated),
 
         // Stock events
-        [nameof(StockInitialized)] = typeof(StockInitialized),
-        [nameof(StockAdjusted)]    = typeof(StockAdjusted),
+        [nameof(StockInitialized)]            = typeof(StockInitialized),
+        [nameof(StockAdjusted)]               = typeof(StockAdjusted),
+        [nameof(StockReconciledFromPurchase)] = typeof(StockReconciledFromPurchase),
 
         // Customer events
         [nameof(CustomerCreated)]               = typeof(CustomerCreated),
@@ -47,6 +49,19 @@ public static class EventTypeRegistry
         [nameof(CustomerAddressRemoved)]        = typeof(CustomerAddressRemoved),
         [nameof(CustomerDefaultAddressChanged)] = typeof(CustomerDefaultAddressChanged),
 
+        // Supplier events
+        [nameof(SupplierRegistered)]       = typeof(SupplierRegistered),
+        [nameof(SupplierUpdated)]          = typeof(SupplierUpdated),
+        [nameof(SupplierActivated)]        = typeof(SupplierActivated),
+        [nameof(SupplierDeactivated)]      = typeof(SupplierDeactivated),
+        [nameof(SupplierPurchasePriceSet)] = typeof(SupplierPurchasePriceSet),
+
+        // Purchase order events
+        [nameof(PurchaseOrderCreated)]   = typeof(PurchaseOrderCreated),
+        [nameof(PurchaseOrderConfirmed)] = typeof(PurchaseOrderConfirmed),
+        [nameof(PurchaseOrderReceived)]  = typeof(PurchaseOrderReceived),
+        [nameof(PurchaseOrderCancelled)] = typeof(PurchaseOrderCancelled),
+
         // Sale events
         [nameof(SaleCreated)]            = typeof(SaleCreated),
         [nameof(SaleCustomerSet)]        = typeof(SaleCustomerSet),
@@ -57,6 +72,8 @@ public static class EventTypeRegistry
         [nameof(SaleConfirmed)]          = typeof(SaleConfirmed),
         [nameof(SalePaid)]               = typeof(SalePaid),
         [nameof(SaleCancelled)]          = typeof(SaleCancelled),
+        [nameof(SaleFinalized)]          = typeof(SaleFinalized),
+        [nameof(DeliveryRequested)]      = typeof(DeliveryRequested),
     };
 
     public static Type Resolve(string eventType) =>

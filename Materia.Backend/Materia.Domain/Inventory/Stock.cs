@@ -1,5 +1,6 @@
 using Materia.Domain.Common;
 using Materia.Domain.Inventory.Events;
+using Materia.Domain.Purchasing;
 
 namespace Materia.Domain.Inventory;
 
@@ -35,10 +36,23 @@ public class Stock : AggregateRoot<StockId>
     public void Adjust(decimal delta, string? reason, string adjustedBy)
     {
         var newQuantity = Quantity + delta;
-        if (newQuantity < 0)
-            throw new DomainException($"Stock cannot go below zero. Current: {Quantity}, Delta: {delta}.");
-
         Raise(new StockAdjusted(Id, ProductId, delta, newQuantity, reason, adjustedBy, DateTime.UtcNow));
+    }
+
+    public void ReconcileFromPurchase(
+        decimal receivedQty,
+        PurchaseOrderId purchaseOrderId,
+        decimal unitCost,
+        string unit,
+        string reconciledBy)
+    {
+        if (receivedQty <= 0)
+            throw new DomainException("Received quantity must be positive.");
+
+        var newQuantity = Quantity + receivedQty;
+        Raise(new StockReconciledFromPurchase(
+            Id, ProductId, receivedQty, newQuantity,
+            purchaseOrderId, unitCost, unit, reconciledBy, DateTime.UtcNow));
     }
 
     // ── Event Application ─────────────────────────────────────────────────────
@@ -55,6 +69,10 @@ public class Stock : AggregateRoot<StockId>
                 break;
 
             case StockAdjusted e:
+                Quantity = e.NewQuantity;
+                break;
+
+            case StockReconciledFromPurchase e:
                 Quantity = e.NewQuantity;
                 break;
         }

@@ -12,9 +12,11 @@ public class SaleReadModel
     public string?       DeliveryAddress   { get; set; }
     public SaleType      SaleType          { get; set; }
     public SaleStatus    Status            { get; set; }
+    public bool          IsDeliveryRequired { get; set; }
     public decimal       Subtotal          { get; set; }
     public decimal       GrandTotal        { get; set; }
     public string        CreatedBy         { get; set; } = default!;
+    public string?       ServedBy          { get; set; }
     public DateTime      CreatedAt         { get; set; }
 
     // Payment (nullable, denormalized)

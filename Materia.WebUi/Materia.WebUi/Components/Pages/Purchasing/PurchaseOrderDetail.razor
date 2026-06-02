@@ -1,0 +1,321 @@
+@page "/purchase-orders/{id:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject PurchaseOrderApiClient PoApi
+@inject InventoryApiClient      InventoryApi
+@inject NavigationManager       Navigation
+
+<PageTitle>Order Pembelian — Materia</PageTitle>
+
+@if (_po is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <a href="/purchase-orders" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
+        <h4 class="mb-0 fw-bold">Order — @_po.SupplierName</h4>
+        @StatusBadge(_po.Status)
+    </div>
+
+    @if (!string.IsNullOrEmpty(_notice))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_notice
+            <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_error
+            <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        @* ── Lines ── *@
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span>Item Order</span>
+                    @if (_receiving)
+                    {
+                        <span class="badge text-bg-primary">Mode Penerimaan</span>
+                    }
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Produk</th>
+                                <th class="text-end">Dipesan</th>
+                                <th class="text-end">Diterima</th>
+                                <th class="text-end">Harga</th>
+                                <th class="text-end">Subtotal</th>
+                                @if (_receiving)
+                                {
+                                    <th class="text-end" style="width:140px">Terima Qty</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var line in _po.Lines)
+                            {
+                                var remaining = line.OrderedQty - line.ReceivedQty;
+                                <tr>
+                                    <td>
+                                        <span class="fw-semibold">@ProductName(line.ProductId)</span>
+                                        <span class="badge text-bg-light border ms-1 small">@line.Unit</span>
+                                    </td>
+                                    <td class="text-end">@line.OrderedQty.ToString("G29")</td>
+                                    <td class="text-end">
+                                        @line.ReceivedQty.ToString("G29")
+                                        @if (remaining > 0 && line.ReceivedQty > 0)
+                                        {
+                                            <span class="text-muted small">(sisa @remaining.ToString("G29"))</span>
+                                        }
+                                    </td>
+                                    <td class="text-end">Rp @line.UnitCost.ToString("N0")</td>
+                                    <td class="text-end fw-semibold">
+                                        Rp @((line.OrderedQty * line.UnitCost).ToString("N0"))
+                                    </td>
+                                    @if (_receiving)
+                                    {
+                                        <td class="text-end">
+                                            @if (remaining > 0)
+                                            {
+                                                <input type="number" class="form-control form-control-sm text-end"
+                                                       @bind="_receiptQty[line.ProductId]"
+                                                       min="0" max="@remaining" step="0.001" />
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success">Lengkap</span>
+                                            }
+                                        </td>
+                                    }
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="4" class="text-end fw-bold">Total</td>
+                                <td class="text-end fw-bold">Rp @Total.ToString("N0")</td>
+                                @if (_receiving) { <td></td> }
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                @if (_receiving)
+                {
+                    <div class="card-footer d-flex gap-2 justify-content-end">
+                        <button class="btn btn-sm btn-outline-secondary" @onclick="CancelReceive" disabled="@_saving">
+                            Batal
+                        </button>
+                        <button class="btn btn-sm btn-success" @onclick="HandleReceive"
+                                disabled="@(_saving || !HasReceiptQty)">
+                            <i class="bi bi-box-arrow-in-down me-1"></i> Konfirmasi Penerimaan
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (_receiving)
+            {
+                <div class="alert alert-info small mt-3 mb-0">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Saat penerimaan dikonfirmasi, saldo stok tiap produk akan bertambah (merekonsiliasi
+                    stok negatif) dan harga beli dari order ini dicatat sebagai lapisan biaya historis.
+                </div>
+            }
+        </div>
+
+        @* ── Info & actions ── *@
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header fw-semibold">Informasi</div>
+                <div class="card-body small">
+                    <dl class="row mb-0">
+                        <dt class="col-5 text-muted fw-normal">Pemasok</dt>
+                        <dd class="col-7 fw-semibold">@_po.SupplierName</dd>
+
+                        <dt class="col-5 text-muted fw-normal">Status</dt>
+                        <dd class="col-7">@StatusBadge(_po.Status)</dd>
+
+                        <dt class="col-5 text-muted fw-normal">Dibuat</dt>
+                        <dd class="col-7">@_po.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
+
+                        <dt class="col-5 text-muted fw-normal">Oleh</dt>
+                        <dd class="col-7">@_po.CreatedBy</dd>
+
+                        @if (_po.ReceivedAt.HasValue)
+                        {
+                            <dt class="col-5 text-muted fw-normal">Diterima</dt>
+                            <dd class="col-7">@_po.ReceivedAt.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
+                        }
+                    </dl>
+                </div>
+
+                @if (!_receiving && CanAct)
+                {
+                    <div class="card-footer d-grid gap-2">
+                        @if (_po.Status == "Draft")
+                        {
+                            <button class="btn btn-sm btn-primary" @onclick="HandleConfirm" disabled="@_saving">
+                                <i class="bi bi-check2-circle me-1"></i> Konfirmasi Order
+                            </button>
+                        }
+                        @if (_po.Status is "Confirmed" or "PartiallyReceived")
+                        {
+                            <button class="btn btn-sm btn-success" @onclick="StartReceive" disabled="@_saving">
+                                <i class="bi bi-box-arrow-in-down me-1"></i> Terima Barang
+                            </button>
+                        }
+                        <button class="btn btn-sm btn-outline-danger" @onclick="ToggleCancelForm" disabled="@_saving">
+                            <i class="bi bi-x-circle me-1"></i> Batalkan Order
+                        </button>
+                    </div>
+                }
+            </div>
+
+            @if (_showCancelForm)
+            {
+                <div class="card mt-3 border-danger">
+                    <div class="card-header fw-semibold text-danger">Batalkan Order</div>
+                    <div class="card-body">
+                        <label class="form-label small">Alasan <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-sm mb-2" rows="2"
+                                  @bind="_cancelReason" placeholder="cth. Pemasok kehabisan stok"></textarea>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    @onclick="ToggleCancelForm" disabled="@_saving">Batal</button>
+                            <button class="btn btn-sm btn-danger" @onclick="HandleCancel"
+                                    disabled="@(_saving || string.IsNullOrWhiteSpace(_cancelReason))">
+                                Ya, Batalkan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private PurchaseOrderDto?  _po;
+    private List<ProductDto>?  _products;
+
+    private bool _receiving;
+    private bool _showCancelForm;
+    private string _cancelReason = "";
+    private readonly Dictionary<Guid, decimal> _receiptQty = [];
+
+    private string? _error;
+    private string? _notice;
+    private bool    _saving;
+
+    private decimal Total => _po?.Lines.Sum(l => l.OrderedQty * l.UnitCost) ?? 0;
+    private bool CanAct => _po is not null && _po.Status is "Draft" or "Confirmed" or "PartiallyReceived";
+    private bool HasReceiptQty => _receiptQty.Values.Any(q => q > 0);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var productsTask = InventoryApi.GetProductsAsync(pageSize: 500);
+        await LoadAsync();
+        _products = (await productsTask)?.Items ?? [];
+    }
+
+    private async Task LoadAsync()
+    {
+        _po = await PoApi.GetByIdAsync(Id);
+        if (_po is null) Navigation.NavigateTo("/purchase-orders");
+    }
+
+    private string ProductName(Guid productId)
+        => _products?.FirstOrDefault(p => p.Id == productId)?.Name ?? productId.ToString()[..8];
+
+    private async Task HandleConfirm()
+    {
+        _saving = true; _error = null;
+        var error = await PoApi.ConfirmAsync(Id);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _notice = "Order berhasil dikonfirmasi.";
+        await LoadAsync();
+    }
+
+    private void StartReceive()
+    {
+        _receiving = true;
+        _showCancelForm = false;
+        _receiptQty.Clear();
+        foreach (var line in _po!.Lines)
+        {
+            var remaining = line.OrderedQty - line.ReceivedQty;
+            _receiptQty[line.ProductId] = remaining > 0 ? remaining : 0;
+        }
+    }
+
+    private void CancelReceive()
+    {
+        _receiving = false;
+        _receiptQty.Clear();
+    }
+
+    private async Task HandleReceive()
+    {
+        var lines = _receiptQty
+            .Where(kv => kv.Value > 0)
+            .Select(kv => new ReceivePoLineInput(kv.Key, kv.Value))
+            .ToList();
+
+        if (lines.Count == 0) return;
+
+        _saving = true; _error = null;
+        var error = await PoApi.ReceiveAsync(Id, lines);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+
+        _receiving = false;
+        _receiptQty.Clear();
+        _notice = "Barang berhasil diterima dan stok direkonsiliasi.";
+        await LoadAsync();
+    }
+
+    private void ToggleCancelForm()
+    {
+        _showCancelForm = !_showCancelForm;
+        _cancelReason = "";
+    }
+
+    private async Task HandleCancel()
+    {
+        _saving = true; _error = null;
+        var error = await PoApi.CancelAsync(Id, _cancelReason);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _showCancelForm = false;
+        _notice = "Order berhasil dibatalkan.";
+        await LoadAsync();
+    }
+
+    private static MarkupString StatusBadge(string status) => status switch
+    {
+        "Draft"             => (MarkupString)"<span class='badge bg-warning text-dark'>Draf</span>",
+        "Confirmed"         => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
+        "PartiallyReceived" => (MarkupString)"<span class='badge bg-info text-dark'>Diterima Sebagian</span>",
+        "Received"          => (MarkupString)"<span class='badge bg-success'>Diterima</span>",
+        "Cancelled"         => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
+        _                   => (MarkupString)$"<span class='badge bg-secondary'>{status}</span>",
+    };
+}

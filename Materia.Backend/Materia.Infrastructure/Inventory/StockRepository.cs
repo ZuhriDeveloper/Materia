@@ -1,6 +1,7 @@
 using Materia.Application.Contracts.Inventory;
 using Materia.Domain.Inventory;
 using Materia.Domain.Inventory.Events;
+using Materia.Domain.Purchasing;
 using Materia.Infrastructure.Persistence;
 using Materia.Infrastructure.Persistence.EventStore;
 using Materia.Infrastructure.Persistence.Projections;
@@ -84,6 +85,13 @@ public class StockRepository(AppDbContext context) : IStockRepository
         {
             projection.LastAdjustedAt = lastAdjust.OccurredAt;
             projection.LastAdjustedBy = lastAdjust.AdjustedBy;
+        }
+
+        var lastReconcile = newEvents.OfType<StockReconciledFromPurchase>().LastOrDefault();
+        if (lastReconcile is not null)
+        {
+            projection.LastAdjustedAt = lastReconcile.OccurredAt;
+            projection.LastAdjustedBy = lastReconcile.ReconciledBy;
         }
     }
 }

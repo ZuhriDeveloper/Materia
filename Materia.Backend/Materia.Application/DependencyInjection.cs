@@ -24,7 +24,17 @@ using Materia.Application.Commands.Inventory.RemoveUnitConversion;
 using Materia.Application.Commands.Inventory.SetProductStatus;
 using Materia.Application.Commands.Inventory.SyncProductCategories;
 using Materia.Application.Commands.Inventory.UpdateProduct;
+using Materia.Application.Commands.Purchasing.CancelPurchaseOrder;
+using Materia.Application.Commands.Purchasing.ConfirmPurchaseOrder;
+using Materia.Application.Commands.Purchasing.CreatePurchaseOrder;
+using Materia.Application.Commands.Purchasing.ReceivePurchaseOrder;
+using Materia.Application.Commands.Purchasing.RegisterSupplier;
+using Materia.Application.Commands.Purchasing.SetPurchasePrice;
+using Materia.Application.Commands.Purchasing.SetSupplierStatus;
+using Materia.Application.Commands.Purchasing.UpdateSupplier;
 using Materia.Application.Queries.Inventory;
+using Materia.Application.Queries.Purchasing;
+using Materia.Application.Commands.Sales.FinalizeSale;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Materia.Application;
@@ -79,8 +89,27 @@ public static class DependencyInjection
         services.AddScoped<GetCustomersQueryHandler>();
         services.AddScoped<GetNearbyCustomersQueryHandler>();
 
+        // Purchasing — supplier commands
+        services.AddScoped<RegisterSupplierCommandHandler>();
+        services.AddScoped<UpdateSupplierCommandHandler>();
+        services.AddScoped<SetSupplierStatusCommandHandler>();
+        services.AddScoped<SetPurchasePriceCommandHandler>();
+
+        // Purchasing — PO commands
+        services.AddScoped<CreatePurchaseOrderCommandHandler>();
+        services.AddScoped<ConfirmPurchaseOrderCommandHandler>();
+        services.AddScoped<ReceivePurchaseOrderCommandHandler>();
+        services.AddScoped<CancelPurchaseOrderCommandHandler>();
+
+        // Purchasing — queries
+        services.AddScoped<GetSuppliersQueryHandler>();
+        services.AddScoped<GetSupplierByIdQueryHandler>();
+        services.AddScoped<GetPurchaseOrdersQueryHandler>();
+        services.AddScoped<GetPurchaseOrderByIdQueryHandler>();
+
         // Sales
         services.AddScoped<SaleService>();
+        services.AddScoped<FinalizeSaleCommandHandler>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();

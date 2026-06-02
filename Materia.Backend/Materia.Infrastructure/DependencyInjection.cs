@@ -80,6 +80,12 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Customers.ICustomerRepository, Customers.CustomerRepository>();
         services.AddScoped<Application.Contracts.Customers.ICustomerQueryRepository, Customers.CustomerQueryRepository>();
 
+        // Purchasing repositories
+        services.AddScoped<Application.Contracts.Purchasing.ISupplierRepository, Purchasing.SupplierRepository>();
+        services.AddScoped<Application.Contracts.Purchasing.IPurchaseOrderRepository, Purchasing.PurchaseOrderRepository>();
+        services.AddScoped<Application.Contracts.Purchasing.ISupplierQueryRepository, Purchasing.SupplierQueryRepository>();
+        services.AddScoped<Application.Contracts.Purchasing.IPurchaseOrderQueryRepository, Purchasing.PurchaseOrderQueryRepository>();
+
         // Sales
         services.AddScoped<Application.Contracts.Sales.ISaleRepository, Sales.SaleRepository>();
         services.AddScoped<Application.Contracts.Sales.ISaleQueryRepository, Sales.SaleQueryRepository>();

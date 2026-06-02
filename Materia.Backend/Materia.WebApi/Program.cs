@@ -21,11 +21,11 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
-{
-    var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
-    await initializer.InitialiseAsync();
-}
+//using (var scope = app.Services.CreateScope())
+//{
+//    var initializer = scope.ServiceProvider.GetRequiredService<DatabaseInitializer>();
+//    await initializer.InitialiseAsync();
+//}
 
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();

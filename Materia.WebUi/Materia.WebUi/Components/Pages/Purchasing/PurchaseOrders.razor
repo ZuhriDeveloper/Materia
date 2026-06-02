@@ -1,0 +1,105 @@
+@page "/purchase-orders"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject PurchaseOrderApiClient Api
+
+<PageTitle>Order Pembelian — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Order Pembelian</h4>
+    <a href="/purchase-orders/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-circle me-1"></i> Order Baru
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" style="width:auto" @bind="_statusFilter">
+                <option value="">Semua Status</option>
+                <option value="Draft">Draf</option>
+                <option value="Confirmed">Dikonfirmasi</option>
+                <option value="PartiallyReceived">Diterima Sebagian</option>
+                <option value="Received">Diterima</option>
+                <option value="Cancelled">Dibatalkan</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+@if (_orders is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else if (Filtered.Count == 0)
+{
+    <div class="alert alert-info">Belum ada order pembelian.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Pemasok</th>
+                        <th class="text-center">Item</th>
+                        <th class="text-end">Nilai</th>
+                        <th>Status</th>
+                        <th>Dibuat</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var po in Filtered)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@po.SupplierName</td>
+                            <td class="text-center">
+                                <span class="badge text-bg-light border">@po.Lines.Count</span>
+                            </td>
+                            <td class="text-end fw-semibold">Rp @TotalValue(po).ToString("N0")</td>
+                            <td>@StatusBadge(po.Status)</td>
+                            <td class="small text-muted">
+                                @po.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                <div>oleh @po.CreatedBy</div>
+                            </td>
+                            <td class="text-end">
+                                <a href="/purchase-orders/@po.Id" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<PurchaseOrderDto>? _orders;
+    private string _statusFilter = "";
+
+    private List<PurchaseOrderDto> Filtered =>
+        _orders is null ? []
+        : string.IsNullOrEmpty(_statusFilter) ? _orders
+        : _orders.Where(o => o.Status == _statusFilter).ToList();
+
+    protected override async Task OnInitializedAsync()
+        => _orders = await Api.GetAllAsync();
+
+    private static decimal TotalValue(PurchaseOrderDto po)
+        => po.Lines.Sum(l => l.OrderedQty * l.UnitCost);
+
+    private static MarkupString StatusBadge(string status) => status switch
+    {
+        "Draft"             => (MarkupString)"<span class='badge bg-warning text-dark'>Draf</span>",
+        "Confirmed"         => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
+        "PartiallyReceived" => (MarkupString)"<span class='badge bg-info text-dark'>Diterima Sebagian</span>",
+        "Received"          => (MarkupString)"<span class='badge bg-success'>Diterima</span>",
+        "Cancelled"         => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
+        _                   => (MarkupString)$"<span class='badge bg-secondary'>{status}</span>",
+    };
+}

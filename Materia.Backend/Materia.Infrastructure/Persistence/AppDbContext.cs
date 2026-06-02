@@ -18,6 +18,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<CustomerAddressReadModel> CustomerAddressReadModels => Set<CustomerAddressReadModel>();
     public DbSet<SaleReadModel> SaleReadModels => Set<SaleReadModel>();
     public DbSet<SaleItemReadModel> SaleItemReadModels => Set<SaleItemReadModel>();
+    public DbSet<SupplierReadModel> SupplierReadModels => Set<SupplierReadModel>();
+    public DbSet<PurchaseOrderReadModel> PurchaseOrderReadModels => Set<PurchaseOrderReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -76,27 +78,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Longitude).HasColumnType("decimal(11,8)");
         });
 
-        builder.Entity<SaleReadModel>(e =>
+        builder.ApplyConfiguration(new Configurations.SaleReadModelConfiguration());
+        builder.ApplyConfiguration(new Configurations.SaleItemReadModelConfiguration());
+
+        builder.Entity<SupplierReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.ReferenceNo).IsUnique();
-            e.HasIndex(x => x.Status);
-            e.HasIndex(x => x.CreatedAt);
-            e.HasIndex(x => x.CustomerId);
-            e.Property(x => x.SaleType).HasConversion<string>();
-            e.Property(x => x.Status).HasConversion<string>();
-            e.Property(x => x.PaymentMethod).HasConversion<string>();
-            e.HasMany(x => x.Items)
-             .WithOne()
-             .HasForeignKey(i => i.SaleId)
-             .OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ContactPhone).HasMaxLength(50);
+            e.Property(x => x.CatalogJson).HasColumnType("jsonb");
+            e.HasIndex(x => x.Name);
+            e.HasIndex(x => x.IsActive);
         });
 
-        builder.Entity<SaleItemReadModel>(e =>
+        builder.Entity<PurchaseOrderReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.SaleId);
-            e.HasIndex(x => x.ProductId);
+            e.Property(x => x.Status).HasMaxLength(30).IsRequired();
+            e.Property(x => x.LinesJson).HasColumnType("jsonb");
+            e.HasIndex(x => x.SupplierId);
+            e.HasIndex(x => x.Status);
+            e.HasIndex(x => x.CreatedAt);
         });
     }
 }

@@ -163,6 +163,97 @@ namespace Materia.Infrastructure.Migrations
                     b.ToTable("CategoryReadModels");
                 });
 
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerAddressReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("City")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDefault")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Label")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Latitude")
+                        .HasColumnType("decimal(11,8)");
+
+                    b.Property<decimal>("Longitude")
+                        .HasColumnType("decimal(11,8)");
+
+                    b.Property<string>("PostalCode")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Province")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Street")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("Latitude", "Longitude");
+
+                    b.ToTable("CustomerAddressReadModels");
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name");
+
+                    b.HasIndex("Phone")
+                        .IsUnique();
+
+                    b.ToTable("CustomerReadModels");
+                });
+
             modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.ProductReadModel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -213,6 +304,243 @@ namespace Materia.Infrastructure.Migrations
                     b.ToTable("ProductReadModels");
                 });
 
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.PurchaseOrderReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("LinesJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<DateTime?>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("SupplierId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SupplierName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Status");
+
+                    b.HasIndex("SupplierId");
+
+                    b.ToTable("PurchaseOrderReadModels");
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.SaleItemReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal>("QuantityInBaseUnit")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("UnitName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("SaleId");
+
+                    b.ToTable("SaleItemReadModels", (string)null);
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.SaleReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal?>("Change")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("CustomerAddressId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CustomerId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CustomerName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DeliveryAddress")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("GrandTotal")
+                        .HasColumnType("numeric");
+
+                    b.Property<bool>("IsDeliveryRequired")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<decimal?>("PaidAmount")
+                        .HasColumnType("numeric");
+
+                    b.Property<DateTime?>("PaidAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("PaymentMethod")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ReferenceNo")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SaleType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ServedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Subtotal")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedAt");
+
+                    b.HasIndex("CustomerId");
+
+                    b.HasIndex("ReferenceNo")
+                        .IsUnique();
+
+                    b.HasIndex("Status");
+
+                    b.ToTable("SaleReadModels", (string)null);
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.StockReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime?>("LastAdjustedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LastAdjustedBy")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId")
+                        .IsUnique();
+
+                    b.ToTable("StockReadModels");
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.SupplierReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CatalogJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("ContactPhone")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("SupplierReadModels");
+                });
+
             modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.UnitReadModel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -248,72 +576,6 @@ namespace Materia.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("UnitReadModels");
-                });
-
-            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.StockReadModel", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("ProductId")
-                        .HasColumnType("uuid");
-
-                    b.Property<decimal>("Quantity")
-                        .HasColumnType("numeric");
-
-                    b.Property<string>("Unit")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("LastAdjustedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("LastAdjustedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductId")
-                        .IsUnique();
-
-                    b.ToTable("StockReadModels");
-                });
-
-            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerReadModel", b =>
-                {
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<DateTime>("CreatedAt").HasColumnType("timestamp with time zone");
-                    b.Property<string>("CreatedBy").IsRequired().HasColumnType("text");
-                    b.Property<string?>("Email").HasColumnType("text");
-                    b.Property<bool>("IsActive").HasColumnType("boolean");
-                    b.Property<string>("Name").IsRequired().HasColumnType("text");
-                    b.Property<string>("Phone").IsRequired().HasColumnType("text");
-                    b.Property<DateTime?>("UpdatedAt").HasColumnType("timestamp with time zone");
-                    b.Property<string?>("UpdatedBy").HasColumnType("text");
-                    b.HasKey("Id");
-                    b.HasIndex("IsActive");
-                    b.HasIndex("Name");
-                    b.HasIndex("Phone").IsUnique();
-                    b.ToTable("CustomerReadModels");
-                });
-
-            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerAddressReadModel", b =>
-                {
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<Guid>("CustomerId").HasColumnType("uuid");
-                    b.Property<bool>("IsDefault").HasColumnType("boolean");
-                    b.Property<string>("Label").IsRequired().HasColumnType("text");
-                    b.Property<decimal>("Latitude").HasColumnType("decimal(11,8)");
-                    b.Property<decimal>("Longitude").HasColumnType("decimal(11,8)");
-                    b.Property<string>("City").IsRequired().HasColumnType("text");
-                    b.Property<string>("Province").IsRequired().HasColumnType("text");
-                    b.Property<string?>("PostalCode").HasColumnType("text");
-                    b.Property<string>("Street").IsRequired().HasColumnType("text");
-                    b.HasKey("Id");
-                    b.HasIndex("CustomerId");
-                    b.HasIndex("Latitude", "Longitude");
-                    b.ToTable("CustomerAddressReadModels");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
@@ -448,6 +710,24 @@ namespace Materia.Infrastructure.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerAddressReadModel", b =>
+                {
+                    b.HasOne("Materia.Infrastructure.Persistence.Projections.CustomerReadModel", null)
+                        .WithMany("Addresses")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.SaleItemReadModel", b =>
+                {
+                    b.HasOne("Materia.Infrastructure.Persistence.Projections.SaleReadModel", null)
+                        .WithMany("Items")
+                        .HasForeignKey("SaleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
                 {
                     b.HasOne("Microsoft.AspNetCore.Identity.IdentityRole", null)
@@ -497,6 +777,16 @@ namespace Materia.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerReadModel", b =>
+                {
+                    b.Navigation("Addresses");
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.SaleReadModel", b =>
+                {
+                    b.Navigation("Items");
                 });
 #pragma warning restore 612, 618
         }

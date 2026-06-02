@@ -1,0 +1,90 @@
+@page "/suppliers"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject SupplierApiClient Api
+
+<PageTitle>Pemasok — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Pemasok</h4>
+    <a href="/suppliers/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-truck me-1"></i> Pemasok Baru
+    </a>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="d-flex gap-2 align-items-center">
+            <select class="form-select form-select-sm" style="width:auto"
+                    @bind="_activeFilter" @bind:after="LoadAsync">
+                <option value="">Semua Status</option>
+                <option value="true">Aktif</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+@if (_suppliers is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else if (_suppliers.Count == 0)
+{
+    <div class="alert alert-info">Belum ada pemasok.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nama</th>
+                        <th>Telepon</th>
+                        <th class="text-center">Produk Dipasok</th>
+                        <th>Status</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var s in _suppliers)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@s.Name</td>
+                            <td class="text-muted">@(string.IsNullOrEmpty(s.ContactPhone) ? "—" : s.ContactPhone)</td>
+                            <td class="text-center">
+                                <span class="badge text-bg-light border">@s.Catalog.Count</span>
+                            </td>
+                            <td>
+                                @if (s.IsActive)
+                                {
+                                    <span class="badge bg-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Tidak Aktif</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <a href="/suppliers/@s.Id" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-pencil-square"></i>
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
+@code {
+    private List<SupplierDto>? _suppliers;
+    private string _activeFilter = "";
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+        => _suppliers = await Api.GetSuppliersAsync(activeOnly: _activeFilter == "true");
+}

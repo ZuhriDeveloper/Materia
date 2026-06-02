@@ -1,0 +1,85 @@
+@page "/suppliers/new"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Materia.WebUi.Services
+@inject SupplierApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Pemasok Baru — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/suppliers" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Pemasok Baru</h4>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @_error
+        <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+    </div>
+}
+
+<div class="row">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header fw-semibold">Informasi Pemasok</div>
+            <div class="card-body">
+                <EditForm Model="_form" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">Nama <span class="text-danger">*</span></label>
+                        <InputText class="form-control" @bind-Value="_form.Name"
+                                   placeholder="cth. PT Jaya Bahan Bangunan" />
+                        <ValidationMessage For="() => _form.Name" class="small text-danger" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Telepon</label>
+                        <InputText class="form-control" @bind-Value="_form.ContactPhone"
+                                   placeholder="cth. 0812xxxxxxx" />
+                        <ValidationMessage For="() => _form.ContactPhone" class="small text-danger" />
+                    </div>
+                    <button type="submit" class="btn btn-primary" disabled="@_saving">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        <i class="bi bi-check-lg me-1"></i> Simpan
+                    </button>
+                </EditForm>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly SupplierForm _form = new();
+    private string? _error;
+    private bool    _saving;
+
+    private async Task HandleSubmit()
+    {
+        _saving = true;
+        _error  = null;
+        var (id, error) = await Api.RegisterAsync(
+            _form.Name,
+            string.IsNullOrWhiteSpace(_form.ContactPhone) ? null : _form.ContactPhone);
+        _saving = false;
+
+        if (error is not null) { _error = error; return; }
+        Navigation.NavigateTo($"/suppliers/{id}");
+    }
+
+    private sealed class SupplierForm
+    {
+        [Required(ErrorMessage = "Nama wajib diisi.")]
+        [MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(50)]
+        public string? ContactPhone { get; set; }
+    }
+}

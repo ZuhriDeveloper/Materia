@@ -16,6 +16,8 @@ public sealed class Sale : AggregateRoot<SaleId>
     public SaleStatus   Status            { get; private set; }
     public SalePayment? Payment           { get; private set; }
     public string       CreatedBy         { get; private set; } = default!;
+    public string?      ServedBy          { get; private set; }
+    public bool         IsDeliveryRequired { get; private set; }
 
     public IReadOnlyList<SaleItem> Items => _items.AsReadOnly();
 
@@ -118,6 +120,31 @@ public sealed class Sale : AggregateRoot<SaleId>
         Raise(new SaleConfirmed(Id, GrandTotal.Amount, confirmedBy, DateTime.UtcNow));
     }
 
+    /// <summary>Flags this consumer sale as needing delivery (lightweight, address-optional).</summary>
+    public void RequestDelivery(string requestedBy)
+    {
+        EnsureDraft();
+        if (IsDeliveryRequired) return;  // idempotent
+
+        Raise(new DeliveryRequested(Id, requestedBy, DateTime.UtcNow));
+    }
+
+    /// <summary>
+    /// Finalizes a consumer sale in a single step: locks the sale, records the serving
+    /// staff, and emits the event the application layer uses to decrement inventory.
+    /// </summary>
+    public void Finalize(string servedBy)
+    {
+        EnsureDraft();
+        if (string.IsNullOrWhiteSpace(servedBy))
+            throw new DomainException("Staf yang melayani (ServedBy) tidak boleh kosong.");
+        if (_items.Count == 0)
+            throw new DomainException("Tidak dapat menyelesaikan penjualan tanpa item.");
+
+        Raise(new SaleFinalized(
+            Id, GrandTotal.Amount, servedBy.Trim(), IsDeliveryRequired, DateTime.UtcNow));
+    }
+
     public void Pay(decimal paidAmount, PaymentMethod method, string paidBy)
     {
         if (Status == SaleStatus.Paid) return;  // idempotent
@@ -190,6 +217,16 @@ public sealed class Sale : AggregateRoot<SaleId>
 
             case SaleConfirmed:
                 Status = SaleStatus.Confirmed;
+                break;
+
+            case DeliveryRequested:
+                IsDeliveryRequired = true;
+                break;
+
+            case SaleFinalized e:
+                Status             = SaleStatus.Confirmed;
+                ServedBy           = e.ServedBy;
+                IsDeliveryRequired = e.IsDeliveryRequired;
                 break;
 
             case SalePaid e:

@@ -72,14 +72,16 @@ public class SaleRepository(AppDbContext context) : ISaleRepository
             context.SaleReadModels.Add(projection);
         }
 
-        projection.CustomerId        = sale.CustomerId;
-        projection.CustomerName      = sale.CustomerName;
-        projection.CustomerAddressId = sale.CustomerAddressId;
-        projection.DeliveryAddress   = sale.DeliveryAddress;
-        projection.SaleType          = sale.SaleType;
-        projection.Status            = sale.Status;
-        projection.Subtotal          = sale.Subtotal.Amount;
-        projection.GrandTotal        = sale.GrandTotal.Amount;
+        projection.CustomerId         = sale.CustomerId;
+        projection.CustomerName       = sale.CustomerName;
+        projection.CustomerAddressId  = sale.CustomerAddressId;
+        projection.DeliveryAddress    = sale.DeliveryAddress;
+        projection.SaleType           = sale.SaleType;
+        projection.Status             = sale.Status;
+        projection.IsDeliveryRequired = sale.IsDeliveryRequired;
+        projection.ServedBy           = sale.ServedBy;
+        projection.Subtotal           = sale.Subtotal.Amount;
+        projection.GrandTotal         = sale.GrandTotal.Amount;
 
         if (sale.Payment is not null)
         {

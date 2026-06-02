@@ -75,8 +75,16 @@ public class InventoryApiClient(HttpClient http)
 
     // ── Stock ─────────────────────────────────────────────────────────────────
 
-    public Task<StockDto?> GetStockByProductIdAsync(Guid productId, CancellationToken ct = default)
-        => http.GetFromJsonAsync<StockDto>($"api/products/{productId}/stock", ct);
+    public async Task<StockDto?> GetStockByProductIdAsync(Guid productId, CancellationToken ct = default)
+    {
+        // A product with no stock record yet returns 404 — treat that as "no stock".
+        var response = await http.GetAsync($"api/products/{productId}/stock", ct);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return null;
+
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<StockDto>(cancellationToken: ct);
+    }
 
     public async Task<string?> AdjustStockAsync(
         Guid productId, decimal delta, string? reason = null, CancellationToken ct = default)

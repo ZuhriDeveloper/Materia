@@ -1,0 +1,327 @@
+@page "/suppliers/{id:guid}"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Materia.WebUi.Services
+@inject SupplierApiClient   Api
+@inject InventoryApiClient  InventoryApi
+@inject NavigationManager   Navigation
+
+<PageTitle>@(_supplier?.Name ?? "Pemasok") — Materia</PageTitle>
+
+@if (_supplier is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <a href="/suppliers" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
+        <h4 class="mb-0 fw-bold">@_supplier.Name</h4>
+        @if (_supplier.IsActive)
+        {
+            <span class="badge bg-success">Aktif</span>
+        }
+        else
+        {
+            <span class="badge bg-secondary">Tidak Aktif</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_notice))
+    {
+        <div class="alert alert-success alert-dismissible">
+            @_notice
+            <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_error
+            <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        @* ── Info card ── *@
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header fw-semibold">Informasi Pemasok</div>
+                <div class="card-body">
+                    <EditForm Model="_editForm" OnValidSubmit="HandleEdit">
+                        <DataAnnotationsValidator />
+                        <div class="mb-3">
+                            <label class="form-label">Nama <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_editForm.Name"
+                                       disabled="@(!_supplier.IsActive)" />
+                            <ValidationMessage For="() => _editForm.Name" class="small text-danger" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Telepon</label>
+                            <InputText class="form-control" @bind-Value="_editForm.ContactPhone"
+                                       disabled="@(!_supplier.IsActive)" />
+                            <ValidationMessage For="() => _editForm.ContactPhone" class="small text-danger" />
+                        </div>
+                        @if (_supplier.IsActive)
+                        {
+                            <button type="submit" class="btn btn-primary btn-sm" disabled="@_saving">
+                                <i class="bi bi-check-lg me-1"></i> Simpan
+                            </button>
+                        }
+                    </EditForm>
+                </div>
+                <div class="card-footer d-flex justify-content-end">
+                    <button class="btn btn-sm @(_supplier.IsActive ? "btn-outline-danger" : "btn-outline-success")"
+                            @onclick="HandleToggleStatus" disabled="@_saving">
+                        @if (_supplier.IsActive)
+                        {
+                            <i class="bi bi-toggle-on me-1"></i>
+                            <span>Nonaktifkan</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-toggle-off me-1"></i>
+                            <span>Aktifkan</span>
+                        }
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        @* ── Catalog card ── *@
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+                    <span>Katalog Harga Beli</span>
+                    <span class="badge text-bg-secondary">@_supplier.Catalog.Count produk</span>
+                </div>
+                <div class="card-body">
+
+                    @if (_supplier.Catalog.Count == 0)
+                    {
+                        <p class="text-muted small">Belum ada produk dalam katalog.</p>
+                    }
+                    else
+                    {
+                        @foreach (var entry in _supplier.Catalog)
+                        {
+                            var latest = entry.Prices
+                                .OrderByDescending(p => p.EffectiveFrom)
+                                .FirstOrDefault();
+                            <div class="border rounded p-3 mb-2">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>@ProductName(entry.ProductId)</strong>
+                                        @if (latest is not null)
+                                        {
+                                            <div class="small mt-1">
+                                                <span class="fw-semibold text-success">
+                                                    Rp @latest.Amount.ToString("N0")
+                                                </span>
+                                                <span class="text-muted">/ @latest.Unit</span>
+                                                <span class="text-muted ms-1">
+                                                    (berlaku @latest.EffectiveFrom.ToLocalTime().ToString("dd MMM yyyy"))
+                                                </span>
+                                            </div>
+                                        }
+                                        @if (entry.Prices.Count > 1)
+                                        {
+                                            <details class="mt-1">
+                                                <summary class="small text-muted" style="cursor:pointer">
+                                                    Riwayat harga (@entry.Prices.Count)
+                                                </summary>
+                                                <ul class="small text-muted mb-0 mt-1 ps-3">
+                                                    @foreach (var p in entry.Prices.OrderByDescending(p => p.EffectiveFrom))
+                                                    {
+                                                        <li>
+                                                            Rp @p.Amount.ToString("N0") / @p.Unit
+                                                            — @p.EffectiveFrom.ToLocalTime().ToString("dd MMM yyyy")
+                                                        </li>
+                                                    }
+                                                </ul>
+                                            </details>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    }
+
+                    @if (_supplier.IsActive)
+                    {
+                        <hr class="my-3" />
+                        <p class="fw-semibold small mb-2">Tetapkan Harga Beli</p>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label small">Produk <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" @onchange="OnProductChanged">
+                                    <option value="">— pilih produk —</option>
+                                    @if (_products is not null)
+                                    {
+                                        @foreach (var p in _products)
+                                        {
+                                            <option value="@p.Id" selected="@(p.Id == _priceForm.ProductId)">
+                                                @p.Name (@p.BaseUnit)
+                                            </option>
+                                        }
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Harga (Rp) <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control form-control-sm"
+                                       @bind="_priceForm.Amount" min="0" step="100" placeholder="0" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Satuan <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" @bind="_priceForm.Unit">
+                                    @if (_selectedProduct is not null)
+                                    {
+                                        <option value="@_selectedProduct.BaseUnit">@_selectedProduct.BaseUnit (dasar)</option>
+                                        @foreach (var conv in _selectedProduct.UnitConversions)
+                                        {
+                                            <option value="@conv.ToUnit">@conv.ToUnit</option>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <option value="">—</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Berlaku Dari</label>
+                                <input type="date" class="form-control form-control-sm"
+                                       @bind="_priceForm.EffectiveFrom" />
+                            </div>
+                            <div class="col-12">
+                                <button class="btn btn-sm btn-primary"
+                                        @onclick="HandleSetPrice"
+                                        disabled="@(_saving || _priceForm.ProductId == Guid.Empty
+                                                    || _priceForm.Amount <= 0 || string.IsNullOrEmpty(_priceForm.Unit))">
+                                    <i class="bi bi-plus me-1"></i> Tetapkan Harga
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+
+    private SupplierDto?      _supplier;
+    private List<ProductDto>? _products;
+    private ProductDto?       _selectedProduct;
+
+    private string? _error;
+    private string? _notice;
+    private bool    _saving;
+
+    private readonly EditForm_   _editForm  = new();
+    private readonly PriceForm_  _priceForm = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var productsTask = InventoryApi.GetProductsAsync(pageSize: 500, isActive: true);
+        await LoadAsync();
+        _products = (await productsTask)?.Items ?? [];
+    }
+
+    private async Task LoadAsync()
+    {
+        _supplier = await Api.GetSupplierByIdAsync(Id);
+        if (_supplier is null) { Navigation.NavigateTo("/suppliers"); return; }
+        _editForm.Name         = _supplier.Name;
+        _editForm.ContactPhone = _supplier.ContactPhone;
+    }
+
+    private string ProductName(Guid productId)
+        => _products?.FirstOrDefault(p => p.Id == productId)?.Name
+           ?? productId.ToString()[..8];
+
+    private void OnProductChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var pid))
+        {
+            _priceForm.ProductId = pid;
+            _selectedProduct     = _products?.FirstOrDefault(p => p.Id == pid);
+            _priceForm.Unit      = _selectedProduct?.BaseUnit ?? "";
+        }
+        else
+        {
+            _priceForm.ProductId = Guid.Empty;
+            _selectedProduct     = null;
+            _priceForm.Unit      = "";
+        }
+    }
+
+    private async Task HandleEdit()
+    {
+        _saving = true;
+        _error  = null;
+        var error = await Api.UpdateAsync(
+            Id, _editForm.Name,
+            string.IsNullOrWhiteSpace(_editForm.ContactPhone) ? null : _editForm.ContactPhone);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _notice = "Data pemasok berhasil diperbarui.";
+        await LoadAsync();
+    }
+
+    private async Task HandleToggleStatus()
+    {
+        _saving = true;
+        _error  = null;
+        var error = await Api.SetStatusAsync(Id, !_supplier!.IsActive);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _notice = $"Pemasok berhasil {(_supplier.IsActive ? "dinonaktifkan" : "diaktifkan")}.";
+        await LoadAsync();
+    }
+
+    private async Task HandleSetPrice()
+    {
+        _saving = true;
+        _error  = null;
+        var effective = _priceForm.EffectiveFrom?.ToDateTime(TimeOnly.MinValue);
+        var error = await Api.SetPriceAsync(
+            Id, _priceForm.ProductId, _priceForm.Amount,
+            "IDR", _priceForm.Unit, effective);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+
+        _notice = "Harga beli berhasil ditetapkan.";
+        _priceForm.Amount    = 0;
+        _priceForm.ProductId = Guid.Empty;
+        _priceForm.Unit      = "";
+        _selectedProduct     = null;
+        await LoadAsync();
+    }
+
+    private sealed class EditForm_
+    {
+        [Required(ErrorMessage = "Nama wajib diisi.")]
+        [MaxLength(200)]
+        public string Name { get; set; } = string.Empty;
+
+        [MaxLength(50)]
+        public string? ContactPhone { get; set; }
+    }
+
+    private sealed class PriceForm_
+    {
+        public Guid      ProductId     { get; set; }
+        public decimal   Amount        { get; set; }
+        public string    Unit          { get; set; } = string.Empty;
+        public DateOnly? EffectiveFrom { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+    }
+}

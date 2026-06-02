@@ -17,27 +17,34 @@ namespace Materia.WebApi.Controllers.Catalog;
 [Route("api/catalog")]
 public class CatalogController(AppDbContext db, SaleService saleService) : ControllerBase
 {
-    // ── GET /api/catalog/search?q=cat+tembok&top=5 ────────────────────────────
+    // ── GET /api/catalog/search?q=Pipa&q=Lem&q=Karet&top=6 ──────────────────────
+    // Accepts multiple q params — one DB roundtrip regardless of keyword count.
 
     [HttpGet("search")]
     [AllowAnonymous]
     public async Task<IActionResult> Search(
-        [FromQuery] string q   = "",
-        [FromQuery] int    top = 5,
-        CancellationToken  ct  = default)
+        [FromQuery] string[] q,
+        [FromQuery] int      top = 6,
+        CancellationToken    ct  = default)
     {
-        if (string.IsNullOrWhiteSpace(q))
+        var terms = q
+            .Where(k => !string.IsNullOrWhiteSpace(k))
+            .Select(k => k.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(10)
+            .ToList();
+
+        if (terms.Count == 0)
             return Ok(Array.Empty<CatalogSearchResultDto>());
 
         top = Math.Clamp(top, 1, 20);
-        var term = q.Trim();
 
+        // One query: product matches ANY of the keywords (OR across all terms)
         var products = await db.ProductReadModels
             .Where(p => p.IsActive &&
-                        (EF.Functions.ILike(p.Name, $"%{term}%") ||
-                         EF.Functions.ILike(p.Description ?? "", $"%{term}%")))
-            .OrderByDescending(p => EF.Functions.ILike(p.Name, $"%{term}%"))
-            .ThenBy(p => p.Name)
+                        terms.Any(t => EF.Functions.ILike(p.Name, $"%{t}%") ||
+                                       EF.Functions.ILike(p.Description ?? "", $"%{t}%")))
+            .OrderBy(p => p.Name)
             .Take(top)
             .ToListAsync(ct);
 

@@ -70,13 +70,19 @@ public class StockTests
     }
 
     [Fact]
-    public void Adjust_BelowZero_ThrowsDomainException()
+    public void Adjust_BelowZero_AllowsNegativeStock()
     {
+        // Negative stock is intentionally allowed so sales can proceed before
+        // a delayed stocktake or purchase order arrives.
         var stock = Stock.Initialize(AnyProductId(), "sak", "user-1");
         stock.Adjust(10m, null, "user-1");
+        stock.ClearDomainEvents();
 
-        Action act = () => stock.Adjust(-20m, null, "user-1");
-        act.Should().Throw<DomainException>().WithMessage("*zero*");
+        stock.Adjust(-20m, null, "user-1");
+
+        stock.Quantity.Should().Be(-10m);
+        stock.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<StockAdjusted>();
     }
 
     [Fact]
