@@ -5,7 +5,7 @@ var builder = DistributedApplication.CreateBuilder(args);
 // in BOTH the container env var (POSTGRES_PASSWORD) AND the injected connection strings.
 // Using WithEnvironment("POSTGRES_PASSWORD", ...) alone only sets the container side
 // and causes a mismatch with Aspire's generated connection strings.
-var pgPassword = builder.AddParameter("postgres-password", "YYYjzk}ppk*CUP.65!X}!~!", secret: true);
+var pgPassword = builder.AddParameter("postgres-password", "YYYjzk}ppk*CUP.65!X}!~!", secret: true); 
 
 var postgres = builder.AddPostgres("postgres", password: pgPassword)
     .WithDataVolume()
