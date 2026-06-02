@@ -69,6 +69,19 @@ public class SaleApiClient(HttpClient http)
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
+    public async Task<(FinalizeSaleResult? Result, string? Error)> FinalizeAsync(
+        Guid? customerId, string? customerName,
+        IReadOnlyList<FinalizeSaleItemInput> items, bool isDeliveryRequired,
+        CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("api/sales/finalize",
+            new { customerId, customerName, items, isDeliveryRequired }, ct);
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorAsync(response));
+        var result = await response.Content.ReadFromJsonAsync<FinalizeSaleResult>(cancellationToken: ct);
+        return (result, null);
+    }
+
     private static async Task<string> ReadErrorAsync(HttpResponseMessage r)
     {
         try

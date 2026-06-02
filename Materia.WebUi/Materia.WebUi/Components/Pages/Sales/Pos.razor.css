@@ -1,0 +1,25 @@
+.pos-total {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+}
+
+.pos-scan-input {
+    font-size: 1.15rem;
+    font-weight: 500;
+}
+
+.pos-table td {
+    vertical-align: middle;
+}
+
+.pos-suggestions {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    z-index: 1050;
+    max-height: 320px;
+    overflow-y: auto;
+}

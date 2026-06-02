@@ -27,9 +27,11 @@ public record SaleDto(
     string?         DeliveryAddress,
     SaleType        SaleType,
     SaleStatus      Status,
+    bool            IsDeliveryRequired,
     decimal         Subtotal,
     decimal         GrandTotal,
     string          CreatedBy,
+    string?         ServedBy,
     DateTime        CreatedAt,
     SalePaymentDto? Payment,
     IReadOnlyList<SaleItemDto> Items);

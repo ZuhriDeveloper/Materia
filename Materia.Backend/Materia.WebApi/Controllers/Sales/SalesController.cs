@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using FluentValidation;
+using Materia.Application.Commands.Sales.FinalizeSale;
 using Materia.Application.DTOs.Sales;
 using Materia.Application.Services;
 using Materia.Domain.Sales;
@@ -10,7 +12,10 @@ namespace Materia.WebApi.Controllers.Sales;
 [ApiController]
 [Authorize(Roles = "Admin,Cashier")]
 [Route("api/[controller]")]
-public class SalesController(SaleService saleService) : ControllerBase
+public class SalesController(
+    SaleService                       saleService,
+    FinalizeSaleCommandHandler        finalizeHandler,
+    IValidator<FinalizeSaleCommand>   finalizeValidator) : ControllerBase
 {
     private string CurrentUser =>
         User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
@@ -77,4 +82,31 @@ public class SalesController(SaleService saleService) : ControllerBase
         await saleService.CancelAsync(id, request.Reason, CurrentUser, ct);
         return NoContent();
     }
+
+    // ── Consumer sale (single-step finalize) ────────────────────────────────────
+
+    [HttpPost("finalize")]
+    public async Task<IActionResult> Finalize(
+        [FromBody] FinalizeSaleRequest request, CancellationToken ct)
+    {
+        var command = new FinalizeSaleCommand(
+            request.CustomerId,
+            request.CustomerName,
+            request.Items,
+            request.IsDeliveryRequired,
+            CurrentUser);
+
+        var validation = await finalizeValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        var result = await finalizeHandler.HandleAsync(command, ct);
+        return CreatedAtAction(nameof(GetById), new { id = result.SaleId }, result);
+    }
 }
+
+public record FinalizeSaleRequest(
+    Guid?                                CustomerId,
+    string?                              CustomerName,
+    IReadOnlyList<FinalizeSaleItemInput> Items,
+    bool                                 IsDeliveryRequired);

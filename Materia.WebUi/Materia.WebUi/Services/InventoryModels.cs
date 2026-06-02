@@ -50,3 +50,9 @@ public record StockDto(
     string Unit,
     DateTime? LastAdjustedAt,
     string? LastAdjustedBy);
+
+public record ProductSearchDto(
+    Guid   Id,
+    string Name,
+    string Sku,
+    string BaseUnit);

@@ -49,8 +49,9 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
         s.CustomerId, s.CustomerName,
         s.CustomerAddressId, s.DeliveryAddress,
         s.SaleType, s.Status,
+        s.IsDeliveryRequired,
         s.Subtotal, s.GrandTotal,
-        s.CreatedBy, s.CreatedAt,
+        s.CreatedBy, s.ServedBy, s.CreatedAt,
         s.PaidAmount.HasValue
             ? new SalePaymentDto(s.PaidAmount.Value, s.Change!.Value, s.PaymentMethod!.Value, s.PaidAt!.Value)
             : null,

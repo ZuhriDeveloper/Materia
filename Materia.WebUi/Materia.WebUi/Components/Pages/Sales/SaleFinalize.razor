@@ -1,0 +1,314 @@
+@page "/sales/finalize"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject SaleApiClient      SaleApi
+@inject InventoryApiClient InventoryApi
+@inject CustomerApiClient  CustomerApi
+@inject NavigationManager  Navigation
+
+<PageTitle>Penjualan Cepat — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/sales" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Penjualan Cepat</h4>
+    <span class="badge text-bg-light border">Konsumen / Walk-in</span>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @_error
+        <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+    </div>
+}
+
+<div class="row g-4">
+
+    @* ── Left: customer + add item ── *@
+    <div class="col-lg-7">
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-person me-1"></i> Pelanggan
+            </div>
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md-8">
+                        <label class="form-label small">Pelanggan</label>
+                        <select class="form-select form-select-sm" @onchange="OnCustomerChanged">
+                            <option value="">— Umum / Walk-in —</option>
+                            @if (_customers is not null)
+                            {
+                                @foreach (var c in _customers)
+                                {
+                                    <option value="@c.Id">@c.Name (@c.Phone)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="deliveryChk"
+                                   @bind="_isDeliveryRequired" />
+                            <label class="form-check-label small" for="deliveryChk">
+                                <i class="bi bi-truck me-1"></i> Perlu Pengiriman
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-plus-circle me-1"></i> Tambah Item
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-12">
+                        <label class="form-label small">Produk</label>
+                        <select class="form-select form-select-sm" @onchange="OnProductChanged">
+                            <option value="">— pilih produk —</option>
+                            @if (_products is not null)
+                            {
+                                @foreach (var p in _products)
+                                {
+                                    <option value="@p.Id">@p.Name (@p.BaseUnit)</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    @if (_selectedProduct is not null)
+                    {
+                        <div class="col-md-4">
+                            <label class="form-label small">Satuan</label>
+                            <select class="form-select form-select-sm" @bind="_itemUnitName">
+                                <option value="@_selectedProduct.BaseUnit">
+                                    @_selectedProduct.BaseUnit (dasar)
+                                </option>
+                                @foreach (var conv in _selectedProduct.UnitConversions)
+                                {
+                                    <option value="@conv.ToUnit">@conv.ToUnit</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Kuantitas</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   @bind="_itemQty" min="0.001" step="0.001" placeholder="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Harga / Satuan (Rp)</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   @bind="_itemPrice" min="0" step="100" placeholder="0" />
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-sm btn-primary"
+                                    @onclick="AddItem"
+                                    disabled="@(_itemQty <= 0 || string.IsNullOrEmpty(_itemUnitName))">
+                                <i class="bi bi-plus me-1"></i> Tambah
+                            </button>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        @if (_items.Count > 0)
+        {
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-cart me-1"></i> Item (@_items.Count)
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Produk</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Harga</th>
+                                <th class="text-end">Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _items)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="fw-semibold">@item.ProductName</span>
+                                        <span class="badge text-bg-light border ms-1 small">@item.UnitName</span>
+                                    </td>
+                                    <td class="text-center">@item.Quantity.ToString("G29")</td>
+                                    <td class="text-end">Rp @item.UnitPrice.ToString("N0")</td>
+                                    <td class="text-end fw-semibold">Rp @((item.Quantity * item.UnitPrice).ToString("N0"))</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-xs btn-outline-danger"
+                                                @onclick="() => _items.Remove(item)">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
+    </div>
+
+    @* ── Right: summary + finalize ── *@
+    <div class="col-lg-5">
+        <div class="card sticky-top" style="top:1rem">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-receipt me-1"></i> Ringkasan
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless mb-3">
+                    <tr>
+                        <td class="text-muted">Pelanggan</td>
+                        <td class="text-end fw-semibold">@(_selectedCustomer?.Name ?? "Umum")</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Pengiriman</td>
+                        <td class="text-end">
+                            @if (_isDeliveryRequired)
+                            {
+                                <span class="badge text-bg-info"><i class="bi bi-truck me-1"></i> Ya</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Ambil di toko</span>
+                            }
+                        </td>
+                    </tr>
+                    <tr class="border-top">
+                        <td class="fw-bold">Total</td>
+                        <td class="text-end fw-bold fs-5">Rp @Total.ToString("N0")</td>
+                    </tr>
+                </table>
+
+                <p class="small text-muted">
+                    Menyelesaikan penjualan akan mengurangi stok tiap produk (boleh menjadi negatif)
+                    dan mencatat Anda sebagai staf yang melayani.
+                </p>
+
+                <button class="btn btn-success w-100"
+                        @onclick="HandleFinalize"
+                        disabled="@(_items.Count == 0 || _processing)">
+                    @if (_processing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-check-circle me-1"></i>
+                    }
+                    Selesaikan Penjualan
+                </button>
+
+                @if (_items.Count == 0)
+                {
+                    <div class="mt-2 text-muted small text-center">Tambahkan item terlebih dahulu</div>
+                }
+            </div>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private List<CustomerDto>? _customers;
+    private List<ProductDto>?  _products;
+    private CustomerDto?       _selectedCustomer;
+    private ProductDto?        _selectedProduct;
+
+    private string  _itemUnitName = "";
+    private decimal _itemQty;
+    private decimal _itemPrice;
+    private bool    _isDeliveryRequired;
+
+    private readonly List<LineItem> _items = [];
+
+    private string? _error;
+    private bool    _processing;
+
+    private decimal Total => _items.Sum(i => i.Quantity * i.UnitPrice);
+
+    protected override async Task OnInitializedAsync()
+    {
+        var customersTask = CustomerApi.GetCustomersAsync(isActive: true);
+        var productsTask  = InventoryApi.GetProductsAsync(isActive: true);
+        _customers = (await customersTask)?.Items ?? [];
+        _products  = (await productsTask)?.Items ?? [];
+    }
+
+    private async Task OnCustomerChanged(ChangeEventArgs e)
+    {
+        _selectedCustomer = Guid.TryParse(e.Value?.ToString(), out var id)
+            ? await CustomerApi.GetCustomerByIdAsync(id)
+            : null;
+    }
+
+    private async Task OnProductChanged(ChangeEventArgs e)
+    {
+        _selectedProduct = null;
+        _itemUnitName    = "";
+        _itemQty         = 0;
+        _itemPrice       = 0;
+
+        if (Guid.TryParse(e.Value?.ToString(), out var id))
+        {
+            _selectedProduct = await InventoryApi.GetProductByIdAsync(id);
+            if (_selectedProduct is not null)
+                _itemUnitName = _selectedProduct.BaseUnit;
+        }
+    }
+
+    private void AddItem()
+    {
+        if (_selectedProduct is null || _itemQty <= 0) return;
+
+        _items.Add(new LineItem(
+            _selectedProduct.Id, _selectedProduct.Name,
+            _itemUnitName, _itemQty, _itemPrice));
+
+        _selectedProduct = null;
+        _itemUnitName    = "";
+        _itemQty         = 0;
+        _itemPrice       = 0;
+    }
+
+    private async Task HandleFinalize()
+    {
+        if (_items.Count == 0) return;
+
+        _processing = true;
+        _error      = null;
+
+        var inputs = _items
+            .Select(i => new FinalizeSaleItemInput(i.ProductId, i.ProductName, i.UnitName, i.Quantity, i.UnitPrice))
+            .ToList();
+
+        var (result, error) = await SaleApi.FinalizeAsync(
+            _selectedCustomer?.Id,
+            _selectedCustomer?.Name,
+            inputs,
+            _isDeliveryRequired);
+
+        _processing = false;
+        if (error is not null) { _error = error; return; }
+
+        Navigation.NavigateTo($"/sales/{result!.SaleId}?finalized=1");
+    }
+
+    private sealed record LineItem(
+        Guid    ProductId,
+        string  ProductName,
+        string  UnitName,
+        decimal Quantity,
+        decimal UnitPrice);
+}

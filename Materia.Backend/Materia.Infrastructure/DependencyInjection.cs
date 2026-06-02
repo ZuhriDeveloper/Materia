@@ -1,5 +1,6 @@
 using System.Text;
 using Materia.Application.Contracts.Auth;
+using Materia.Application.Contracts.Inventory;
 using Materia.Infrastructure.Auth;
 using Materia.Infrastructure.Identity;
 using Materia.Infrastructure.Persistence;
@@ -11,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using StackExchange.Redis;
 
 namespace Materia.Infrastructure;
 
@@ -27,6 +29,20 @@ public static class DependencyInjection
                 // that EF Core raises when the live model diverges from the snapshot.
                 .ConfigureWarnings(w =>
                     w.Ignore(RelationalEventId.PendingModelChangesWarning)));
+
+        // ── Redis (PoS product-name autocomplete) ───────────────────────────────
+        // Connection string "cache" is injected by Aspire. When the API is run
+        // standalone (no Aspire), fall back to a local Redis; AbortOnConnectFail=false
+        // keeps startup resilient, and the search cache degrades to the DB if Redis
+        // is unreachable.
+        var redisConnection = configuration.GetConnectionString("cache") ?? "localhost:6379";
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        {
+            var options = ConfigurationOptions.Parse(redisConnection);
+            options.AbortOnConnectFail = false;
+            return ConnectionMultiplexer.Connect(options);
+        });
+        services.AddScoped<IProductSearchCache, Inventory.RedisProductSearchCache>();
 
         services.AddIdentity<ApplicationUser, IdentityRole>(options =>
             {

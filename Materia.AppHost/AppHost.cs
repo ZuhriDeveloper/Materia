@@ -14,10 +14,17 @@ var postgres = builder.AddPostgres("postgres", password: pgPassword)
 
 var materiadb = postgres.AddDatabase("materiadb");
 
+// ── Cache ────────────────────────────────────────────────────────────────────
+// Redis backs the PoS product-name autocomplete (cache-aside over the catalog).
+var redis = builder.AddRedis("cache")
+    .WithLifetime(ContainerLifetime.Persistent);
+
 var webApi = builder.AddProject<Projects.Materia_WebApi>("webapi")
     .WithReference(postgres)
     .WithReference(materiadb)
-    .WaitFor(materiadb);
+    .WithReference(redis)
+    .WaitFor(materiadb)
+    .WaitFor(redis);
 
 builder.AddProject<Projects.Materia_WebUi>("webui")
     .WithReference(webApi)

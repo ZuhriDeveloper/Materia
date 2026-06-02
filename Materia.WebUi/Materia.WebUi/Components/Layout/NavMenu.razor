@@ -16,6 +16,20 @@
 
         <AuthorizeView Roles="Admin,Cashier">
             <div class="nav-item px-3 mt-2">
+                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Penjualan</small>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="pos">
+                    <i class="bi bi-shop me-2"></i> Kasir
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="sales" Match="NavLinkMatch.All">
+                    <i class="bi bi-receipt me-2"></i> Daftar Penjualan
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3 mt-2">
                 <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Pelanggan</small>
             </div>
             <div class="nav-item px-3">

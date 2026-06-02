@@ -1,0 +1,210 @@
+@page "/sales/{id:guid}"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject SaleApiClient     Api
+@inject NavigationManager Navigation
+
+<PageTitle>@(_sale?.ReferenceNo ?? "Penjualan") — Materia</PageTitle>
+
+@if (_sale is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else
+{
+    <div class="d-flex align-items-center gap-2 mb-4">
+        <a href="/sales" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
+        <h4 class="mb-0 fw-bold font-monospace">@_sale.ReferenceNo</h4>
+        @StatusBadge(_sale.Status)
+    </div>
+
+    @if (_justFinalized)
+    {
+        <div class="alert alert-success alert-dismissible">
+            <i class="bi bi-check-circle me-1"></i>
+            Penjualan berhasil diselesaikan dan stok telah diperbarui.
+            <button type="button" class="btn-close" @onclick="() => _justFinalized = false"></button>
+        </div>
+    }
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger alert-dismissible">
+            @_error
+            <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+        </div>
+    }
+
+    <div class="row g-4">
+
+        @* ── Items ── *@
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header fw-semibold"><i class="bi bi-box-seam me-1"></i> Item</div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0 align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Produk</th>
+                                <th class="text-center">Qty</th>
+                                <th class="text-end">Harga</th>
+                                <th class="text-end">Subtotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var item in _sale.Items)
+                            {
+                                <tr>
+                                    <td>
+                                        <span class="fw-semibold">@item.ProductName</span>
+                                        <span class="badge text-bg-light border ms-1 small">@item.UnitName</span>
+                                    </td>
+                                    <td class="text-center">@item.Quantity.ToString("G29")</td>
+                                    <td class="text-end">Rp @item.UnitPrice.ToString("N0")</td>
+                                    <td class="text-end fw-semibold">Rp @item.Subtotal.ToString("N0")</td>
+                                </tr>
+                            }
+                        </tbody>
+                        <tfoot class="table-light">
+                            <tr>
+                                <td colspan="3" class="text-end fw-bold">Total</td>
+                                <td class="text-end fw-bold">Rp @_sale.GrandTotal.ToString("N0")</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+
+            @if (_sale.Payment is not null)
+            {
+                <div class="card mt-3">
+                    <div class="card-header fw-semibold"><i class="bi bi-cash-coin me-1"></i> Pembayaran</div>
+                    <div class="card-body">
+                        <dl class="row mb-0 small">
+                            <dt class="col-5 text-muted fw-normal">Metode</dt>
+                            <dd class="col-7">@_sale.Payment.Method</dd>
+                            <dt class="col-5 text-muted fw-normal">Dibayar</dt>
+                            <dd class="col-7">Rp @_sale.Payment.PaidAmount.ToString("N0")</dd>
+                            <dt class="col-5 text-muted fw-normal">Kembalian</dt>
+                            <dd class="col-7">Rp @_sale.Payment.Change.ToString("N0")</dd>
+                        </dl>
+                    </div>
+                </div>
+            }
+        </div>
+
+        @* ── Info + actions ── *@
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header fw-semibold">Informasi</div>
+                <div class="card-body small">
+                    <dl class="row mb-0">
+                        <dt class="col-5 text-muted fw-normal">Pelanggan</dt>
+                        <dd class="col-7 fw-semibold">@_sale.CustomerName</dd>
+
+                        <dt class="col-5 text-muted fw-normal">Pengiriman</dt>
+                        <dd class="col-7">
+                            @if (_sale.IsDeliveryRequired || _sale.SaleType == SaleType.Delivery)
+                            {
+                                <span class="badge text-bg-info"><i class="bi bi-truck me-1"></i> Ya</span>
+                            }
+                            else
+                            {
+                                <span class="badge text-bg-secondary">Ambil di toko</span>
+                            }
+                        </dd>
+
+                        @if (!string.IsNullOrEmpty(_sale.DeliveryAddress))
+                        {
+                            <dt class="col-5 text-muted fw-normal">Alamat</dt>
+                            <dd class="col-7">@_sale.DeliveryAddress</dd>
+                        }
+
+                        <dt class="col-5 text-muted fw-normal">Dilayani</dt>
+                        <dd class="col-7">@(_sale.ServedBy ?? _sale.CreatedBy)</dd>
+
+                        <dt class="col-5 text-muted fw-normal">Tanggal</dt>
+                        <dd class="col-7">@_sale.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
+                    </dl>
+                </div>
+
+                @if (CanCancel)
+                {
+                    <div class="card-footer d-grid">
+                        @if (!_showCancel)
+                        {
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => _showCancel = true"
+                                    disabled="@_saving">
+                                <i class="bi bi-x-circle me-1"></i> Batalkan Penjualan
+                            </button>
+                        }
+                        else
+                        {
+                            <label class="form-label small">Alasan pembatalan</label>
+                            <textarea class="form-control form-control-sm mb-2" rows="2"
+                                      @bind="_cancelReason"></textarea>
+                            <div class="d-flex gap-2 justify-content-end">
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        @onclick="() => _showCancel = false" disabled="@_saving">Batal</button>
+                                <button class="btn btn-sm btn-danger" @onclick="HandleCancel"
+                                        disabled="@(_saving || string.IsNullOrWhiteSpace(_cancelReason))">
+                                    Ya, Batalkan
+                                </button>
+                            </div>
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public Guid Id { get; set; }
+    [SupplyParameterFromQuery(Name = "finalized")] public string? Finalized { get; set; }
+
+    private SaleDto? _sale;
+    private bool     _justFinalized;
+    private bool     _showCancel;
+    private string   _cancelReason = "";
+    private string?  _error;
+    private bool     _saving;
+
+    private bool CanCancel => _sale is not null
+        && _sale.Status is not SaleStatus.Paid and not SaleStatus.Cancelled;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _justFinalized = Finalized == "1";
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _sale = await Api.GetSaleByIdAsync(Id);
+        if (_sale is null) Navigation.NavigateTo("/sales");
+    }
+
+    private async Task HandleCancel()
+    {
+        _saving = true;
+        _error  = null;
+        var error = await Api.CancelAsync(Id, _cancelReason);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _showCancel = false;
+        await LoadAsync();
+    }
+
+    private static MarkupString StatusBadge(SaleStatus status) => status switch
+    {
+        SaleStatus.Draft     => (MarkupString)"<span class='badge bg-warning text-dark'>Draft</span>",
+        SaleStatus.Confirmed => (MarkupString)"<span class='badge bg-primary'>Selesai</span>",
+        SaleStatus.Paid      => (MarkupString)"<span class='badge bg-success'>Lunas</span>",
+        SaleStatus.Cancelled => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
+        _                    => (MarkupString)"<span class='badge bg-secondary'>—</span>",
+    };
+}

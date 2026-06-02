@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Inventory;
 
-public class ProductRepository(AppDbContext context) : IProductRepository
+public class ProductRepository(AppDbContext context, IProductSearchCache searchCache) : IProductRepository
 {
     private const string AggregateType = "Product";
 
@@ -50,6 +50,9 @@ public class ProductRepository(AppDbContext context) : IProductRepository
         await UpdateProjectionAsync(product, newEvents, ct);
         await context.SaveChangesAsync(ct);
         product.ClearDomainEvents();
+
+        // Product catalog changed — drop the cached autocomplete catalog.
+        await searchCache.InvalidateAsync(ct);
     }
 
     private async Task UpdateProjectionAsync(

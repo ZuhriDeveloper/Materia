@@ -29,9 +29,11 @@ public record SaleDto(
     string?         DeliveryAddress,
     SaleType        SaleType,
     SaleStatus      Status,
+    bool            IsDeliveryRequired,
     decimal         Subtotal,
     decimal         GrandTotal,
     string          CreatedBy,
+    string?         ServedBy,
     DateTime        CreatedAt,
     SalePaymentDto? Payment,
     List<SaleItemDto> Items);
@@ -42,3 +44,14 @@ public record PagedSalesDto(
     int Page,
     int PageSize,
     int TotalPages);
+
+// ── Consumer sale (single-step finalize) ────────────────────────────────────
+
+public record FinalizeSaleItemInput(
+    Guid    ProductId,
+    string  ProductName,
+    string  UnitName,
+    decimal Quantity,
+    decimal UnitPrice);
+
+public record FinalizeSaleResult(Guid SaleId, string ReferenceNo);

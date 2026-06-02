@@ -17,6 +17,15 @@ public class InventoryApiClient(HttpClient http)
     public Task<ProductDto?> GetProductByIdAsync(Guid id, CancellationToken ct = default)
         => http.GetFromJsonAsync<ProductDto>($"api/products/{id}", ct);
 
+    /// <summary>Redis-backed product-name autocomplete for the PoS cashier.</summary>
+    public async Task<List<ProductSearchDto>> SearchProductsAsync(
+        string term, int limit = 8, CancellationToken ct = default)
+    {
+        var url = $"api/products/search?term={Uri.EscapeDataString(term)}&limit={limit}";
+        var results = await http.GetFromJsonAsync<List<ProductSearchDto>>(url, ct);
+        return results ?? [];
+    }
+
     public async Task<(Guid? Id, string? Error)> CreateProductAsync(
         string name, string? description, string baseUnit, List<Guid>? categoryIds = null, CancellationToken ct = default)
     {
