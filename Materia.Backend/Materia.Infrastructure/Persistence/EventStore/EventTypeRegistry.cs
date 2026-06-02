@@ -13,6 +13,8 @@ public static class EventTypeRegistry
         // Product events
         [nameof(ProductCreated)]             = typeof(ProductCreated),
         [nameof(ProductNameUpdated)]         = typeof(ProductNameUpdated),
+        [nameof(ProductSalePriceChanged)]    = typeof(ProductSalePriceChanged),
+        [nameof(ProductBarcodeChanged)]      = typeof(ProductBarcodeChanged),
         [nameof(ProductDescriptionUpdated)]  = typeof(ProductDescriptionUpdated),
         [nameof(ProductDeactivated)]         = typeof(ProductDeactivated),
         [nameof(ProductActivated)]           = typeof(ProductActivated),

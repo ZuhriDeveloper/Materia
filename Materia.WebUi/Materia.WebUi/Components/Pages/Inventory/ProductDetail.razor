@@ -55,6 +55,18 @@ else
                             <label class="form-label">Deskripsi</label>
                             <InputTextArea class="form-control" @bind-Value="_editForm.Description" rows="3" />
                         </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label">Harga Jual (Rp)</label>
+                                <InputNumber class="form-control" @bind-Value="_editForm.SalePrice" min="0" step="100" />
+                                <ValidationMessage For="() => _editForm.SalePrice" class="small text-danger" />
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">Barcode / QR</label>
+                                <InputText class="form-control" @bind-Value="_editForm.Barcode" placeholder="cth. 8991234567890" />
+                                <ValidationMessage For="() => _editForm.Barcode" class="small text-danger" />
+                            </div>
+                        </div>
                         <button type="submit" class="btn btn-primary btn-sm">
                             <i class="bi bi-check-lg me-1"></i> Simpan Perubahan
                         </button>
@@ -231,20 +243,28 @@ else
 
                     @if (_product.UnitConversions.Count > 0)
                     {
-                        <table class="table table-sm table-bordered mb-3" style="max-width:480px">
+                        <table class="table table-sm table-bordered mb-3" style="max-width:560px">
                             <thead class="table-light">
                                 <tr>
                                     <th>1 @_product.BaseUnit =</th>
                                     <th>Satuan</th>
+                                    <th class="text-end">Harga Jual</th>
                                     <th></th>
                                 </tr>
                             </thead>
                             <tbody>
+                                <tr class="table-light">
+                                    <td class="fw-semibold">1</td>
+                                    <td>@_product.BaseUnit <span class="badge text-bg-secondary ms-1">dasar</span></td>
+                                    <td class="text-end">@(_product.SalePrice > 0 ? $"Rp {_product.SalePrice:N0}" : "—")</td>
+                                    <td></td>
+                                </tr>
                                 @foreach (var conv in _product.UnitConversions)
                                 {
                                     <tr>
                                         <td class="fw-semibold">@conv.Factor</td>
                                         <td>@conv.ToUnit</td>
+                                        <td class="text-end">@(conv.SalePrice > 0 ? $"Rp {conv.SalePrice:N0}" : "—")</td>
                                         <td class="text-end">
                                             <EditForm Model="@(new RemoveConvForm { ToUnit = conv.ToUnit })"
                                                       OnValidSubmit="@(() => HandleRemoveConversion(conv.ToUnit))"
@@ -287,11 +307,15 @@ else
                                 <InputNumber class="form-control form-control-sm" @bind-Value="_addConvForm.Factor" placeholder="Faktor" />
                                 <ValidationMessage For="() => _addConvForm.Factor" class="small text-danger" />
                             </div>
+                            <div style="width:140px">
+                                <InputNumber class="form-control form-control-sm" @bind-Value="_addConvForm.SalePrice" placeholder="Harga jual" />
+                                <ValidationMessage For="() => _addConvForm.SalePrice" class="small text-danger" />
+                            </div>
                             <button type="submit" class="btn btn-sm btn-outline-primary">
                                 <i class="bi bi-plus-lg me-1"></i> Tambah
                             </button>
                         </div>
-                        <div class="form-text">1 @_product.BaseUnit = [faktor] [satuan]</div>
+                        <div class="form-text">1 @_product.BaseUnit = [faktor] [satuan] · harga jual per [satuan]</div>
                     </EditForm>
                 </div>
             </div>
@@ -343,6 +367,8 @@ else
         {
             _editForm.Name = _product.Name;
             _editForm.Description = _product.Description;
+            _editForm.SalePrice = _product.SalePrice;
+            _editForm.Barcode = _product.Barcode;
         }
     }
 
@@ -370,7 +396,10 @@ else
 
     private async Task HandleEdit()
     {
-        _error = await Api.UpdateProductAsync(Id, _editForm.Name, _editForm.Description);
+        _error = await Api.UpdateProductAsync(
+            Id, _editForm.Name, _editForm.Description,
+            _editForm.SalePrice,
+            string.IsNullOrWhiteSpace(_editForm.Barcode) ? null : _editForm.Barcode.Trim());
         if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
     }
 
@@ -395,7 +424,7 @@ else
 
     private async Task HandleAddConversion()
     {
-        _error = await Api.AddUnitConversionAsync(Id, _addConvForm.ToUnit, _addConvForm.Factor);
+        _error = await Api.AddUnitConversionAsync(Id, _addConvForm.ToUnit, _addConvForm.Factor, _addConvForm.SalePrice);
         if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
     }
 
@@ -424,6 +453,12 @@ else
 
         [System.ComponentModel.DataAnnotations.MaxLength(1000)]
         public string? Description { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Harga jual tidak boleh negatif.")]
+        public decimal SalePrice { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string? Barcode { get; set; }
     }
 
     private sealed class AddConvForm
@@ -434,6 +469,9 @@ else
 
         [System.ComponentModel.DataAnnotations.Range(0.0001, double.MaxValue, ErrorMessage = "Faktor harus lebih dari nol.")]
         public decimal Factor { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Harga jual tidak boleh negatif.")]
+        public decimal SalePrice { get; set; }
     }
 
     private sealed class AssignCatForm

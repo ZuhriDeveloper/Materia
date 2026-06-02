@@ -5,6 +5,8 @@ public record ProductDto(
     string Name,
     string? Description,
     string BaseUnit,
+    decimal SalePrice,
+    string? Barcode,
     bool IsActive,
     string CreatedBy,
     DateTime CreatedAt,
@@ -13,7 +15,7 @@ public record ProductDto(
     List<UnitConversionDto> UnitConversions,
     List<CategoryRefDto> Categories);
 
-public record UnitConversionDto(string FromUnit, string ToUnit, decimal Factor);
+public record UnitConversionDto(string FromUnit, string ToUnit, decimal Factor, decimal SalePrice);
 
 public record CategoryRefDto(Guid Id, string Name);
 
@@ -52,7 +54,12 @@ public record StockDto(
     string? LastAdjustedBy);
 
 public record ProductSearchDto(
-    Guid   Id,
-    string Name,
-    string Sku,
-    string BaseUnit);
+    Guid    Id,
+    string  Name,
+    string  Sku,
+    string  BaseUnit,
+    decimal SalePrice,
+    string? Barcode,
+    List<ProductUnitPriceDto> Units);
+
+public record ProductUnitPriceDto(string UnitName, decimal SalePrice);

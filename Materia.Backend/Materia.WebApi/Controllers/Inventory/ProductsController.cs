@@ -66,7 +66,9 @@ public class ProductsController(
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateProductRequest request, CancellationToken ct)
     {
-        var command = new CreateProductCommand(request.Name, request.Description, request.BaseUnit, request.CategoryIds ?? [], CurrentUser);
+        var command = new CreateProductCommand(
+            request.Name, request.Description, request.BaseUnit, request.CategoryIds ?? [], CurrentUser,
+            request.SalePrice, request.Barcode);
         var validation = await createValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -78,7 +80,9 @@ public class ProductsController(
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductRequest request, CancellationToken ct)
     {
-        var command = new UpdateProductCommand(id, request.Name, request.Description, CurrentUser);
+        var command = new UpdateProductCommand(
+            id, request.Name, request.Description, CurrentUser,
+            request.SalePrice, request.Barcode);
         var validation = await updateValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -121,7 +125,7 @@ public class ProductsController(
     [HttpPost("{id:guid}/unit-conversions")]
     public async Task<IActionResult> AddUnitConversion(Guid id, [FromBody] AddUnitConversionRequest request, CancellationToken ct)
     {
-        var command = new AddUnitConversionCommand(id, request.ToUnit, request.Factor, CurrentUser);
+        var command = new AddUnitConversionCommand(id, request.ToUnit, request.Factor, CurrentUser, request.SalePrice);
         var validation = await addConversionValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -159,9 +163,13 @@ public class ProductsController(
     }
 }
 
-public record CreateProductRequest(string Name, string? Description, string BaseUnit, List<Guid>? CategoryIds);
-public record UpdateProductRequest(string Name, string? Description);
+public record CreateProductRequest(
+    string Name, string? Description, string BaseUnit, List<Guid>? CategoryIds,
+    decimal SalePrice = 0m, string? Barcode = null);
+public record UpdateProductRequest(
+    string Name, string? Description,
+    decimal SalePrice = 0m, string? Barcode = null);
 public record SetStatusRequest(bool IsActive);
-public record AddUnitConversionRequest(string ToUnit, decimal Factor);
+public record AddUnitConversionRequest(string ToUnit, decimal Factor, decimal SalePrice = 0m);
 public record SyncCategoriesRequest(List<Guid> CategoryIds);
 public record AdjustStockRequest(decimal Delta, string? Reason);

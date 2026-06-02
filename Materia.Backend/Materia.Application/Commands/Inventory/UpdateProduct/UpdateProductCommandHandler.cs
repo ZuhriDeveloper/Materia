@@ -11,7 +11,9 @@ public class UpdateProductCommandHandler(IProductRepository repository)
         var product = await repository.GetByIdAsync(ProductId.From(command.ProductId), ct)
             ?? throw new DomainException($"Product '{command.ProductId}' not found.");
 
-        product.Update(command.Name, command.Description, command.UpdatedBy);
+        product.Update(
+            command.Name, command.Description, command.UpdatedBy,
+            command.SalePrice, command.Barcode);
         await repository.SaveAsync(product, ct);
     }
 }

@@ -11,7 +11,8 @@ public class AddUnitConversionCommandHandler(IProductRepository repository)
         var product = await repository.GetByIdAsync(ProductId.From(command.ProductId), ct)
             ?? throw new DomainException($"Product '{command.ProductId}' not found.");
 
-        var conversion = new UnitConversion(product.BaseUnit, new UnitName(command.ToUnit), command.Factor);
+        var conversion = new UnitConversion(
+            product.BaseUnit, new UnitName(command.ToUnit), command.Factor, command.SalePrice);
         product.AddUnitConversion(conversion, command.UpdatedBy);
         await repository.SaveAsync(product, ct);
     }

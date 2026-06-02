@@ -5,4 +5,6 @@ public record CreateProductCommand(
     string? Description,
     string BaseUnit,
     IReadOnlyList<Guid> CategoryIds,
-    string CreatedBy);
+    string CreatedBy,
+    decimal SalePrice = 0m,
+    string? Barcode = null);

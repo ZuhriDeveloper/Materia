@@ -78,9 +78,11 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
         // Always reflect latest aggregate state
         projection.Name = product.Name;
         projection.Description = product.Description;
+        projection.SalePrice = product.SalePrice;
+        projection.Barcode = product.Barcode;
         projection.IsActive = product.IsActive;
         projection.UnitConversionsJson = JsonSerializer.Serialize(
-            product.UnitConversions.Select(c => new { c.FromUnit.Value, toUnit = c.ToUnit.Value, c.Factor }));
+            product.UnitConversions.Select(c => new { c.FromUnit.Value, toUnit = c.ToUnit.Value, c.Factor, salePrice = c.SalePrice }));
         projection.CategoryIdsJson = JsonSerializer.Serialize(
             product.CategoryIds.Select(id => id.Value));
 
@@ -90,6 +92,8 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
             {
                 ProductNameUpdated e => e.UpdatedBy,
                 ProductDescriptionUpdated e => e.UpdatedBy,
+                ProductSalePriceChanged e => e.ChangedBy,
+                ProductBarcodeChanged e => e.ChangedBy,
                 ProductDeactivated e => e.DeactivatedBy,
                 ProductActivated e => e.ActivatedBy,
                 ProductCategoryAssigned e => e.UpdatedBy,

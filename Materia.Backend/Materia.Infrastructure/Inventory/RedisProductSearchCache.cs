@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Materia.Application.Contracts.Inventory;
+using Materia.Application.DTOs.Inventory;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -30,8 +31,10 @@ public class RedisProductSearchCache(
 
         return catalog
             .Where(p => p.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
-                     || p.Sku.Contains(trimmed, StringComparison.OrdinalIgnoreCase))
-            .OrderByDescending(p => p.Name.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
+                     || p.Sku.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
+                     || (p.Barcode is not null && p.Barcode.Contains(trimmed, StringComparison.OrdinalIgnoreCase)))
+            .OrderByDescending(p => p.Barcode == trimmed)   // exact barcode scan wins
+            .ThenByDescending(p => p.Name.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
             .ThenBy(p => p.Name)
             .Take(limit)
             .ToList();
@@ -96,9 +99,18 @@ public class RedisProductSearchCache(
     {
         var paged = await products.GetPagedAsync(1, 1000, isActive: true, ct);
         return paged.Items
-            .Select(p => new ProductSearchResult(p.Id, p.Name, Sku(p.Id), p.BaseUnit))
+            .Select(p => new ProductSearchResult(
+                p.Id, p.Name, Sku(p.Id), p.BaseUnit, p.SalePrice, p.Barcode, BuildUnits(p)))
             .ToList();
     }
 
     private static string Sku(Guid productId) => productId.ToString("N")[..8].ToUpperInvariant();
+
+    /// <summary>Base unit (product price) first, then each conversion unit with its own price.</summary>
+    private static List<ProductUnitPrice> BuildUnits(ProductDto p)
+    {
+        var units = new List<ProductUnitPrice> { new(p.BaseUnit, p.SalePrice) };
+        units.AddRange(p.UnitConversions.Select(c => new ProductUnitPrice(c.ToUnit, c.SalePrice)));
+        return units;
+    }
 }

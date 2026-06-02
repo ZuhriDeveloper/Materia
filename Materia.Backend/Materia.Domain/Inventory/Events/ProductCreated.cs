@@ -8,4 +8,6 @@ public record ProductCreated(
     string? Description,
     string BaseUnit,
     string CreatedBy,
-    DateTime OccurredAt) : IDomainEvent;
+    DateTime OccurredAt,
+    decimal SalePrice = 0m,
+    string? Barcode = null) : IDomainEvent;

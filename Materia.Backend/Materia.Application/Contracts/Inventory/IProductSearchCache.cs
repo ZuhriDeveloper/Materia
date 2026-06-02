@@ -13,4 +13,14 @@ public interface IProductSearchCache
     Task InvalidateAsync(CancellationToken ct = default);
 }
 
-public record ProductSearchResult(Guid Id, string Name, string Sku, string BaseUnit);
+public record ProductSearchResult(
+    Guid    Id,
+    string  Name,
+    string  Sku,
+    string  BaseUnit,
+    decimal SalePrice,
+    string? Barcode,
+    IReadOnlyList<ProductUnitPrice> Units);
+
+/// <summary>A sellable unit for a product and its price (base unit + each conversion unit).</summary>
+public record ProductUnitPrice(string UnitName, decimal SalePrice);

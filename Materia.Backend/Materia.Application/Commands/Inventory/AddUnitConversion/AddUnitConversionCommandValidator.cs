@@ -27,6 +27,8 @@ public class AddUnitConversionCommandValidator : AbstractValidator<AddUnitConver
             .GreaterThan(0)
             .WithMessage("Faktor konversi harus lebih dari nol.");
 
+        RuleFor(x => x.SalePrice).GreaterThanOrEqualTo(0);
+
         RuleFor(x => x.UpdatedBy).NotEmpty();
     }
 }

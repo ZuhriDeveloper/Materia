@@ -35,6 +35,21 @@
                 <InputTextArea class="form-control" @bind-Value="_form.Description" rows="3" placeholder="Deskripsi opsional" />
             </div>
 
+            <div class="row g-3 mb-3">
+                <div class="col-sm-6">
+                    <label class="form-label">Harga Jual (Rp)</label>
+                    <InputNumber class="form-control" @bind-Value="_form.SalePrice" min="0" step="100" />
+                    <div class="form-text">Harga default saat produk dipilih di kasir.</div>
+                    <ValidationMessage For="() => _form.SalePrice" class="small text-danger" />
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">Barcode / QR</label>
+                    <InputText class="form-control" @bind-Value="_form.Barcode" placeholder="cth. 8991234567890" />
+                    <div class="form-text">Opsional, harus unik.</div>
+                    <ValidationMessage For="() => _form.Barcode" class="small text-danger" />
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">Satuan Dasar <span class="text-danger">*</span></label>
                 @if (_units is null)
@@ -145,7 +160,9 @@
         _error = null;
         var (id, error) = await Api.CreateProductAsync(
             _form.Name, _form.Description, _form.BaseUnit,
-            _selectedIds.Count > 0 ? [.. _selectedIds] : null);
+            _selectedIds.Count > 0 ? [.. _selectedIds] : null,
+            _form.SalePrice,
+            string.IsNullOrWhiteSpace(_form.Barcode) ? null : _form.Barcode.Trim());
         _saving = false;
         if (error is not null) { _error = error; return; }
         Navigation.NavigateTo($"/products/{id}?created=1", forceLoad: true);
@@ -163,5 +180,11 @@
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Satuan dasar wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(50)]
         public string BaseUnit { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Harga jual tidak boleh negatif.")]
+        public decimal SalePrice { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string? Barcode { get; set; }
     }
 }

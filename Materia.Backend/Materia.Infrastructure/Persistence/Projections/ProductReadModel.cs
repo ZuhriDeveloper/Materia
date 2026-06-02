@@ -6,6 +6,8 @@ public class ProductReadModel
     public string Name { get; set; } = default!;
     public string? Description { get; set; }
     public string BaseUnit { get; set; } = default!;
+    public decimal SalePrice { get; set; }
+    public string? Barcode { get; set; }
     public bool IsActive { get; set; }
     public string CreatedBy { get; set; } = default!;
     public DateTime CreatedAt { get; set; }

@@ -45,6 +45,8 @@
                     <tr>
                         <th>Nama</th>
                         <th>Satuan Dasar</th>
+                        <th class="text-end">Harga Jual</th>
+                        <th>Barcode</th>
                         <th>Kategori</th>
                         <th>Status</th>
                         <th>Diperbarui</th>
@@ -57,6 +59,12 @@
                         <tr>
                             <td class="fw-semibold">@p.Name</td>
                             <td><span class="badge bg-light text-dark border">@p.BaseUnit</span></td>
+                            <td class="text-end">@(p.SalePrice > 0 ? $"Rp {p.SalePrice:N0}" : "—")</td>
+                            <td class="small">
+                                @(string.IsNullOrEmpty(p.Barcode)
+                                    ? (MarkupString)"<span class='text-muted'>—</span>"
+                                    : (MarkupString)$"<code>{p.Barcode}</code>")
+                            </td>
                             <td class="small text-muted">
                                 @(p.Categories.Count == 0 ? "—" : string.Join(", ", p.Categories.Select(c => c.Name)))
                             </td>

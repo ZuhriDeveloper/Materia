@@ -37,6 +37,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasKey(x => x.Id);
             e.HasIndex(x => x.Name);
             e.HasIndex(x => x.IsActive);
+            e.Property(x => x.Barcode).HasMaxLength(100);
+            // Unique per barcode; PostgreSQL treats NULLs as distinct, so products
+            // without a barcode are unaffected.
+            e.HasIndex(x => x.Barcode).IsUnique();
         });
 
         builder.Entity<CategoryReadModel>(e =>

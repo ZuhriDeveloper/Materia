@@ -8,4 +8,5 @@ public record ProductUnitConversionAdded(
     string ToUnit,
     decimal Factor,
     string UpdatedBy,
-    DateTime OccurredAt) : IDomainEvent;
+    DateTime OccurredAt,
+    decimal SalePrice = 0m) : IDomainEvent;

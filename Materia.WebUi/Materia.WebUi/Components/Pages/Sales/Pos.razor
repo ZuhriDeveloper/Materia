@@ -155,7 +155,22 @@
                                     <td class="text-muted small">@(_lines.IndexOf(line) + 1)</td>
                                     <td>
                                         <div class="fw-semibold">@line.ProductName</div>
-                                        <span class="badge text-bg-light border small">@line.UnitName</span>
+                                        @if (line.Units.Count > 1)
+                                        {
+                                            <select class="form-select form-select-sm mt-1" style="max-width:150px"
+                                                    @onchange="e => OnUnitChanged(line, e)">
+                                                @foreach (var u in line.Units)
+                                                {
+                                                    <option value="@u.UnitName" selected="@(u.UnitName == line.UnitName)">
+                                                        @u.UnitName — Rp @u.SalePrice.ToString("N0")
+                                                    </option>
+                                                }
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge text-bg-light border small">@line.UnitName</span>
+                                        }
                                     </td>
                                     <td><code class="text-muted">@line.Sku</code></td>
                                     <td>
@@ -274,7 +289,7 @@
     private List<ProductSearchDto> _suggestions = [];
     private bool _showSuggestions;
     private int  _highlightIndex = -1;
-    private CancellationTokenSource? _debounceCts;
+    private int  _searchGeneration;
 
     private readonly List<CartLine> _lines = [];
 
@@ -332,9 +347,9 @@
         _codeInput   = e.Value?.ToString() ?? "";
         _scanMessage = null;
 
-        _debounceCts?.Cancel();
-        _debounceCts = new CancellationTokenSource();
-        var token = _debounceCts.Token;
+        // "Latest wins" debounce without cancelling in-flight HTTP requests — that
+        // would abort the socket and raise a TaskCanceledException on every keystroke.
+        var generation = ++_searchGeneration;
 
         var term = _codeInput.Trim();
         if (term.Length == 0)
@@ -344,21 +359,25 @@
             return;
         }
 
+        await Task.Delay(200);                          // debounce keystrokes
+        if (generation != _searchGeneration) return;    // a newer keystroke superseded this
+
+        List<ProductSearchDto> results;
         try
         {
-            await Task.Delay(200, token);   // debounce keystrokes
-            var results = await InventoryApi.SearchProductsAsync(term, 8, token);
-            if (token.IsCancellationRequested) return;
-
-            _suggestions     = results;
-            _showSuggestions = results.Count > 0;
-            _highlightIndex  = -1;
-            StateHasChanged();
+            results = await InventoryApi.SearchProductsAsync(term, 8);
         }
-        catch (OperationCanceledException)
+        catch (HttpRequestException)
         {
-            // superseded by a newer keystroke — ignore
+            return;   // transient lookup failure — leave current suggestions untouched
         }
+
+        if (generation != _searchGeneration) return;    // discard stale response
+
+        _suggestions     = results;
+        _showSuggestions = results.Count > 0;
+        _highlightIndex  = -1;
+        StateHasChanged();
     }
 
     private async Task OnKeyDown(KeyboardEventArgs e)
@@ -430,7 +449,13 @@
 
     private void AddOrIncrement(ProductSearchDto product)
     {
-        var existing = _lines.FirstOrDefault(l => l.ProductId == product.Id);
+        // Available sellable units (base first); fall back to base unit if none provided.
+        var units = product.Units is { Count: > 0 }
+            ? product.Units
+            : [new ProductUnitPriceDto(product.BaseUnit, product.SalePrice)];
+        var baseUnit = units[0];
+
+        var existing = _lines.FirstOrDefault(l => l.ProductId == product.Id && l.UnitName == baseUnit.UnitName);
         if (existing is not null)
         {
             existing.Quantity += 1;
@@ -442,10 +467,23 @@
             ProductId   = product.Id,
             ProductName = product.Name,
             Sku         = product.Sku,
-            UnitName    = product.BaseUnit,
+            UnitName    = baseUnit.UnitName,
             Quantity    = 1,
-            UnitPrice   = 0,
+            UnitPrice   = baseUnit.SalePrice,   // auto-loaded for the unit; still editable in the table
+            Units       = units,
         });
+    }
+
+    private void OnUnitChanged(CartLine line, ChangeEventArgs e)
+    {
+        var unitName = e.Value?.ToString();
+        if (string.IsNullOrEmpty(unitName)) return;
+
+        var unit = line.Units.FirstOrDefault(u => u.UnitName == unitName);
+        if (unit is null) return;
+
+        line.UnitName  = unit.UnitName;
+        line.UnitPrice = unit.SalePrice;   // re-price for the chosen unit (still editable)
     }
 
     // ── Line editing (flat guard clauses) ────────────────────────────────────
@@ -513,9 +551,6 @@
 
     public async ValueTask DisposeAsync()
     {
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-
         if (_scanner is null) return;
         try { await _scanner.DisposeAsync(); }
         catch { /* circuit already torn down */ }
@@ -526,9 +561,10 @@
         public Guid    ProductId   { get; init; }
         public string  ProductName { get; init; } = "";
         public string  Sku         { get; init; } = "";
-        public string  UnitName    { get; init; } = "";
+        public string  UnitName    { get; set; } = "";
         public decimal Quantity    { get; set; }
         public decimal UnitPrice   { get; set; }
+        public IReadOnlyList<ProductUnitPriceDto> Units { get; init; } = [];
         public decimal Total       => Quantity * UnitPrice;
     }
 }

@@ -27,10 +27,11 @@ public class InventoryApiClient(HttpClient http)
     }
 
     public async Task<(Guid? Id, string? Error)> CreateProductAsync(
-        string name, string? description, string baseUnit, List<Guid>? categoryIds = null, CancellationToken ct = default)
+        string name, string? description, string baseUnit, List<Guid>? categoryIds = null,
+        decimal salePrice = 0m, string? barcode = null, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/products",
-            new { name, description, baseUnit, categoryIds }, ct);
+            new { name, description, baseUnit, categoryIds, salePrice, barcode }, ct);
 
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
@@ -40,10 +41,11 @@ public class InventoryApiClient(HttpClient http)
     }
 
     public async Task<string?> UpdateProductAsync(
-        Guid id, string name, string? description, CancellationToken ct = default)
+        Guid id, string name, string? description,
+        decimal salePrice = 0m, string? barcode = null, CancellationToken ct = default)
     {
         var response = await http.PutAsJsonAsync($"api/products/{id}",
-            new { name, description }, ct);
+            new { name, description, salePrice, barcode }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
@@ -67,10 +69,10 @@ public class InventoryApiClient(HttpClient http)
     }
 
     public async Task<string?> AddUnitConversionAsync(
-        Guid productId, string toUnit, decimal factor, CancellationToken ct = default)
+        Guid productId, string toUnit, decimal factor, decimal salePrice = 0m, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync($"api/products/{productId}/unit-conversions",
-            new { toUnit, factor }, ct);
+            new { toUnit, factor, salePrice }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

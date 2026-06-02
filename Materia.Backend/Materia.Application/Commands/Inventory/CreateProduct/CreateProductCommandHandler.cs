@@ -11,7 +11,9 @@ public class CreateProductCommandHandler(
 {
     public async Task<Guid> HandleAsync(CreateProductCommand command, CancellationToken ct = default)
     {
-        var product = Product.Create(command.Name, command.Description, new UnitName(command.BaseUnit), command.CreatedBy);
+        var product = Product.Create(
+            command.Name, command.Description, new UnitName(command.BaseUnit), command.CreatedBy,
+            command.SalePrice, command.Barcode);
 
         foreach (var categoryId in command.CategoryIds)
         {

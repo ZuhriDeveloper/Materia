@@ -5,6 +5,8 @@ public record ProductDto(
     string Name,
     string? Description,
     string BaseUnit,
+    decimal SalePrice,
+    string? Barcode,
     bool IsActive,
     string CreatedBy,
     DateTime CreatedAt,
@@ -13,7 +15,7 @@ public record ProductDto(
     IReadOnlyList<UnitConversionDto> UnitConversions,
     IReadOnlyList<CategorySummaryDto> Categories);
 
-public record UnitConversionDto(string FromUnit, string ToUnit, decimal Factor);
+public record UnitConversionDto(string FromUnit, string ToUnit, decimal Factor, decimal SalePrice);
 
 public record CategorySummaryDto(Guid Id, string Name);
 

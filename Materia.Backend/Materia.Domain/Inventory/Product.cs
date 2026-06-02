@@ -8,6 +8,8 @@ public class Product : AggregateRoot<ProductId>
     public string Name { get; private set; } = default!;
     public string? Description { get; private set; }
     public UnitName BaseUnit { get; private set; } = default!;
+    public decimal SalePrice { get; private set; }
+    public string? Barcode { get; private set; }
     public bool IsActive { get; private set; }
 
     private readonly List<CategoryId> _categoryIds = [];
@@ -21,10 +23,14 @@ public class Product : AggregateRoot<ProductId>
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
-    public static Product Create(string name, string? description, UnitName baseUnit, string createdBy)
+    public static Product Create(
+        string name, string? description, UnitName baseUnit, string createdBy,
+        decimal salePrice = 0m, string? barcode = null)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("Product name cannot be empty.");
+        if (salePrice < 0)
+            throw new DomainException("Sale price cannot be negative.");
 
         var product = new Product();
         product.Raise(new ProductCreated(
@@ -33,7 +39,9 @@ public class Product : AggregateRoot<ProductId>
             description?.Trim(),
             baseUnit.Value,
             createdBy,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            salePrice,
+            NormalizeBarcode(barcode)));
         return product;
     }
 
@@ -46,18 +54,29 @@ public class Product : AggregateRoot<ProductId>
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
-    public void Update(string name, string? description, string updatedBy)
+    public void Update(
+        string name, string? description, string updatedBy,
+        decimal salePrice = 0m, string? barcode = null)
     {
         if (!IsActive)
             throw new DomainException("Cannot update an inactive product.");
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("Product name cannot be empty.");
+        if (salePrice < 0)
+            throw new DomainException("Sale price cannot be negative.");
 
         if (Name != name.Trim())
             Raise(new ProductNameUpdated(Id, name.Trim(), updatedBy, DateTime.UtcNow));
 
         if (Description != description?.Trim())
             Raise(new ProductDescriptionUpdated(Id, description?.Trim(), updatedBy, DateTime.UtcNow));
+
+        if (SalePrice != salePrice)
+            Raise(new ProductSalePriceChanged(Id, salePrice, updatedBy, DateTime.UtcNow));
+
+        var normalizedBarcode = NormalizeBarcode(barcode);
+        if (Barcode != normalizedBarcode)
+            Raise(new ProductBarcodeChanged(Id, normalizedBarcode, updatedBy, DateTime.UtcNow));
     }
 
     public void Deactivate(string deactivatedBy)
@@ -101,7 +120,8 @@ public class Product : AggregateRoot<ProductId>
             conversion.ToUnit.Value,
             conversion.Factor,
             updatedBy,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            conversion.SalePrice));
     }
 
     public void RemoveUnitConversion(UnitName toUnit, string updatedBy)
@@ -122,6 +142,8 @@ public class Product : AggregateRoot<ProductId>
                 Name = e.Name;
                 Description = e.Description;
                 BaseUnit = new UnitName(e.BaseUnit);
+                SalePrice = e.SalePrice;
+                Barcode = e.Barcode;
                 IsActive = true;
                 break;
 
@@ -131,6 +153,14 @@ public class Product : AggregateRoot<ProductId>
 
             case ProductDescriptionUpdated e:
                 Description = e.Description;
+                break;
+
+            case ProductSalePriceChanged e:
+                SalePrice = e.SalePrice;
+                break;
+
+            case ProductBarcodeChanged e:
+                Barcode = e.Barcode;
                 break;
 
             case ProductDeactivated:
@@ -153,7 +183,8 @@ public class Product : AggregateRoot<ProductId>
                 _unitConversions.Add(new UnitConversion(
                     new UnitName(e.FromUnit),
                     new UnitName(e.ToUnit),
-                    e.Factor));
+                    e.Factor,
+                    e.SalePrice));
                 break;
 
             case ProductUnitConversionRemoved e:
@@ -161,4 +192,9 @@ public class Product : AggregateRoot<ProductId>
                 break;
         }
     }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static string? NormalizeBarcode(string? barcode)
+        => string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
 }

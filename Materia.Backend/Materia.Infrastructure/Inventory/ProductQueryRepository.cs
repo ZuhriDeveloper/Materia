@@ -72,9 +72,9 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
     {
         var conversions = JsonSerializer.Deserialize<ConversionJson[]>(p.UnitConversionsJson) ?? [];
         return new ProductDto(
-            p.Id, p.Name, p.Description, p.BaseUnit, p.IsActive,
+            p.Id, p.Name, p.Description, p.BaseUnit, p.SalePrice, p.Barcode, p.IsActive,
             p.CreatedBy, p.CreatedAt, p.UpdatedBy, p.UpdatedAt,
-            conversions.Select(c => new UnitConversionDto(c.Value, c.ToUnit, c.Factor)).ToList(),
+            conversions.Select(c => new UnitConversionDto(c.Value, c.ToUnit, c.Factor, c.SalePrice)).ToList(),
             categories);
     }
 
@@ -86,10 +86,19 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             : context.ProductReadModels.AnyAsync(p => p.Name == trimmed, ct);
     }
 
+    public Task<bool> ExistsByBarcodeAsync(string barcode, Guid? excludeId = null, CancellationToken ct = default)
+    {
+        var trimmed = barcode.Trim();
+        return excludeId.HasValue
+            ? context.ProductReadModels.AnyAsync(p => p.Barcode == trimmed && p.Id != excludeId.Value, ct)
+            : context.ProductReadModels.AnyAsync(p => p.Barcode == trimmed, ct);
+    }
+
     // JSON is written as { "Value": "...", "toUnit": "...", "Factor": ... } — mixed casing.
     // Use explicit [JsonPropertyName] attributes so case-sensitive deserialization works correctly.
     private record ConversionJson(
         [property: System.Text.Json.Serialization.JsonPropertyName("Value")]  string Value,
         [property: System.Text.Json.Serialization.JsonPropertyName("toUnit")] string ToUnit,
-        decimal Factor);
+        decimal Factor,
+        [property: System.Text.Json.Serialization.JsonPropertyName("salePrice")] decimal SalePrice = 0m);
 }
