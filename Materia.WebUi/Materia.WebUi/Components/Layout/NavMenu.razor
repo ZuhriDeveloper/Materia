@@ -1,79 +1,48 @@
-<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Materia</a>
-    </div>
-</div>
+<nav class="sidebar-nav">
+    <NavLink class="sidebar-link" href="" Match="NavLinkMatch.All" title="Beranda">
+        <i class="bi bi-house-door-fill sidebar-link-icon"></i>
+        <span class="sidebar-link-text">Beranda</span>
+    </NavLink>
 
-<input type="checkbox" title="Menu navigasi" class="navbar-toggler" />
+    <AuthorizeView Roles="Admin,Cashier">
+        <div class="nav-section">Penjualan</div>
+        <NavLink class="sidebar-link" href="pos" title="Kasir">
+            <i class="bi bi-shop sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Kasir</span>
+        </NavLink>
+        <NavLink class="sidebar-link" href="sales" title="Daftar Penjualan">
+            <i class="bi bi-receipt sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Daftar Penjualan</span>
+        </NavLink>
+        <div class="nav-section">Pelanggan</div>
+        <NavLink class="sidebar-link" href="customers" title="Pelanggan">
+            <i class="bi bi-people sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Pelanggan</span>
+        </NavLink>
+    </AuthorizeView>
 
-<div class="nav-scrollable" onclick="document.querySelector('.navbar-toggler').click()">
-    <nav class="nav flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <i class="bi bi-house-door-fill me-2"></i> Beranda
-            </NavLink>
-        </div>
-
-        <AuthorizeView Roles="Admin,Cashier">
-            <div class="nav-item px-3 mt-2">
-                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Penjualan</small>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="pos">
-                    <i class="bi bi-shop me-2"></i> Kasir
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="sales" Match="NavLinkMatch.All">
-                    <i class="bi bi-receipt me-2"></i> Daftar Penjualan
-                </NavLink>
-            </div>
-
-            <div class="nav-item px-3 mt-2">
-                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Pelanggan</small>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="customers">
-                    <i class="bi bi-people me-2"></i> Pelanggan
-                </NavLink>
-            </div>
-        </AuthorizeView>
-
-        <AuthorizeView Roles="Admin">
-            <div class="nav-item px-3 mt-2">
-                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Inventaris</small>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="products">
-                    <i class="bi bi-box-seam me-2"></i> Produk
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="categories">
-                    <i class="bi bi-tags me-2"></i> Kategori
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="units">
-                    <i class="bi bi-rulers me-2"></i> Satuan
-                </NavLink>
-            </div>
-        </AuthorizeView>
-
-        <AuthorizeView Roles="Admin">
-            <div class="nav-item px-3 mt-2">
-                <small class="text-white-50 text-uppercase px-1" style="font-size:.65rem;letter-spacing:.05em">Pengadaan</small>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="suppliers">
-                    <i class="bi bi-truck me-2"></i> Pemasok
-                </NavLink>
-            </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="purchase-orders">
-                    <i class="bi bi-clipboard-check me-2"></i> Order Pembelian
-                </NavLink>
-            </div>
-        </AuthorizeView>
-    </nav>
-</div>
+    <AuthorizeView Roles="Admin">
+        <div class="nav-section">Inventaris</div>
+        <NavLink class="sidebar-link" href="products" title="Produk">
+            <i class="bi bi-box-seam sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Produk</span>
+        </NavLink>
+        <NavLink class="sidebar-link" href="categories" title="Kategori">
+            <i class="bi bi-tags sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Kategori</span>
+        </NavLink>
+        <NavLink class="sidebar-link" href="units" title="Satuan">
+            <i class="bi bi-rulers sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Satuan</span>
+        </NavLink>
+        <div class="nav-section">Pengadaan</div>
+        <NavLink class="sidebar-link" href="suppliers" title="Pemasok">
+            <i class="bi bi-truck sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Pemasok</span>
+        </NavLink>
+        <NavLink class="sidebar-link" href="purchase-orders" title="Order Pembelian">
+            <i class="bi bi-clipboard-check sidebar-link-icon"></i>
+            <span class="sidebar-link-text">Order Pembelian</span>
+        </NavLink>
+    </AuthorizeView>
+</nav>
