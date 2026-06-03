@@ -1,48 +1,115 @@
-<nav class="sidebar-nav">
-    <NavLink class="sidebar-link" href="" Match="NavLinkMatch.All" title="Beranda">
-        <i class="bi bi-house-door-fill sidebar-link-icon"></i>
-        <span class="sidebar-link-text">Beranda</span>
-    </NavLink>
+@using Microsoft.AspNetCore.Components.Authorization
+
+<MudNavMenu Class="pt-2">
+
+    <MudNavLink Href="" Match="NavLinkMatch.All"
+                Icon="@Icons.Material.Filled.Home">
+        Beranda
+    </MudNavLink>
 
     <AuthorizeView Roles="Admin,Cashier">
-        <div class="nav-section">Penjualan</div>
-        <NavLink class="sidebar-link" href="pos" title="Kasir">
-            <i class="bi bi-shop sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Kasir</span>
-        </NavLink>
-        <NavLink class="sidebar-link" href="sales" title="Daftar Penjualan">
-            <i class="bi bi-receipt sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Daftar Penjualan</span>
-        </NavLink>
-        <div class="nav-section">Pelanggan</div>
-        <NavLink class="sidebar-link" href="customers" title="Pelanggan">
-            <i class="bi bi-people sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Pelanggan</span>
-        </NavLink>
+
+        @* Section: Penjualan *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Penjualan
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="pos" Icon="@Icons.Material.Filled.Store">
+            Kasir
+        </MudNavLink>
+        <MudNavLink Href="sales" Icon="@Icons.Material.Filled.Receipt">
+            Daftar Penjualan
+        </MudNavLink>
+
+        @* Section: Pelanggan *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Pelanggan
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="customers" Icon="@Icons.Material.Filled.Group">
+            Pelanggan
+        </MudNavLink>
+
     </AuthorizeView>
 
     <AuthorizeView Roles="Admin">
-        <div class="nav-section">Inventaris</div>
-        <NavLink class="sidebar-link" href="products" title="Produk">
-            <i class="bi bi-box-seam sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Produk</span>
-        </NavLink>
-        <NavLink class="sidebar-link" href="categories" title="Kategori">
-            <i class="bi bi-tags sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Kategori</span>
-        </NavLink>
-        <NavLink class="sidebar-link" href="units" title="Satuan">
-            <i class="bi bi-rulers sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Satuan</span>
-        </NavLink>
-        <div class="nav-section">Pengadaan</div>
-        <NavLink class="sidebar-link" href="suppliers" title="Pemasok">
-            <i class="bi bi-truck sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Pemasok</span>
-        </NavLink>
-        <NavLink class="sidebar-link" href="purchase-orders" title="Order Pembelian">
-            <i class="bi bi-clipboard-check sidebar-link-icon"></i>
-            <span class="sidebar-link-text">Order Pembelian</span>
-        </NavLink>
+
+        @* Section: Keuangan *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Keuangan
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="financials" Icon="@Icons.Material.Filled.BarChart">
+            Laporan Keuangan
+        </MudNavLink>
+
+        @* Section: Inventaris *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Inventaris
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="products"   Icon="@Icons.Material.Filled.Inventory2">Produk</MudNavLink>
+        <MudNavLink Href="categories" Icon="@Icons.Material.Filled.Label">Kategori</MudNavLink>
+        <MudNavLink Href="units"      Icon="@Icons.Material.Filled.Straighten">Satuan</MudNavLink>
+
+        @* Section: Pengadaan *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Pengadaan
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="suppliers"       Icon="@Icons.Material.Filled.LocalShipping">Pemasok</MudNavLink>
+        <MudNavLink Href="purchase-orders" Icon="@Icons.Material.Filled.Assignment">Order Pembelian</MudNavLink>
+
     </AuthorizeView>
-</nav>
+
+</MudNavMenu>
+
+@code {
+    [CascadingParameter(Name = "DrawerOpen")]
+    private bool _drawerOpen { get; set; }
+}

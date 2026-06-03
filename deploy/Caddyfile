@@ -1,0 +1,9 @@
+{$APP_DOMAIN} {
+    encode gzip
+    reverse_proxy webui:8080
+}
+
+{$API_DOMAIN} {
+    encode gzip
+    reverse_proxy webapi:8080
+}

@@ -1,5 +1,7 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
@@ -11,6 +13,9 @@ namespace Materia.WebUi.Services;
 /// Works in both SSR (reads from HttpContext) and Interactive Server
 /// (reads from AuthenticationStateProvider, since HttpContext is null
 /// after the SignalR handshake).
+/// On <see cref="HttpStatusCode.Unauthorized"/>: navigates to the
+/// /account/session-expired endpoint which signs out the cookie and
+/// redirects to the login page with an expiry notice.
 /// </summary>
 public class BearerTokenHandler(
     IHttpContextAccessor accessor,
@@ -36,6 +41,18 @@ public class BearerTokenHandler(
         if (!string.IsNullOrEmpty(token))
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
 
-        return await base.SendAsync(request, ct);
+        var response = await base.SendAsync(request, ct);
+
+        // JWT expired or invalid — force the user back to the login page.
+        // In SSR this throws NavigationException (caught by Blazor's renderer
+        // which issues a proper HTTP redirect). In Interactive Server it sends
+        // a navigation command to the browser over SignalR.
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            var nav = serviceProvider.GetService<NavigationManager>();
+            nav?.NavigateTo("/account/session-expired", forceLoad: true);
+        }
+
+        return response;
     }
 }

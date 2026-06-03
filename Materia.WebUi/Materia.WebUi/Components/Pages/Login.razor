@@ -1,11 +1,8 @@
 @page "/login"
 @layout LoginLayout
-@using System.Security.Claims
-@using Microsoft.AspNetCore.Authentication
-@using Microsoft.AspNetCore.Authentication.Cookies
 @using Materia.WebUi.Services
-@inject AuthService AuthService
 @inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthState
 
 <PageTitle>Masuk — Materia</PageTitle>
 
@@ -15,35 +12,43 @@
             <h4 class="card-title mb-1 fw-bold">Materia</h4>
             <p class="text-muted mb-4 small">Point of Sale — masuk untuk melanjutkan</p>
 
-            @if (!string.IsNullOrEmpty(ErrorMessage))
+            @if (Expired == "1")
             {
-                <div class="alert alert-danger py-2 small" role="alert">
-                    @ErrorMessage
+                <div class="alert alert-warning py-2 small d-flex align-items-center gap-2" role="alert">
+                    <i class="bi bi-clock-history flex-shrink-0"></i>
+                    <span>Sesi Anda telah berakhir. Silakan masuk kembali.</span>
                 </div>
             }
 
-            <EditForm Model="Model" OnValidSubmit="HandleLoginAsync" FormName="login" method="post">
-                <DataAnnotationsValidator />
+            @if (!string.IsNullOrEmpty(Error))
+            {
+                <div class="alert alert-danger py-2 small" role="alert">
+                    @Uri.UnescapeDataString(Error)
+                </div>
+            }
+
+            @* Plain HTML form — posts to a minimal-API endpoint that calls
+               HttpContext.SignInAsync (requires a real HTTP request, not SignalR). *@
+            <form method="post" action="/account/login-handler">
+                <input type="hidden" name="returnUrl" value="@ReturnUrl" />
 
                 <div class="mb-3">
                     <label class="form-label" for="email">Email</label>
-                    <InputText id="email"
-                               class="form-control"
-                               @bind-Value="Model.Email"
-                               autocomplete="email"
-                               placeholder="masukan username" />
-                    <ValidationMessage For="() => Model.Email" class="small text-danger" />
+                    <input id="email" name="email" type="email"
+                           class="form-control"
+                           autocomplete="email"
+                           placeholder="masukan username"
+                           required />
                 </div>
 
                 <div class="mb-4">
                     <label class="form-label" for="password">Kata Sandi</label>
                     <div class="input-group">
-                        <InputText id="password"
-                                   type="password"
-                                   class="form-control"
-                                   @bind-Value="Model.Password"
-                                   autocomplete="current-password"
-                                   placeholder="masukan password" />
+                        <input id="password" name="password" type="password"
+                               class="form-control"
+                               autocomplete="current-password"
+                               placeholder="masukan password"
+                               required />
                         <button type="button"
                                 class="btn btn-outline-secondary"
                                 title="Tampilkan / sembunyikan kata sandi"
@@ -61,70 +66,29 @@
                             <i class="bi bi-eye"></i>
                         </button>
                     </div>
-                    <ValidationMessage For="() => Model.Password" class="small text-danger" />
                 </div>
 
                 <button type="submit" class="btn btn-primary w-100">Masuk</button>
-            </EditForm>
+            </form>
         </div>
     </div>
 </div>
 
 @code {
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
 
-    [SupplyParameterFromForm]
-    private LoginFormModel Model { get; set; } = default!;
+    [SupplyParameterFromQuery(Name = "expired")]
+    public string? Expired { get; set; }
 
-    protected override void OnParametersSet() => Model ??= new();
+    [SupplyParameterFromQuery(Name = "returnUrl")]
+    public string? ReturnUrl { get; set; }
 
-    private string? ErrorMessage { get; set; }
-
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (HttpContext.User.Identity?.IsAuthenticated == true)
+        // If already authenticated, go straight to the dashboard
+        var state = await AuthState.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
             Navigation.NavigateTo("/", forceLoad: true);
-    }
-
-    private async Task HandleLoginAsync()
-    {
-        ErrorMessage = null;
-
-        var result = await AuthService.LoginAsync(Model.Email, Model.Password);
-        if (!result.Succeeded)
-        {
-            ErrorMessage = result.ErrorMessage;
-            return;
-        }
-
-        var data = result.Data!;
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.Email, data.Email),
-            new(ClaimTypes.Name, data.FullName ?? data.Email),
-            new("access_token", data.Token),
-        };
-        claims.AddRange(data.Roles.Select(r => new Claim(ClaimTypes.Role, r)));
-
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-
-        await HttpContext.SignInAsync(
-            CookieAuthenticationDefaults.AuthenticationScheme,
-            principal,
-            new AuthenticationProperties { IsPersistent = true, ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8) });
-
-        Navigation.NavigateTo("/", forceLoad: true);
-    }
-
-    private sealed class LoginFormModel
-    {
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email wajib diisi.")]
-        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Format email tidak valid.")]
-        public string Email { get; set; } = string.Empty;
-
-        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kata sandi wajib diisi.")]
-        public string Password { get; set; } = string.Empty;
     }
 }

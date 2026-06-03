@@ -1,0 +1,486 @@
+@page "/financials"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject FinancialApiClient Api
+
+<PageTitle>Laporan Keuangan — Materia</PageTitle>
+
+@* ── Header ── *@
+<div class="d-flex justify-space-between align-center mb-4">
+    <MudText Typo="Typo.h5" Style="font-weight:700">
+        <MudIcon Icon="@Icons.Material.Filled.BarChart" Class="mr-2 mb-1" />
+        Laporan Keuangan
+    </MudText>
+</div>
+
+@* ── Date range filter ── *@
+<MudPaper Outlined="true" Class="pa-3 mb-4 rounded-lg">
+    <div class="d-flex flex-wrap gap-2 align-center">
+
+        <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" Color="Color.Default">
+            <MudButton OnClick="@(() => ApplyPreset(DateTime.Today, DateTime.Today))">
+                Hari Ini
+            </MudButton>
+            <MudButton OnClick="@(() => ApplyPreset(ThisWeekStart, DateTime.Today))">
+                Minggu Ini
+            </MudButton>
+            <MudButton OnClick="@(() => ApplyPreset(ThisMonthStart, DateTime.Today))">
+                Bulan Ini
+            </MudButton>
+        </MudButtonGroup>
+
+        <MudDivider Vertical="true" FlexItem="true" Class="mx-1" />
+
+        <MudDateRangePicker @bind-DateRange="_dateRange"
+                            Label="Rentang Kustom"
+                            DateFormat="dd MMM yyyy"
+                            MaxDate="DateTime.Today"
+                            Variant="Variant.Outlined"
+                            Margin="Margin.Dense"
+                            Style="width:300px"
+                            PickerVariant="PickerVariant.Dialog" />
+
+        <MudButton Variant="Variant.Filled"
+                   Color="Color.Primary"
+                   StartIcon="@Icons.Material.Filled.Search"
+                   OnClick="LoadAsync"
+                   Disabled="_loading">
+            Tampilkan
+        </MudButton>
+
+    </div>
+</MudPaper>
+
+@if (_loading)
+{
+    <MudProgressLinear Indeterminate="true" Color="Color.Primary" Class="mb-4" />
+}
+@if (!string.IsNullOrEmpty(_error))
+{
+    <MudAlert Severity="Severity.Error" Class="mb-4">@_error</MudAlert>
+}
+
+@* ════════════════════════════════════════════════════════
+   SUMMARY CARDS
+   ════════════════════════════════════════════════════════ *@
+<MudGrid Spacing="3" Class="mb-5">
+
+    @* Revenue *@
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 rounded-lg" Style="background:#f0fdf4;border:1px solid #bbf7d0">
+            <div class="d-flex justify-space-between align-start mb-2">
+                <MudText Typo="Typo.caption"
+                         Style="font-weight:600;text-transform:uppercase;
+                                letter-spacing:.06em;color:#15803d">
+                    Total Pendapatan
+                </MudText>
+                <MudIcon Icon="@Icons.Material.Filled.TrendingUp"
+                         Style="color:#22c55e;font-size:1.5rem" />
+            </div>
+            <MudText Style="font-size:1.5rem;font-weight:800;color:#15803d;line-height:1.2">
+                Rp @(_pnl?.TotalRevenue.ToString("N0") ?? "—")
+            </MudText>
+            <MudText Typo="Typo.caption" Style="color:#16a34a">
+                @(_pnl?.RevenueLines.Count ?? 0) transaksi
+            </MudText>
+        </MudPaper>
+    </MudItem>
+
+    @* COGS *@
+    <MudItem xs="12" sm="6" md="3">
+        <MudPaper Class="pa-4 rounded-lg" Style="background:#fffbeb;border:1px solid #fde68a">
+            <div class="d-flex justify-space-between align-start mb-2">
+                <MudText Typo="Typo.caption"
+                         Style="font-weight:600;text-transform:uppercase;
+                                letter-spacing:.06em;color:#b45309">
+                    HPP (Biaya Pembelian)
+                </MudText>
+                <MudIcon Icon="@Icons.Material.Filled.Inventory"
+                         Style="color:#f59e0b;font-size:1.5rem" />
+            </div>
+            <MudText Style="font-size:1.5rem;font-weight:800;color:#b45309;line-height:1.2">
+                Rp @(_pnl?.TotalCogs.ToString("N0") ?? "—")
+            </MudText>
+            <MudText Typo="Typo.caption" Style="color:#d97706">
+                @(_pnl?.CogsLines.Count ?? 0) order pembelian
+            </MudText>
+        </MudPaper>
+    </MudItem>
+
+    @* Gross Profit *@
+    <MudItem xs="12" sm="6" md="3">
+        @{
+            var profitColor  = (_pnl?.GrossProfit ?? 0) >= 0 ? "#1d4ed8" : "#b91c1c";
+            var profitBg     = (_pnl?.GrossProfit ?? 0) >= 0 ? "#eff6ff" : "#fef2f2";
+            var profitBorder = (_pnl?.GrossProfit ?? 0) >= 0 ? "#bfdbfe" : "#fecaca";
+            var profitIcon   = (_pnl?.GrossProfit ?? 0) >= 0
+                               ? Icons.Material.Filled.AccountBalanceWallet
+                               : Icons.Material.Filled.Warning;
+        }
+        <MudPaper Class="pa-4 rounded-lg"
+                  Style="@($"background:{profitBg};border:1px solid {profitBorder}")">
+            <div class="d-flex justify-space-between align-start mb-2">
+                <MudText Typo="Typo.caption"
+                         Style="@($"font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:{profitColor}")">
+                    Laba Kotor
+                </MudText>
+                <MudIcon Icon="@profitIcon"
+                         Style="@($"color:{profitColor};font-size:1.5rem")" />
+            </div>
+            <MudText Style="@($"font-size:1.5rem;font-weight:800;color:{profitColor};line-height:1.2")">
+                Rp @(_pnl?.GrossProfit.ToString("N0") ?? "—")
+            </MudText>
+            <MudText Typo="Typo.caption" Style="@($"color:{profitColor}")">
+                Margin @(_pnl?.GrossProfitMarginPct.ToString("N1") ?? "—") %
+            </MudText>
+        </MudPaper>
+    </MudItem>
+
+    @* Net Cash Flow *@
+    <MudItem xs="12" sm="6" md="3">
+        @{
+            var cashColor  = (_cashFlow?.NetCashFlow ?? 0) >= 0 ? "#0e7490" : "#b91c1c";
+            var cashBg     = (_cashFlow?.NetCashFlow ?? 0) >= 0 ? "#f0fdfa" : "#fef2f2";
+            var cashBorder = (_cashFlow?.NetCashFlow ?? 0) >= 0 ? "#99f6e4" : "#fecaca";
+            var cashIcon   = (_cashFlow?.NetCashFlow ?? 0) >= 0
+                             ? Icons.Material.Filled.Savings
+                             : Icons.Material.Filled.MoneyOff;
+        }
+        <MudPaper Class="pa-4 rounded-lg"
+                  Style="@($"background:{cashBg};border:1px solid {cashBorder}")">
+            <div class="d-flex justify-space-between align-start mb-2">
+                <MudText Typo="Typo.caption"
+                         Style="@($"font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:{cashColor}")">
+                    Arus Kas Bersih
+                </MudText>
+                <MudIcon Icon="@cashIcon"
+                         Style="@($"color:{cashColor};font-size:1.5rem")" />
+            </div>
+            <MudText Style="@($"font-size:1.5rem;font-weight:800;color:{cashColor};line-height:1.2")">
+                Rp @(_cashFlow?.NetCashFlow.ToString("N0") ?? "—")
+            </MudText>
+            <MudText Typo="Typo.caption" Style="@($"color:{cashColor}")">
+                Masuk @(_cashFlow?.TotalInflows.ToString("N0") ?? "—") /
+                Keluar @(_cashFlow?.TotalOutflows.ToString("N0") ?? "—")
+            </MudText>
+        </MudPaper>
+    </MudItem>
+
+</MudGrid>
+
+@* ════════════════════════════════════════════════════════
+   DETAIL TABLES
+   ════════════════════════════════════════════════════════ *@
+<MudGrid Spacing="3">
+
+    @* ── P&L detail ── *@
+    <MudItem xs="12" lg="7">
+        <MudPaper Outlined="true" Class="rounded-lg" Style="overflow:hidden">
+
+            @* Revenue table *@
+            <div class="px-4 py-2 d-flex justify-space-between align-center"
+                 style="background:#f0fdf4;border-bottom:1px solid var(--mud-palette-divider)">
+                <MudText Typo="Typo.subtitle2" Style="color:#15803d">
+                    <MudIcon Icon="@Icons.Material.Filled.AddCircleOutline"
+                             Size="Size.Small" Class="mr-1" />
+                    Pendapatan (Revenue)
+                </MudText>
+                <MudText Typo="Typo.subtitle2" Style="color:#15803d;font-weight:700">
+                    Rp @(_pnl?.TotalRevenue.ToString("N0") ?? "—")
+                </MudText>
+            </div>
+
+            <MudTable T="PnlLineItemResult"
+                      Items="@(_pnl?.RevenueLines ?? [])"
+                      Dense="true" Hover="true" Elevation="0"
+                      FixedHeader="true"
+                      Height="@((_pnl?.RevenueLines.Count ?? 0) > 8 ? "260px" : null)"
+                      Style="background:transparent">
+                <HeaderContent>
+                    <MudTh Style="padding:5px 12px">Tanggal</MudTh>
+                    <MudTh Style="padding:5px 12px">No. Ref</MudTh>
+                    <MudTh Style="padding:5px 12px">Keterangan</MudTh>
+                    <MudTh Style="padding:5px 12px;text-align:right">Jumlah</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption">
+                            @context.Date.ToLocalTime().ToString("dd/MM/yy HH:mm")
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption" Style="font-family:monospace">
+                            @context.ReferenceNo
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption">@context.Description</MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px;text-align:right">
+                        <MudText Typo="Typo.caption" Style="font-weight:600;color:#15803d">
+                            Rp @context.Amount.ToString("N0")
+                        </MudText>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-3">
+                        Tidak ada data pendapatan untuk periode ini.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            @* COGS table *@
+            <div class="px-4 py-2 d-flex justify-space-between align-center"
+                 style="background:#fffbeb;border-top:2px solid var(--mud-palette-divider);
+                        border-bottom:1px solid var(--mud-palette-divider)">
+                <MudText Typo="Typo.subtitle2" Style="color:#b45309">
+                    <MudIcon Icon="@Icons.Material.Filled.RemoveCircleOutline"
+                             Size="Size.Small" Class="mr-1" />
+                    HPP / Biaya Pembelian (COGS)
+                </MudText>
+                <MudText Typo="Typo.subtitle2" Style="color:#b45309;font-weight:700">
+                    Rp @(_pnl?.TotalCogs.ToString("N0") ?? "—")
+                </MudText>
+            </div>
+
+            <MudTable T="PnlLineItemResult"
+                      Items="@(_pnl?.CogsLines ?? [])"
+                      Dense="true" Hover="true" Elevation="0"
+                      FixedHeader="true"
+                      Height="@((_pnl?.CogsLines.Count ?? 0) > 8 ? "260px" : null)"
+                      Style="background:transparent">
+                <HeaderContent>
+                    <MudTh Style="padding:5px 12px">Tanggal</MudTh>
+                    <MudTh Style="padding:5px 12px">No. Ref</MudTh>
+                    <MudTh Style="padding:5px 12px">Keterangan</MudTh>
+                    <MudTh Style="padding:5px 12px;text-align:right">Jumlah</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption">
+                            @context.Date.ToLocalTime().ToString("dd/MM/yy HH:mm")
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption" Style="font-family:monospace">
+                            @context.ReferenceNo
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption">@context.Description</MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px;text-align:right">
+                        <MudText Typo="Typo.caption" Style="font-weight:600;color:#b45309">
+                            Rp @context.Amount.ToString("N0")
+                        </MudText>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-3">
+                        Tidak ada data pembelian untuk periode ini.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            @* Gross Profit footer *@
+            <div class="px-4 py-3 d-flex justify-space-between align-center"
+                 style="border-top:2px solid var(--mud-palette-divider)">
+                <MudText Typo="Typo.subtitle2" Style="font-weight:700">
+                    Laba Kotor
+                </MudText>
+                <MudText Typo="Typo.subtitle1"
+                         Style="@($"font-weight:800;color:{((_pnl?.GrossProfit ?? 0) >= 0 ? "#1d4ed8" : "#b91c1c")}")">
+                    Rp @(_pnl?.GrossProfit.ToString("N0") ?? "—")
+                    <MudText Typo="Typo.caption" Style="opacity:.75">
+                        (@(_pnl?.GrossProfitMarginPct.ToString("N1") ?? "—") %)
+                    </MudText>
+                </MudText>
+            </div>
+
+        </MudPaper>
+    </MudItem>
+
+    @* ── Cash Flow detail ── *@
+    <MudItem xs="12" lg="5">
+        <MudPaper Outlined="true" Class="rounded-lg" Style="overflow:hidden">
+
+            @* Inflows table *@
+            <div class="px-4 py-2 d-flex justify-space-between align-center"
+                 style="background:#f0fdfa;border-bottom:1px solid var(--mud-palette-divider)">
+                <MudText Typo="Typo.subtitle2" Style="color:#0e7490">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowDownward"
+                             Size="Size.Small" Class="mr-1" />
+                    Arus Kas Masuk
+                </MudText>
+                <MudText Typo="Typo.subtitle2" Style="color:#0e7490;font-weight:700">
+                    Rp @(_cashFlow?.TotalInflows.ToString("N0") ?? "—")
+                </MudText>
+            </div>
+
+            <MudTable T="CashFlowLineResult"
+                      Items="@(_cashFlow?.Inflows ?? [])"
+                      Dense="true" Hover="true" Elevation="0"
+                      FixedHeader="true"
+                      Height="@((_cashFlow?.Inflows.Count ?? 0) > 8 ? "260px" : null)"
+                      Style="background:transparent">
+                <HeaderContent>
+                    <MudTh Style="padding:5px 12px">Tanggal</MudTh>
+                    <MudTh Style="padding:5px 12px">Keterangan</MudTh>
+                    <MudTh Style="padding:5px 12px;text-align:right">Jumlah</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption">
+                            @context.Date.ToLocalTime().ToString("dd/MM/yy")
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption" Style="font-family:monospace;font-size:.72rem">
+                            @context.ReferenceNo
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="font-size:.72rem;opacity:.75">
+                            @context.Description
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px;text-align:right">
+                        <MudText Typo="Typo.caption" Style="font-weight:600;color:#0e7490">
+                            Rp @context.Amount.ToString("N0")
+                        </MudText>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-3">
+                        Tidak ada arus kas masuk.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            @* Outflows table *@
+            <div class="px-4 py-2 d-flex justify-space-between align-center"
+                 style="background:#fff7ed;border-top:2px solid var(--mud-palette-divider);
+                        border-bottom:1px solid var(--mud-palette-divider)">
+                <MudText Typo="Typo.subtitle2" Style="color:#c2410c">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowUpward"
+                             Size="Size.Small" Class="mr-1" />
+                    Arus Kas Keluar
+                </MudText>
+                <MudText Typo="Typo.subtitle2" Style="color:#c2410c;font-weight:700">
+                    Rp @(_cashFlow?.TotalOutflows.ToString("N0") ?? "—")
+                </MudText>
+            </div>
+
+            <MudTable T="CashFlowLineResult"
+                      Items="@(_cashFlow?.Outflows ?? [])"
+                      Dense="true" Hover="true" Elevation="0"
+                      FixedHeader="true"
+                      Height="@((_cashFlow?.Outflows.Count ?? 0) > 8 ? "260px" : null)"
+                      Style="background:transparent">
+                <HeaderContent>
+                    <MudTh Style="padding:5px 12px">Tanggal</MudTh>
+                    <MudTh Style="padding:5px 12px">Keterangan</MudTh>
+                    <MudTh Style="padding:5px 12px;text-align:right">Jumlah</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption">
+                            @context.Date.ToLocalTime().ToString("dd/MM/yy")
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px">
+                        <MudText Typo="Typo.caption" Style="font-family:monospace;font-size:.72rem">
+                            @context.ReferenceNo
+                        </MudText>
+                        <MudText Typo="Typo.caption" Style="font-size:.72rem;opacity:.75">
+                            @context.Description
+                        </MudText>
+                    </MudTd>
+                    <MudTd Style="padding:4px 12px;text-align:right">
+                        <MudText Typo="Typo.caption" Style="font-weight:600;color:#c2410c">
+                            Rp @context.Amount.ToString("N0")
+                        </MudText>
+                    </MudTd>
+                </RowTemplate>
+                <NoRecordsContent>
+                    <MudText Typo="Typo.caption" Color="Color.Secondary" Class="pa-3">
+                        Tidak ada arus kas keluar.
+                    </MudText>
+                </NoRecordsContent>
+            </MudTable>
+
+            @* Net Cash Flow footer *@
+            <div class="px-4 py-3 d-flex justify-space-between align-center"
+                 style="border-top:2px solid var(--mud-palette-divider)">
+                <MudText Typo="Typo.subtitle2" Style="font-weight:700">
+                    Arus Kas Bersih
+                </MudText>
+                <MudText Typo="Typo.subtitle1"
+                         Style="@($"font-weight:800;color:{((_cashFlow?.NetCashFlow ?? 0) >= 0 ? "#0e7490" : "#b91c1c")}")">
+                    Rp @(_cashFlow?.NetCashFlow.ToString("N0") ?? "—")
+                </MudText>
+            </div>
+
+        </MudPaper>
+    </MudItem>
+
+</MudGrid>
+
+@code {
+    private MudBlazor.DateRange _dateRange = new(ThisMonthStart, DateTime.Today);
+
+    private ProfitAndLossResult? _pnl;
+    private CashFlowResult?      _cashFlow;
+    private bool                 _loading;
+    private string?              _error;
+
+    // ── Date preset helpers ──────────────────────────────────────────────────
+    private static DateTime ThisMonthStart
+        => new(DateTime.Today.Year, DateTime.Today.Month, 1);
+
+    private static DateTime ThisWeekStart
+    {
+        get
+        {
+            var d = (int)DateTime.Today.DayOfWeek;
+            return DateTime.Today.AddDays(-(d == 0 ? 6 : d - 1)); // Mon-based
+        }
+    }
+
+    // ── Lifecycle ────────────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    // ── Handlers ─────────────────────────────────────────────────────────────
+    private void ApplyPreset(DateTime from, DateTime to)
+    {
+        _dateRange = new MudBlazor.DateRange(from, to);
+        _ = LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        if (_dateRange.Start is null || _dateRange.End is null) return;
+
+        _loading = true;
+        _error   = null;
+
+        try
+        {
+            var from = _dateRange.Start.Value;
+            var to   = _dateRange.End.Value;
+
+            var pnlTask  = Api.GetProfitAndLossAsync(from, to);
+            var cashTask = Api.GetCashFlowAsync(from, to);
+            await Task.WhenAll(pnlTask, cashTask);
+            _pnl      = pnlTask.Result;
+            _cashFlow = cashTask.Result;
+        }
+        catch (Exception ex)
+        {
+            _error = $"Gagal memuat laporan: {ex.Message}";
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

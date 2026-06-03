@@ -1,48 +1,127 @@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
+@inject ThemeState ThemeState
+@implements IDisposable
 
-<div class="app-shell">
-    <aside class="sidebar">
-        <div class="sidebar-header">
-            <a class="brand" href="/">
-                <i class="bi bi-grid-3x3-gap-fill brand-icon"></i>
-                <span class="brand-name">Materia</span>
-            </a>
-        </div>
-        <div class="nav-scrollable">
+@* All MudBlazor global providers live here inside the Routes interactive circuit.
+   ThemeProvider shares the exact same ThemeState instance as the toggle button.
+   Popup providers are co-located so they participate in the same DI scope. *@
+<MudThemeProvider Theme="@MateriaTheme.Default" IsDarkMode="@ThemeState.IsDarkMode" />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+
+    @* ── App Bar ── *@
+    <MudAppBar Elevation="0" Dense="true"
+               Style="border-bottom:1px solid var(--mud-palette-divider);">
+
+        <MudIconButton Icon="@Icons.Material.Filled.Menu"
+                       Color="Color.Inherit"
+                       Edge="Edge.Start"
+                       OnClick="ToggleDrawer" />
+
+        <MudText Typo="Typo.h6" Class="ml-1"
+                 Style="font-weight:700;letter-spacing:-.4px;user-select:none">
+            Materia
+        </MudText>
+
+        <MudSpacer />
+
+        <MudTooltip Text="@(ThemeState.IsDarkMode ? "Mode Terang" : "Mode Gelap")"
+                    Placement="Placement.Bottom">
+            <MudIconButton Icon="@(ThemeState.IsDarkMode
+                                     ? Icons.Material.Filled.LightMode
+                                     : Icons.Material.Filled.DarkMode)"
+                           Color="Color.Inherit"
+                           OnClick="ToggleDarkMode" />
+        </MudTooltip>
+
+        <AuthorizeView>
+            <Authorized>
+                <MudTooltip Text="@context.User.Identity?.Name" Placement="Placement.Bottom">
+                    <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-1"
+                               Style="font-size:.75rem;cursor:default">
+                        @(context.User.Identity?.Name?[..1].ToUpperInvariant() ?? "?")
+                    </MudAvatar>
+                </MudTooltip>
+                <form method="post" action="/account/logout">
+                    <AntiforgeryToken />
+                    <MudTooltip Text="Keluar" Placement="Placement.Bottom">
+                        <MudIconButton Icon="@Icons.Material.Filled.Logout"
+                                       Color="Color.Inherit"
+                                       ButtonType="ButtonType.Submit"
+                                       Size="Size.Small" />
+                    </MudTooltip>
+                </form>
+            </Authorized>
+        </AuthorizeView>
+
+    </MudAppBar>
+
+    @* ── Drawer ── *@
+    <MudDrawer @bind-Open="_drawerOpen"
+               Elevation="0"
+               Variant="DrawerVariant.Mini"
+               OpenMiniOnHover="true"
+               ClipMode="DrawerClipMode.Always"
+               Style="border-right:1px solid rgba(255,255,255,.06)">
+
+        <MudDrawerHeader Dense="true" Class="px-4"
+                         Style="min-height:48px;align-items:center;
+                                border-bottom:1px solid rgba(255,255,255,.06)">
+            @if (_drawerOpen)
+            {
+                <MudText Typo="Typo.subtitle2"
+                         Style="font-weight:700;color:var(--mud-palette-drawer-text);
+                                letter-spacing:-.2px;user-select:none">
+                    Materia
+                </MudText>
+            }
+        </MudDrawerHeader>
+
+        <CascadingValue Value="_drawerOpen" Name="DrawerOpen">
             <NavMenu />
-        </div>
-    </aside>
+        </CascadingValue>
 
-    <div class="main-wrapper">
-        <header class="topbar">
-            <button class="sidebar-toggle-btn" type="button" onclick="toggleSidebar()" title="Toggle menu">
-                <i class="bi bi-list"></i>
-            </button>
-            <div class="topbar-right">
-                <AuthorizeView>
-                    <Authorized>
-                        <span class="topbar-user">
-                            <i class="bi bi-person-circle me-1"></i>@context.User.Identity?.Name
-                        </span>
-                        <form method="post" action="/account/logout">
-                            <AntiforgeryToken />
-                            <button type="submit" class="btn-logout">
-                                <i class="bi bi-box-arrow-right me-1"></i>Keluar
-                            </button>
-                        </form>
-                    </Authorized>
-                </AuthorizeView>
-            </div>
-        </header>
-        <main class="page-content">
+    </MudDrawer>
+
+    @* ── Main content ── *@
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.False" Class="pa-5 pt-4">
             @Body
-        </main>
-    </div>
-</div>
+        </MudContainer>
+    </MudMainContent>
+
+</MudLayout>
 
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    private bool _drawerOpen = true;
+
+    // Subscribe so the icon re-renders if ThemeState is toggled from
+    // anywhere else (future code, JS interop, etc.).
+    protected override void OnInitialized()
+        => ThemeState.OnChanged += OnThemeChanged;
+
+    private void OnThemeChanged()
+        => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+        => ThemeState.OnChanged -= OnThemeChanged;
+
+    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+
+    private void ToggleDarkMode()
+    {
+        ThemeState.Toggle();
+        // StateHasChanged is called automatically after any event handler,
+        // but the OnChanged subscription above also covers remote triggers.
+    }
+}

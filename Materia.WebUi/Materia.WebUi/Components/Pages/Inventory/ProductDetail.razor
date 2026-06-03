@@ -1,4 +1,5 @@
 @page "/products/{id:guid}"
+@rendermode InteractiveServer
 @attribute [Authorize(Roles = "Admin")]
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
@@ -326,7 +327,6 @@ else
 
 @code {
     [Parameter] public Guid Id { get; set; }
-    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
 
     [SupplyParameterFromForm(FormName = "edit-info")]
     private EditInfoForm _editForm { get; set; } = new();
@@ -354,16 +354,15 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        if (HttpContext?.Request.Query.ContainsKey("created") == true)
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+        if (query.ContainsKey("created"))
             _notice = "Produk berhasil dibuat.";
 
         await LoadAsync();
 
-        // Populate the edit form when not handling a POST submission.
-        // HttpContext is null when rendered outside SSR (enhanced navigation, etc.),
-        // which is never a POST, so the form should always be pre-filled in that case.
-        var isPost = HttpContext is not null && HttpMethods.IsPost(HttpContext.Request.Method);
-        if (!isPost && _product is not null)
+        // In Interactive Server the initial render is never a POST submission,
+        // so the edit form is always pre-filled from the loaded product.
+        if (_product is not null)
         {
             _editForm.Name = _product.Name;
             _editForm.Description = _product.Description;

@@ -1,0 +1,90 @@
+services:
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: materiadb
+      POSTGRES_USER: materia
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - materia-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U materia -d materiadb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    networks:
+      - materia-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  webapi:
+    image: ${GHCR_PREFIX}/materia-webapi:latest
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__materiadb: Host=postgres;Port=5432;Database=materiadb;Username=materia;Password=${POSTGRES_PASSWORD}
+      ConnectionStrings__cache: redis:6379,password=${REDIS_PASSWORD}
+      Jwt__Key: ${JWT_KEY}
+      Jwt__Issuer: Materia.WebApi
+      Jwt__Audience: Materia.WebUi
+      WebUi__BaseUrl: https://${APP_DOMAIN}
+    networks:
+      - materia-net
+
+  webui:
+    image: ${GHCR_PREFIX}/materia-webui:latest
+    restart: unless-stopped
+    depends_on:
+      - webapi
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      ApiService__BaseUrl: https://${API_DOMAIN}
+    networks:
+      - materia-net
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - materia-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  materia-net:
+    driver: bridge

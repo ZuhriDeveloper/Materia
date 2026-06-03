@@ -1,0 +1,21 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy project files first for restore layer caching
+COPY Materia.Backend/Materia.Domain/Materia.Domain.csproj                Materia.Backend/Materia.Domain/
+COPY Materia.Backend/Materia.Application/Materia.Application.csproj      Materia.Backend/Materia.Application/
+COPY Materia.Backend/Materia.Infrastructure/Materia.Infrastructure.csproj Materia.Backend/Materia.Infrastructure/
+COPY Materia.Backend/Materia.WebApi/Materia.WebApi.csproj                 Materia.Backend/Materia.WebApi/
+RUN dotnet restore Materia.Backend/Materia.WebApi/Materia.WebApi.csproj
+
+COPY Materia.Backend/ Materia.Backend/
+RUN dotnet publish Materia.Backend/Materia.WebApi/Materia.WebApi.csproj \
+    -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+ENV ASPNETCORE_URLS=http://+:8080
+EXPOSE 8080
+USER app
+ENTRYPOINT ["dotnet", "Materia.WebApi.dll"]

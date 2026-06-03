@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/*.user
+**/appsettings.Development.json
+.git/
+.gitignore
+Materia.AppHost/
+Materia.Tests/
+Materia.AndroidUi/
+deploy/
+.github/

@@ -1,4 +1,5 @@
 @page "/products"
+@rendermode InteractiveServer
 @attribute [Authorize(Roles = "Admin")]
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
@@ -114,8 +115,6 @@
 </div>
 
 @code {
-    [CascadingParameter] private HttpContext HttpContext { get; set; } = default!;
-
     private PagedProductsDto? _products;
     private bool? _filter;
     private string? _notice;
@@ -124,13 +123,15 @@
 
     protected override async Task OnInitializedAsync()
     {
-        if (HttpContext.Request.Query.ContainsKey("created"))
+        var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
+
+        if (query.ContainsKey("created"))
             _notice = "Produk berhasil dibuat.";
 
-        var activeParam = HttpContext.Request.Query["active"].ToString();
+        var activeParam = query.TryGetValue("active", out var av) ? av.ToString() : "";
         _filter = activeParam == "true" ? true : activeParam == "false" ? false : null;
 
-        var page = int.TryParse(HttpContext.Request.Query["page"], out var p) ? p : 1;
+        var page = query.TryGetValue("page", out var pv) && int.TryParse(pv, out var p) ? p : 1;
         _products = await Api.GetProductsAsync(page, 20, _filter);
     }
 }

@@ -1,0 +1,22 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+WORKDIR /src
+
+# Copy project files first for restore layer caching
+# Both the server and the WASM client must be present (server references client)
+COPY Materia.WebUi/Materia.WebUi.Client/Materia.WebUi.Client.csproj Materia.WebUi/Materia.WebUi.Client/
+COPY Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj               Materia.WebUi/Materia.WebUi/
+RUN dotnet restore Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj
+
+COPY Materia.WebUi/ Materia.WebUi/
+RUN dotnet publish Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj \
+    -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
+WORKDIR /app
+COPY --from=build /app/publish .
+ENV ASPNETCORE_URLS=http://+:8080
+# Required so UseHttpsRedirection respects X-Forwarded-Proto: https from Caddy
+ENV ASPNETCORE_FORWARDEDHEADERS_ENABLED=true
+EXPOSE 8080
+USER app
+ENTRYPOINT ["dotnet", "Materia.WebUi.dll"]

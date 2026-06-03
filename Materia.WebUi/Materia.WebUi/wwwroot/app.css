@@ -60,6 +60,68 @@ h1:focus {
 }
 
 /* ==============================================
+   Receipt — thermal paper print styles (80mm)
+   ============================================== */
+
+/* Hidden on screen; shown only by @media print below */
+.receipt-print-only {
+    display: none;
+}
+
+/* Target 80mm thermal roll — browsers that support size will honour it */
+@page {
+    margin: 0;
+    size: 80mm auto;
+}
+
+@media print {
+    /* --- Suppress everything on the page --- */
+    body * {
+        visibility: hidden !important;
+    }
+
+    /* --- Make only the receipt visible --- */
+    .receipt-print-only,
+    .receipt-print-only * {
+        visibility: visible !important;
+    }
+
+    .receipt-print-only {
+        display: block !important;
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        padding: 4mm 5mm 10mm;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 8.5pt;
+        line-height: 1.35;
+        color: #000;
+        background: #fff;
+        width: 80mm;
+    }
+
+    /* Reset any MudBlazor or Bootstrap box-shadows / colours inside the receipt */
+    .receipt-print-only * {
+        background: transparent !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    /* ── Surat Jalan overrides (A5 professional layout) ──────────────────────
+       The base rule locks width to 80mm and uses Courier New for thermal paper.
+       These overrides switch to a proportional font and let the content fill
+       the full A5 content area (paper minus @page margins injected by print.js).
+    ──────────────────────────────────────────────────────────────────────────── */
+    .receipt-print-only.is-surat-jalan {
+        font-family: Arial, Helvetica, sans-serif !important;
+        font-size:   10pt !important;
+        line-height: 1.5 !important;
+        padding:     0    !important;
+        width:       auto !important;
+    }
+}
+
+/* ==============================================
    App Shell — Collapsible Sidebar Layout
    ============================================== */
 

@@ -35,6 +35,7 @@ using Materia.Application.Commands.Purchasing.UpdateSupplier;
 using Materia.Application.Queries.Inventory;
 using Materia.Application.Queries.Purchasing;
 using Materia.Application.Commands.Sales.FinalizeSale;
+using Materia.Application.Financials.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Materia.Application;
@@ -110,6 +111,10 @@ public static class DependencyInjection
         // Sales
         services.AddScoped<SaleService>();
         services.AddScoped<FinalizeSaleCommandHandler>();
+
+        // Financials
+        services.AddScoped<GetProfitAndLossQueryHandler>();
+        services.AddScoped<GetCashFlowQueryHandler>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();
