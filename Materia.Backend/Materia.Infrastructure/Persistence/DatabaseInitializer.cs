@@ -9,6 +9,7 @@ public class DatabaseInitializer(
     AppDbContext dbContext,
     RoleManager<IdentityRole> roleManager,
     UserManager<ApplicationUser> userManager,
+    CatalogSeeder catalogSeeder,
     ILogger<DatabaseInitializer> logger)
 {
     private static readonly SeedUser[] SeedUsers =
@@ -23,6 +24,7 @@ public class DatabaseInitializer(
         await MigrateAsync(cancellationToken);
         await SeedRolesAsync();
         await SeedUsersAsync();
+        await catalogSeeder.SeedAsync(cancellationToken);
     }
 
     private async Task MigrateAsync(CancellationToken cancellationToken)

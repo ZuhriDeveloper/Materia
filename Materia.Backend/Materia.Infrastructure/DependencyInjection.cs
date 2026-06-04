@@ -81,6 +81,7 @@ public static class DependencyInjection
         services.AddScoped<IUserAuthRepository, UserAuthRepository>();
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<DatabaseInitializer>();
+        services.AddScoped<CatalogSeeder>();
 
         // Inventory repositories
         services.AddScoped<Application.Contracts.Inventory.IProductRepository, Inventory.ProductRepository>();
