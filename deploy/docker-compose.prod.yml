@@ -47,6 +47,8 @@ services:
       Jwt__Issuer: Materia.WebApi
       Jwt__Audience: Materia.WebUi
       WebUi__BaseUrl: https://${APP_DOMAIN}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - materia-net
 
@@ -59,6 +61,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ApiService__BaseUrl: https://${API_DOMAIN}
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - materia-net
 
@@ -76,6 +80,28 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    networks:
+      - materia-net
+
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    # Pull-based auto-deploy: polls GHCR and recreates the labeled app
+    # containers (webapi/webui) whenever CI pushes a new image. Outbound only —
+    # no inbound access to the VPS is needed, so the firewall block is irrelevant.
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Reuses the `docker login ghcr.io` you ran on the VPS so Watchtower can
+      # pull your PRIVATE images. Must match the user you logged in as:
+      #   logged in as 'deploy' -> keep the line below
+      #   logged in as root     -> change to /root/.docker/config.json
+      #   images are PUBLIC     -> delete the line below
+      - /home/deploy/.docker/config.json:/config.json:ro
+    environment:
+      WATCHTOWER_CLEANUP: "true"          # remove old images after updating
+      WATCHTOWER_LABEL_ENABLE: "true"     # only watch containers we labeled
+      WATCHTOWER_POLL_INTERVAL: "120"     # check GHCR every 120 seconds
+      WATCHTOWER_ROLLING_RESTART: "true"  # update one container at a time
     networks:
       - materia-net
 
