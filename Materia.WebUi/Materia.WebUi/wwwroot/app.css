@@ -2,6 +2,13 @@ html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
+/* Applied immediately by the inline script before MudBlazor boots,
+   so users who prefer dark mode don't see a white flash on load. */
+html[data-prefers-dark='true'] {
+    background: #0F172A;
+    color-scheme: dark;
+}
+
 a, .btn-link {
     color: #006bb7;
 }

@@ -1,6 +1,7 @@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
 @inject ThemeState ThemeState
+@inject IJSRuntime JS
 @implements IDisposable
 
 @* All MudBlazor global providers live here inside the Routes interactive circuit.
@@ -105,10 +106,26 @@
 @code {
     private bool _drawerOpen = true;
 
-    // Subscribe so the icon re-renders if ThemeState is toggled from
-    // anywhere else (future code, JS interop, etc.).
     protected override void OnInitialized()
         => ThemeState.OnChanged += OnThemeChanged;
+
+    // Restore persisted preferences on the first interactive render.
+    // JSInterop is only safe after the circuit connects (OnAfterRenderAsync).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        try
+        {
+            var darkPref    = await JS.InvokeAsync<string?>("localStorage.getItem", "materia_dark");
+            var sidebarPref = await JS.InvokeAsync<string?>("localStorage.getItem", "materia_sidebar");
+
+            ThemeState.SetDarkMode(darkPref == "1");
+            _drawerOpen = sidebarPref != "1";
+        }
+        catch { /* localStorage not available (private/incognito edge cases) */ }
+
+        StateHasChanged();
+    }
 
     private void OnThemeChanged()
         => InvokeAsync(StateHasChanged);
@@ -116,12 +133,17 @@
     public void Dispose()
         => ThemeState.OnChanged -= OnThemeChanged;
 
-    private void ToggleDrawer() => _drawerOpen = !_drawerOpen;
+    private async Task ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "materia_sidebar", _drawerOpen ? "0" : "1"); }
+        catch { }
+    }
 
-    private void ToggleDarkMode()
+    private async Task ToggleDarkMode()
     {
         ThemeState.Toggle();
-        // StateHasChanged is called automatically after any event handler,
-        // but the OnChanged subscription above also covers remote triggers.
+        try { await JS.InvokeVoidAsync("localStorage.setItem", "materia_dark", ThemeState.IsDarkMode ? "1" : "0"); }
+        catch { }
     }
 }
