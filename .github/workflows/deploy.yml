@@ -67,6 +67,15 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.OWNER_LC }}/materia-webui:latest
             ${{ env.REGISTRY }}/${{ env.OWNER_LC }}/materia-webui:${{ github.sha }}
 
+      - name: Debug — can the runner reach the VPS?
+        run: |
+          echo "Testing TCP from GitHub runner to 145.79.10.227:22 ..."
+          if timeout 10 bash -c 'cat < /dev/null > /dev/tcp/145.79.10.227/22' 2>/dev/null; then
+            echo "RESULT: ✅ runner CAN reach 145.79.10.227:22  ->  problem is the VPS_HOST secret value"
+          else
+            echo "RESULT: ❌ runner CANNOT reach 145.79.10.227:22  ->  VPS firewall is blocking GitHub IPs"
+          fi
+
       - name: Copy deploy files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
