@@ -39,11 +39,17 @@ public class CatalogController(AppDbContext db, SaleService saleService) : Contr
 
         top = Math.Clamp(top, 1, 20);
 
+        // Build the LIKE patterns on the client first. Doing the "%{t}%" here (not
+        // inside the query) keeps string.Format out of the expression tree — EF Core
+        // can't translate string interpolation, but it CAN translate
+        // patterns.Any(...) into an EXISTS over the parameterised list.
+        var patterns = terms.Select(t => $"%{t}%").ToList();
+
         // One query: product matches ANY of the keywords (OR across all terms)
         var products = await db.ProductReadModels
             .Where(p => p.IsActive &&
-                        terms.Any(t => EF.Functions.ILike(p.Name, $"%{t}%") ||
-                                       EF.Functions.ILike(p.Description ?? "", $"%{t}%")))
+                        patterns.Any(pat => EF.Functions.ILike(p.Name, pat) ||
+                                            EF.Functions.ILike(p.Description ?? "", pat)))
             .OrderBy(p => p.Name)
             .Take(top)
             .ToListAsync(ct);
