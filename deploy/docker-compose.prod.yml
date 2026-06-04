@@ -98,6 +98,9 @@ services:
       #   images are PUBLIC     -> delete the line below
       - /home/deploy/.docker/config.json:/config.json:ro
     environment:
+      # The watchtower image defaults to an old Docker API version (1.25) that
+      # modern Docker daemons reject — pin a supported one.
+      DOCKER_API_VERSION: "1.41"
       WATCHTOWER_CLEANUP: "true"          # remove old images after updating
       WATCHTOWER_LABEL_ENABLE: "true"     # only watch containers we labeled
       WATCHTOWER_POLL_INTERVAL: "120"     # check GHCR every 120 seconds
