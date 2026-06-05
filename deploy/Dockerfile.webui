@@ -8,8 +8,16 @@ COPY Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj               Materia.WebU
 RUN dotnet restore Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj
 
 COPY Materia.WebUi/ Materia.WebUi/
+# Do NOT add --no-restore here. The framework static-web-assets package
+# 'microsoft.aspnetcore.app.internal.assets' (which ships blazor.web.js / blazor.server.js)
+# is only added to the restore graph during publish — the earlier `dotnet restore` step
+# does not pull it. With --no-restore on a clean machine (CI), it is silently skipped, so
+# blazor.web.js never ships and the app 404s it in production. Dev machines hide this because
+# the package is already in the global NuGet cache from other projects. Letting publish
+# restore pulls it; the bulk of packages are already cached from the restore layer, so the
+# extra cost is negligible.
 RUN dotnet publish Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj \
-    -c Release -o /app/publish --no-restore
+    -c Release -o /app/publish
 
 # Guard: blazor.web.js is the script the browser loads to boot the Blazor Web App. If the
 # server-side static web assets ever fail to publish (leaving only the WASM client assets),
