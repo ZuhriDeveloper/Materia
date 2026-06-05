@@ -4,9 +4,26 @@ using Materia.WebUi.Components;
 using Materia.WebUi.Services;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.HttpOverrides;
 using MudBlazor.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// The container runs plain HTTP on :8080 behind a TLS-terminating reverse proxy
+// (Caddy/Nginx) on the internal Docker network. Honor the proxy's X-Forwarded-*
+// headers so the app sees the original https scheme and public host instead of the
+// internal http://...:8080 hop. By default ForwardedHeaders only trusts loopback
+// proxies, and a container-to-container hop is NOT loopback — so the headers would be
+// dropped. Clearing the allowlists trusts the proxy. This is safe because :8080 is only
+// reachable through the proxy on the private network, never published publicly.
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor
+        | ForwardedHeaders.XForwardedProto
+        | ForwardedHeaders.XForwardedHost;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeState>();
@@ -61,6 +78,11 @@ builder.Services.AddHttpClient<FinancialApiClient>(client =>
 
 var app = builder.Build();
 
+// MUST be the first middleware so everything downstream (HSTS, the auth-cookie Secure
+// flag, generated redirects/absolute URLs, and the SignalR negotiate response) sees the
+// real client scheme/host rather than the internal http://...:8080 hop.
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseWebAssemblyDebugging();
@@ -71,7 +93,12 @@ else
     app.UseHsts();
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
-app.UseHttpsRedirection();
+
+// No UseHttpsRedirection(): TLS terminates at the reverse proxy and the container only
+// listens on http://+:8080, so there is no https port to redirect to (Kestrel logs
+// "Failed to determine the https port for redirect"). The proxy already upgrades
+// http->https at the edge. Enabling it here only spams warnings and, if a port were ever
+// inferred, risks a redirect loop on every request — including /_framework/blazor.web.js.
 
 app.UseAuthentication();
 app.UseAuthorization();

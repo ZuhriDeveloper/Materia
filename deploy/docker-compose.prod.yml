@@ -59,7 +59,8 @@ services:
       - webapi
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+      # Forwarded-header handling lives in Program.cs (UseForwardedHeaders). Do not set
+      # ASPNETCORE_FORWARDEDHEADERS_ENABLED here — it would register the middleware twice.
       ApiService__BaseUrl: https://${API_DOMAIN}
     labels:
       - "com.centurylinklabs.watchtower.enable=true"

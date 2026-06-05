@@ -1,3 +1,12 @@
+# Caddy terminates TLS (auto Let's Encrypt) and reverse-proxies to the containers over the
+# internal Docker network. `reverse_proxy` already does everything this app needs:
+#   * proxies EVERY path, including /_framework/* (blazor.web.js + the static-asset endpoints)
+#   * upgrades the Blazor Interactive Server SignalR WebSocket (/_blazor) transparently —
+#     no manual Upgrade/Connection headers required (that's an Nginx-ism, see deploy/nginx/)
+#   * sets X-Forwarded-Proto/-Host/-For, which Program.cs now trusts (UseForwardedHeaders)
+#   * streams responses (no buffering), so the SignalR circuit stays alive
+# `encode gzip` is safe: Caddy skips responses that already carry Content-Encoding, so it does
+# not double-compress the pre-compressed .br/.gz assets that MapStaticAssets serves.
 {$APP_DOMAIN} {
     encode gzip
     reverse_proxy webui:8080
