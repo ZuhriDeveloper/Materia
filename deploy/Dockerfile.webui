@@ -11,6 +11,13 @@ COPY Materia.WebUi/ Materia.WebUi/
 RUN dotnet publish Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj \
     -c Release -o /app/publish --no-restore
 
+# Guard: blazor.web.js is the script the browser loads to boot the Blazor Web App. If the
+# server-side static web assets ever fail to publish (leaving only the WASM client assets),
+# the app 404s this file and renders a blank page. Fail the IMAGE BUILD here instead of
+# shipping a broken container that silently breaks in production behind the proxy.
+RUN test -s /app/publish/wwwroot/_framework/blazor.web.js \
+    || (echo "BUILD FAILED: /app/publish/wwwroot/_framework/blazor.web.js missing or empty — Blazor Web App static assets did not publish." && exit 1)
+
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
