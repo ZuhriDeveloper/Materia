@@ -58,5 +58,5 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
         s.Items.Select(i => new SaleItemDto(
             i.Id, i.ProductId, i.ProductName,
             i.UnitName, i.Quantity, i.QuantityInBaseUnit,
-            i.UnitPrice, i.Subtotal)).ToList());
+            i.UnitPrice, i.Subtotal, i.VariantId, i.ColorName)).ToList());
 }

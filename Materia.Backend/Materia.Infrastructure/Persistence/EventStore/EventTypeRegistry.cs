@@ -22,6 +22,11 @@ public static class EventTypeRegistry
         [nameof(ProductCategoryRemoved)]     = typeof(ProductCategoryRemoved),
         [nameof(ProductUnitConversionAdded)] = typeof(ProductUnitConversionAdded),
         [nameof(ProductUnitConversionRemoved)] = typeof(ProductUnitConversionRemoved),
+        [nameof(ProductColorVariantAdded)]     = typeof(ProductColorVariantAdded),
+        [nameof(ProductColorVariantUpdated)]   = typeof(ProductColorVariantUpdated),
+        [nameof(ProductColorVariantRemoved)]   = typeof(ProductColorVariantRemoved),
+        [nameof(ProductColorVariantDeactivated)] = typeof(ProductColorVariantDeactivated),
+        [nameof(ProductColorVariantActivated)] = typeof(ProductColorVariantActivated),
 
         // Category events
         [nameof(CategoryCreated)]            = typeof(CategoryCreated),

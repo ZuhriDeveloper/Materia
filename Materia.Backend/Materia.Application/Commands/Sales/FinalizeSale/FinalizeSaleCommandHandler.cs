@@ -74,7 +74,9 @@ public sealed class FinalizeSaleCommandHandler(
                 item.Quantity,
                 quantityInBaseUnit,
                 item.UnitPrice,
-                command.ServedBy);
+                command.ServedBy,
+                item.VariantId,
+                item.ColorName);
         }
     }
 
@@ -84,6 +86,7 @@ public sealed class FinalizeSaleCommandHandler(
         {
             await stockDeduction.DeductAsync(
                 item.ProductId,
+                item.VariantId,
                 item.QuantityInBaseUnit,
                 $"Penjualan {sale.ReferenceNo}",
                 servedBy,

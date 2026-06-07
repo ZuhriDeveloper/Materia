@@ -9,7 +9,8 @@ public class AdjustStockCommandHandler(IStockRepository repository, IProductRepo
     public async Task HandleAsync(AdjustStockCommand command, CancellationToken ct = default)
     {
         var productId = ProductId.From(command.ProductId);
-        var stock = await repository.GetByProductIdAsync(productId, ct);
+        var variantId = command.VariantId is { } v ? VariantId.From(v) : null;
+        var stock = await repository.GetAsync(productId, variantId, ct);
 
         if (stock is null)
         {
@@ -17,11 +18,11 @@ public class AdjustStockCommandHandler(IStockRepository repository, IProductRepo
             var product = await productRepository.GetByIdAsync(productId, ct)
                 ?? throw new DomainException($"Product '{command.ProductId}' not found.");
 
-            stock = Stock.Initialize(productId, product.BaseUnit.Value, command.AdjustedBy);
+            stock = Stock.Initialize(productId, product.BaseUnit.Value, command.AdjustedBy, variantId);
             await repository.SaveAsync(stock, ct);
 
             // Re-load so subsequent save appends correctly
-            stock = await repository.GetByProductIdAsync(productId, ct)!;
+            stock = await repository.GetAsync(productId, variantId, ct)!;
         }
 
         stock!.Adjust(command.Delta, command.Reason, command.AdjustedBy);

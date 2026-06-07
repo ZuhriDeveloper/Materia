@@ -314,6 +314,44 @@ namespace Materia.Infrastructure.Migrations
                     b.ToTable("ProductReadModels");
                 });
 
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.ProductVariantReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Barcode")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ColorCode")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ColorName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<decimal?>("PriceOverride")
+                        .HasColumnType("numeric");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Barcode")
+                        .IsUnique();
+
+                    b.HasIndex("ProductId");
+
+                    b.ToTable("ProductVariantReadModels");
+                });
+
             modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.PurchaseOrderReadModel", b =>
                 {
                     b.Property<Guid>("Id")
@@ -363,6 +401,9 @@ namespace Materia.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("ColorName")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
@@ -388,6 +429,9 @@ namespace Materia.Infrastructure.Migrations
 
                     b.Property<decimal>("UnitPrice")
                         .HasColumnType("numeric");
+
+                    b.Property<Guid?>("VariantId")
+                        .HasColumnType("uuid");
 
                     b.HasKey("Id");
 
@@ -499,9 +543,12 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("VariantId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId")
+                    b.HasIndex("ProductId", "VariantId")
                         .IsUnique();
 
                     b.ToTable("StockReadModels");

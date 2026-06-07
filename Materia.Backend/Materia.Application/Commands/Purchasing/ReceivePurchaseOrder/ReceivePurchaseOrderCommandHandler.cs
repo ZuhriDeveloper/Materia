@@ -37,7 +37,7 @@ public sealed class ReceivePurchaseOrderCommandHandler(
 
             // A product received for the first time may not have a stock record yet —
             // initialise it at zero, then reconcile the received quantity onto it.
-            var stock = await stockRepository.GetByProductIdAsync(productId, ct)
+            var stock = await stockRepository.GetAsync(productId, ct: ct)
                 ?? Stock.Initialize(productId, line.Unit, command.ReceivedBy);
 
             stock.ReconcileFromPurchase(

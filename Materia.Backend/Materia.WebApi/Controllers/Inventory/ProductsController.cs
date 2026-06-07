@@ -1,13 +1,17 @@
 using System.Security.Claims;
 using FluentValidation;
+using Materia.Application.Commands.Inventory.AddColorVariant;
 using Materia.Application.Commands.Inventory.AddUnitConversion;
 using Materia.Application.Commands.Inventory.AdjustStock;
 using Materia.Application.Commands.Inventory.AssignCategory;
 using Materia.Application.Commands.Inventory.CreateProduct;
 using Materia.Application.Commands.Inventory.RemoveCategory;
+using Materia.Application.Commands.Inventory.RemoveColorVariant;
 using Materia.Application.Commands.Inventory.RemoveUnitConversion;
+using Materia.Application.Commands.Inventory.SetColorVariantStatus;
 using Materia.Application.Commands.Inventory.SetProductStatus;
 using Materia.Application.Commands.Inventory.SyncProductCategories;
+using Materia.Application.Commands.Inventory.UpdateColorVariant;
 using Materia.Application.Commands.Inventory.UpdateProduct;
 using Materia.Application.Queries.Inventory;
 using Microsoft.AspNetCore.Authorization;
@@ -27,13 +31,20 @@ public class ProductsController(
     SyncProductCategoriesCommandHandler syncCategoriesHandler,
     AddUnitConversionCommandHandler addConversionHandler,
     RemoveUnitConversionCommandHandler removeConversionHandler,
+    AddColorVariantCommandHandler addColorVariantHandler,
+    UpdateColorVariantCommandHandler updateColorVariantHandler,
+    RemoveColorVariantCommandHandler removeColorVariantHandler,
+    SetColorVariantStatusCommandHandler setColorVariantStatusHandler,
     AdjustStockCommandHandler adjustStockHandler,
     GetProductByIdQueryHandler getByIdHandler,
     GetProductsQueryHandler getPagedHandler,
     GetStockByProductIdQueryHandler getStockHandler,
+    GetProductStocksQueryHandler getProductStocksHandler,
     IValidator<CreateProductCommand> createValidator,
     IValidator<UpdateProductCommand> updateValidator,
     IValidator<AddUnitConversionCommand> addConversionValidator,
+    IValidator<AddColorVariantCommand> addColorVariantValidator,
+    IValidator<UpdateColorVariantCommand> updateColorVariantValidator,
     IValidator<AdjustStockCommand> adjustStockValidator) : ControllerBase
 {
     private string CurrentUser =>
@@ -141,6 +152,52 @@ public class ProductsController(
         return NoContent();
     }
 
+    // ── Color Variants ──────────────────────────────────────────────────────────
+
+    [HttpPost("{id:guid}/color-variants")]
+    public async Task<IActionResult> AddColorVariant(
+        Guid id, [FromBody] AddColorVariantRequest request, CancellationToken ct)
+    {
+        var command = new AddColorVariantCommand(
+            id, request.ColorName, request.ColorCode, request.Barcode, request.PriceOverride, CurrentUser);
+        var validation = await addColorVariantValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        var variantId = await addColorVariantHandler.HandleAsync(command, ct);
+        return CreatedAtAction(nameof(GetById), new { id }, new { id, variantId });
+    }
+
+    [HttpPut("{id:guid}/color-variants/{variantId:guid}")]
+    public async Task<IActionResult> UpdateColorVariant(
+        Guid id, Guid variantId, [FromBody] UpdateColorVariantRequest request, CancellationToken ct)
+    {
+        var command = new UpdateColorVariantCommand(
+            id, variantId, request.ColorName, request.ColorCode, request.Barcode, request.PriceOverride, CurrentUser);
+        var validation = await updateColorVariantValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        await updateColorVariantHandler.HandleAsync(command, ct);
+        return NoContent();
+    }
+
+    [HttpDelete("{id:guid}/color-variants/{variantId:guid}")]
+    public async Task<IActionResult> RemoveColorVariant(Guid id, Guid variantId, CancellationToken ct)
+    {
+        await removeColorVariantHandler.HandleAsync(new RemoveColorVariantCommand(id, variantId, CurrentUser), ct);
+        return NoContent();
+    }
+
+    [HttpPatch("{id:guid}/color-variants/{variantId:guid}/status")]
+    public async Task<IActionResult> SetColorVariantStatus(
+        Guid id, Guid variantId, [FromBody] SetStatusRequest request, CancellationToken ct)
+    {
+        await setColorVariantStatusHandler.HandleAsync(
+            new SetColorVariantStatusCommand(id, variantId, request.IsActive, CurrentUser), ct);
+        return NoContent();
+    }
+
     // ── Stock ─────────────────────────────────────────────────────────────────
 
     [HttpGet("{id:guid}/stock")]
@@ -150,10 +207,18 @@ public class ProductsController(
         return result is null ? NotFound() : Ok(result);
     }
 
+    /// <summary>All stock rows for the product, including one per color variant.</summary>
+    [HttpGet("{id:guid}/variant-stock")]
+    public async Task<IActionResult> GetVariantStock(Guid id, CancellationToken ct)
+    {
+        var result = await getProductStocksHandler.HandleAsync(new GetProductStocksQuery(id), ct);
+        return Ok(result);
+    }
+
     [HttpPost("{id:guid}/stock/adjust")]
     public async Task<IActionResult> AdjustStock(Guid id, [FromBody] AdjustStockRequest request, CancellationToken ct)
     {
-        var command = new AdjustStockCommand(id, request.Delta, request.Reason, CurrentUser);
+        var command = new AdjustStockCommand(id, request.Delta, request.Reason, CurrentUser, request.VariantId);
         var validation = await adjustStockValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -171,5 +236,9 @@ public record UpdateProductRequest(
     decimal SalePrice = 0m, string? Barcode = null);
 public record SetStatusRequest(bool IsActive);
 public record AddUnitConversionRequest(string ToUnit, decimal Factor, decimal SalePrice = 0m);
+public record AddColorVariantRequest(
+    string ColorName, string? ColorCode = null, string? Barcode = null, decimal? PriceOverride = null);
+public record UpdateColorVariantRequest(
+    string ColorName, string? ColorCode = null, string? Barcode = null, decimal? PriceOverride = null);
 public record SyncCategoriesRequest(List<Guid> CategoryIds);
-public record AdjustStockRequest(decimal Delta, string? Reason);
+public record AdjustStockRequest(decimal Delta, string? Reason, Guid? VariantId = null);

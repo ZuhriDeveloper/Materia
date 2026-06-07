@@ -7,6 +7,10 @@ namespace Materia.Domain.Inventory;
 public class Stock : AggregateRoot<StockId>
 {
     public ProductId ProductId { get; private set; } = default!;
+
+    /// <summary>The color variant this stock is for, or null for product-level stock.</summary>
+    public VariantId? VariantId { get; private set; }
+
     public decimal Quantity { get; private set; }
     public string Unit { get; private set; } = default!;
 
@@ -14,13 +18,15 @@ public class Stock : AggregateRoot<StockId>
 
     // ── Factory ───────────────────────────────────────────────────────────────
 
-    public static Stock Initialize(ProductId productId, string unit, string createdBy)
+    public static Stock Initialize(
+        ProductId productId, string unit, string createdBy, VariantId? variantId = null)
     {
         if (string.IsNullOrWhiteSpace(unit))
             throw new DomainException("Stock unit cannot be empty.");
 
         var stock = new Stock();
-        stock.Raise(new StockInitialized(StockId.New(), productId, 0m, unit, createdBy, DateTime.UtcNow));
+        stock.Raise(new StockInitialized(
+            StockId.New(), productId, 0m, unit, createdBy, DateTime.UtcNow, variantId?.Value));
         return stock;
     }
 
@@ -64,6 +70,7 @@ public class Stock : AggregateRoot<StockId>
             case StockInitialized e:
                 Id = e.StockId;
                 ProductId = e.ProductId;
+                VariantId = e.VariantId is { } v ? Inventory.VariantId.From(v) : null;
                 Quantity = e.Quantity;
                 Unit = e.Unit;
                 break;

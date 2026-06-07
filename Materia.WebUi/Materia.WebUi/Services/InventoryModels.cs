@@ -13,9 +13,19 @@ public record ProductDto(
     string? UpdatedBy,
     DateTime? UpdatedAt,
     List<UnitConversionDto> UnitConversions,
-    List<CategoryRefDto> Categories);
+    List<CategoryRefDto> Categories,
+    List<ColorVariantDto>? ColorVariants = null);
 
 public record UnitConversionDto(string FromUnit, string ToUnit, decimal Factor, decimal SalePrice);
+
+public record ColorVariantDto(
+    Guid Id,
+    string ColorName,
+    string? ColorCode,
+    string? Barcode,
+    decimal? PriceOverride,
+    decimal EffectivePrice,
+    bool IsActive);
 
 public record CategoryRefDto(Guid Id, string Name);
 
@@ -60,6 +70,14 @@ public record ProductSearchDto(
     string  BaseUnit,
     decimal SalePrice,
     string? Barcode,
-    List<ProductUnitPriceDto> Units);
+    List<ProductUnitPriceDto> Units,
+    List<ProductVariantSearchDto>? Variants = null);
 
 public record ProductUnitPriceDto(string UnitName, decimal SalePrice);
+
+public record ProductVariantSearchDto(
+    Guid    VariantId,
+    string  ColorName,
+    string? ColorCode,
+    string? Barcode,
+    decimal EffectivePrice);

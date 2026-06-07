@@ -5,4 +5,6 @@ public record StockDto(
     decimal Quantity,
     string Unit,
     DateTime? LastAdjustedAt,
-    string? LastAdjustedBy);
+    string? LastAdjustedBy,
+    Guid? VariantId = null,
+    string? ColorName = null);

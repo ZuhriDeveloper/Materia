@@ -12,4 +12,6 @@ public record SaleItemAdded(
     decimal    QuantityInBaseUnit,
     decimal    UnitPrice,
     string     UpdatedBy,
-    DateTime   OccurredAt) : IDomainEvent;
+    DateTime   OccurredAt,
+    Guid?      VariantId = null,
+    string?    ColorName = null) : IDomainEvent;
