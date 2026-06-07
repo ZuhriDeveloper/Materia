@@ -6,7 +6,9 @@ public sealed class SaleItem
 {
     public SaleItemId Id                { get; }
     public Guid       ProductId         { get; }
+    public Guid?      VariantId         { get; }   // color variant sold, or null
     public string     ProductName       { get; }
+    public string?    ColorName         { get; }   // color label for receipts, or null
     public string     UnitName          { get; }   // unit as entered (e.g. "sak")
     public decimal    Quantity          { get; }   // quantity in entered unit
     public decimal    QuantityInBaseUnit { get; }  // converted to product base unit
@@ -20,7 +22,9 @@ public sealed class SaleItem
         string     unitName,
         decimal    quantity,
         decimal    quantityInBaseUnit,
-        Money      unitPrice)
+        Money      unitPrice,
+        Guid?      variantId = null,
+        string?    colorName = null)
     {
         if (quantity <= 0)
             throw new DomainException("Kuantitas harus lebih dari nol.");
@@ -29,7 +33,9 @@ public sealed class SaleItem
 
         Id                 = id;
         ProductId          = productId;
+        VariantId          = variantId;
         ProductName        = productName;
+        ColorName          = colorName;
         UnitName           = unitName;
         Quantity           = quantity;
         QuantityInBaseUnit = quantityInBaseUnit;

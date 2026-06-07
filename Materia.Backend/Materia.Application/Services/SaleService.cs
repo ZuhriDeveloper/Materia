@@ -72,7 +72,9 @@ public class SaleService(
             request.Quantity,
             quantityInBaseUnit,
             request.UnitPrice,
-            updatedBy);
+            updatedBy,
+            request.VariantId,
+            request.ColorName);
 
         await saleRepository.SaveAsync(sale, ct);
         return itemId.Value;
@@ -105,6 +107,7 @@ public class SaleService(
         {
             await stockDeduction.DeductAsync(
                 item.ProductId,
+                item.VariantId,
                 item.QuantityInBaseUnit,
                 $"Penjualan {sale.ReferenceNo}",
                 confirmedBy,

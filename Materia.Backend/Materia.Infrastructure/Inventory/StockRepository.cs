@@ -13,12 +13,16 @@ public class StockRepository(AppDbContext context) : IStockRepository
 {
     private const string AggregateType = "Stock";
 
-    public async Task<Stock?> GetByProductIdAsync(ProductId productId, CancellationToken ct = default)
+    public async Task<Stock?> GetAsync(
+        ProductId productId, VariantId? variantId = null, CancellationToken ct = default)
     {
-        var stockId = await context.StockReadModels
-            .Where(s => s.ProductId == productId.Value)
-            .Select(s => s.Id)
-            .FirstOrDefaultAsync(ct);
+        var query = context.StockReadModels.Where(s => s.ProductId == productId.Value);
+        // Null-safe variant match: a null parameter must translate to "IS NULL", not "= @p".
+        query = variantId is null
+            ? query.Where(s => s.VariantId == null)
+            : query.Where(s => s.VariantId == variantId.Value);
+
+        var stockId = await query.Select(s => s.Id).FirstOrDefaultAsync(ct);
 
         if (stockId == Guid.Empty) return null;
 
@@ -64,8 +68,9 @@ public class StockRepository(AppDbContext context) : IStockRepository
         IReadOnlyList<Domain.Common.IDomainEvent> newEvents,
         CancellationToken ct)
     {
-        var projection = await context.StockReadModels
-            .FirstOrDefaultAsync(s => s.ProductId == stock.ProductId.Value, ct);
+        var variantId = stock.VariantId?.Value;
+        var projection = await context.StockReadModels.FirstOrDefaultAsync(
+            s => s.ProductId == stock.ProductId.Value && s.VariantId == variantId, ct);
 
         if (projection is null)
         {
@@ -73,6 +78,7 @@ public class StockRepository(AppDbContext context) : IStockRepository
             {
                 Id = stock.Id.Value,
                 ProductId = stock.ProductId.Value,
+                VariantId = variantId,
                 Unit = stock.Unit,
             };
             context.StockReadModels.Add(projection);

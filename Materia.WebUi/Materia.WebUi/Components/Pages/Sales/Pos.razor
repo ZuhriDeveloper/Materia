@@ -117,7 +117,7 @@ else
                                 <div>
                                     <MudText Typo="Typo.body2" Style="font-weight:600;line-height:1.3">@p.Name</MudText>
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
-                                        @p.BaseUnit &nbsp;·&nbsp; Rp @p.SalePrice.ToString("N0")
+                                        @p.BaseUnit &nbsp;·&nbsp; Rp @p.SalePrice.ToString("N0")@(p.Variants is { Count: > 0 } ? $" · {p.Variants.Count} warna" : "")
                                     </MudText>
                                 </div>
                                 <MudText Typo="Typo.caption" Color="Color.Tertiary"
@@ -225,6 +225,24 @@ else
                                              Style="height:18px;font-size:.68rem;margin:2px 0 0">
                                         @context.UnitName
                                     </MudChip>
+                                }
+                                @if (context.Variants.Count > 0)
+                                {
+                                    <MudSelect T="Guid?"
+                                               Value="@context.VariantId"
+                                               ValueChanged="@(v => OnVariantChanged(context, v))"
+                                               Dense="true" Margin="Margin.Dense"
+                                               Variant="Variant.Text"
+                                               Adornment="Adornment.Start"
+                                               AdornmentIcon="@Icons.Material.Filled.Palette"
+                                               Style="max-width:170px;font-size:.75rem;margin-top:1px">
+                                        @foreach (var cv in context.Variants)
+                                        {
+                                            <MudSelectItem T="Guid?" Value="@((Guid?)cv.VariantId)">
+                                                @cv.ColorName — Rp @cv.EffectivePrice.ToString("N0")
+                                            </MudSelectItem>
+                                        }
+                                    </MudSelect>
                                 }
                             </MudTd>
                             <MudTd Style="padding:4px 8px">
@@ -488,7 +506,7 @@ else
                                 @(i + 1).
                             </td>
                             <td style="padding:2mm 1mm;font-weight:600;vertical-align:top">
-                                @ln.ProductName
+                                @ln.ProductName@(string.IsNullOrEmpty(ln.ColorName) ? "" : $" — {ln.ColorName}")
                             </td>
                             <td style="text-align:center;padding:2mm 1mm;vertical-align:top">
                                 @FormatQty(ln.Quantity)
@@ -596,7 +614,7 @@ else
                     <div style="margin-bottom:1.5mm">
                         <div style="font-weight:600;font-size:8.5pt;
                                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-                            @item.ProductName
+                            @item.ProductName@(string.IsNullOrEmpty(item.ColorName) ? "" : $" — {item.ColorName}")
                         </div>
                         <div style="display:flex;justify-content:space-between;
                                     font-size:8pt;padding-left:3mm">
@@ -746,10 +764,26 @@ else
         if (string.IsNullOrWhiteSpace(code)) return;
 
         var results = await InventoryApi.SearchProductsAsync(code, 5);
-        var match   = results.FirstOrDefault(p =>
-                          p.Sku.Equals(code, StringComparison.OrdinalIgnoreCase) ||
-                          p.Barcode?.Equals(code, StringComparison.OrdinalIgnoreCase) == true)
-                   ?? (results.Count == 1 ? results[0] : null);
+
+        // 1) A scanned color-variant barcode adds that exact color.
+        foreach (var p in results)
+        {
+            var variant = (p.Variants ?? []).FirstOrDefault(
+                v => v.Barcode?.Equals(code, StringComparison.OrdinalIgnoreCase) == true);
+            if (variant is not null)
+            {
+                AddOrIncrement(p, variant);
+                _scanMessage = null;
+                await FocusScanAsync();
+                return;
+            }
+        }
+
+        // 2) Otherwise match the product by its own barcode / SKU.
+        var match = results.FirstOrDefault(p =>
+                        p.Sku.Equals(code, StringComparison.OrdinalIgnoreCase) ||
+                        p.Barcode?.Equals(code, StringComparison.OrdinalIgnoreCase) == true)
+                 ?? (results.Count == 1 ? results[0] : null);
 
         if (match is not null) { AddOrIncrement(match); _scanMessage = null; }
         else _scanMessage = $"Produk \"{code}\" tidak ditemukan.";
@@ -765,26 +799,38 @@ else
     }
 
     // ── Cart mutation ────────────────────────────────────────────────────────
-    private void AddOrIncrement(ProductSearchDto product)
+    private void AddOrIncrement(ProductSearchDto product, ProductVariantSearchDto? variant = null)
     {
+        var variants = product.Variants ?? [];
+        // A product with color variants is sold as a specific color — default to the first.
+        variant ??= variants.FirstOrDefault();
+
         var units    = product.Units is { Count: > 0 }
                        ? product.Units
                        : [new ProductUnitPriceDto(product.BaseUnit, product.SalePrice)];
         var baseUnit = units[0];
 
+        // A chosen variant's effective price wins for the base unit.
+        var unitPrice = variant?.EffectivePrice ?? baseUnit.SalePrice;
+
         var existing = _lines.FirstOrDefault(
-            l => l.ProductId == product.Id && l.UnitName == baseUnit.UnitName);
+            l => l.ProductId == product.Id
+              && l.VariantId == variant?.VariantId
+              && l.UnitName == baseUnit.UnitName);
         if (existing is not null) { existing.Quantity += 1; return; }
 
         _lines.Add(new CartLine
         {
             ProductId   = product.Id,
+            VariantId   = variant?.VariantId,
             ProductName = product.Name,
+            ColorName   = variant?.ColorName,
             Sku         = product.Sku,
             UnitName    = baseUnit.UnitName,
             Quantity    = 1,
-            UnitPrice   = baseUnit.SalePrice,
+            UnitPrice   = unitPrice,
             Units       = units,
+            Variants    = variants,
         });
     }
 
@@ -803,6 +849,15 @@ else
         if (unit is null) return;
         line.UnitName  = unit.UnitName;
         line.UnitPrice = unit.SalePrice;
+    }
+
+    private void OnVariantChanged(CartLine line, Guid? variantId)
+    {
+        var variant = line.Variants.FirstOrDefault(v => v.VariantId == variantId);
+        if (variant is null) return;
+        line.VariantId = variant.VariantId;
+        line.ColorName = variant.ColorName;
+        line.UnitPrice = variant.EffectivePrice;
     }
 
     private void OnQtyChanged(CartLine line, decimal qty)
@@ -827,7 +882,8 @@ else
 
         var items = _lines
             .Select(l => new FinalizeSaleItemInput(
-                l.ProductId, l.ProductName, l.UnitName, l.Quantity, l.UnitPrice))
+                l.ProductId, l.ProductName, l.UnitName, l.Quantity, l.UnitPrice,
+                l.VariantId, l.ColorName))
             .ToList();
 
         var (result, error) = await SaleApi.FinalizeAsync(
@@ -860,7 +916,7 @@ else
             IsRegisteredCustomer: _customerId is not null,
             IsDeliveryRequired  : _isDeliveryRequired,
             Lines               : _lines.Select(l => new ReceiptLine(
-                                      l.ProductName, l.UnitName, l.Quantity,
+                                      l.ProductName, l.ColorName, l.UnitName, l.Quantity,
                                       l.UnitPrice, l.Total)).ToList(),
             Subtotal            : Subtotal,
             Discount            : DiscountAmount,
@@ -912,12 +968,15 @@ else
     private sealed class CartLine
     {
         public Guid    ProductId   { get; init; }
+        public Guid?   VariantId   { get; set; }
         public string  ProductName { get; init; } = "";
+        public string? ColorName   { get; set; }
         public string  Sku         { get; init; } = "";
         public string  UnitName    { get; set; }  = "";
         public decimal Quantity    { get; set; }
         public decimal UnitPrice   { get; set; }
         public IReadOnlyList<ProductUnitPriceDto> Units { get; init; } = [];
+        public IReadOnlyList<ProductVariantSearchDto> Variants { get; init; } = [];
         public decimal Total => Quantity * UnitPrice;
     }
 
@@ -944,6 +1003,7 @@ else
 
     private sealed record ReceiptLine(
         string  ProductName,
+        string? ColorName,
         string  UnitName,
         decimal Quantity,
         decimal UnitPrice,

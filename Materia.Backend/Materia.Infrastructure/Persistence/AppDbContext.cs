@@ -71,7 +71,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.Entity<StockReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.ProductId).IsUnique();
+            // One stock row per (product, variant). Product-level stock has a null VariantId.
+            e.HasIndex(x => new { x.ProductId, x.VariantId }).IsUnique();
         });
 
         builder.Entity<CustomerReadModel>(e =>

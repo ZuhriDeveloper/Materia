@@ -12,6 +12,8 @@ public record FinalizeSaleItemInput(
     string  ProductName,
     string  UnitName,
     decimal Quantity,
-    decimal UnitPrice);
+    decimal UnitPrice,
+    Guid?   VariantId = null,
+    string? ColorName = null);
 
 public record FinalizeSaleResult(Guid SaleId, string ReferenceNo);

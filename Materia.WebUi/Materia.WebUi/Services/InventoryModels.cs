@@ -70,6 +70,14 @@ public record ProductSearchDto(
     string  BaseUnit,
     decimal SalePrice,
     string? Barcode,
-    List<ProductUnitPriceDto> Units);
+    List<ProductUnitPriceDto> Units,
+    List<ProductVariantSearchDto>? Variants = null);
 
 public record ProductUnitPriceDto(string UnitName, decimal SalePrice);
+
+public record ProductVariantSearchDto(
+    Guid    VariantId,
+    string  ColorName,
+    string? ColorCode,
+    string? Barcode,
+    decimal EffectivePrice);

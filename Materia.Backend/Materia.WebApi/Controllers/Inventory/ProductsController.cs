@@ -39,6 +39,7 @@ public class ProductsController(
     GetProductByIdQueryHandler getByIdHandler,
     GetProductsQueryHandler getPagedHandler,
     GetStockByProductIdQueryHandler getStockHandler,
+    GetProductStocksQueryHandler getProductStocksHandler,
     IValidator<CreateProductCommand> createValidator,
     IValidator<UpdateProductCommand> updateValidator,
     IValidator<AddUnitConversionCommand> addConversionValidator,
@@ -206,10 +207,18 @@ public class ProductsController(
         return result is null ? NotFound() : Ok(result);
     }
 
+    /// <summary>All stock rows for the product, including one per color variant.</summary>
+    [HttpGet("{id:guid}/variant-stock")]
+    public async Task<IActionResult> GetVariantStock(Guid id, CancellationToken ct)
+    {
+        var result = await getProductStocksHandler.HandleAsync(new GetProductStocksQuery(id), ct);
+        return Ok(result);
+    }
+
     [HttpPost("{id:guid}/stock/adjust")]
     public async Task<IActionResult> AdjustStock(Guid id, [FromBody] AdjustStockRequest request, CancellationToken ct)
     {
-        var command = new AdjustStockCommand(id, request.Delta, request.Reason, CurrentUser);
+        var command = new AdjustStockCommand(id, request.Delta, request.Reason, CurrentUser, request.VariantId);
         var validation = await adjustStockValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -232,4 +241,4 @@ public record AddColorVariantRequest(
 public record UpdateColorVariantRequest(
     string ColorName, string? ColorCode = null, string? Barcode = null, decimal? PriceOverride = null);
 public record SyncCategoriesRequest(List<Guid> CategoryIds);
-public record AdjustStockRequest(decimal Delta, string? Reason);
+public record AdjustStockRequest(decimal Delta, string? Reason, Guid? VariantId = null);

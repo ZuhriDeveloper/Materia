@@ -24,6 +24,56 @@ public class SaleAggregateTests
     }
 
     [Fact]
+    public void AddItem_WithColorVariant_CapturesVariantOnEventAndItem()
+    {
+        var sale = Sale.Create("INV-0100", Staff);
+        var variantId = Guid.NewGuid();
+
+        var itemId = sale.AddItem(
+            productId: Guid.NewGuid(),
+            productName: "Cat Tembok",
+            unitName: "kaleng",
+            quantity: 2m,
+            quantityInBaseUnit: 2m,
+            unitPrice: 55_000m,
+            updatedBy: Staff,
+            variantId: variantId,
+            colorName: "  Merah  ");
+
+        var evt = sale.DomainEvents.OfType<SaleItemAdded>().Single();
+        evt.VariantId.Should().Be(variantId);
+        evt.ColorName.Should().Be("Merah");   // trimmed
+
+        var item = sale.Items.Single(i => i.Id == itemId);
+        item.VariantId.Should().Be(variantId);
+        item.ColorName.Should().Be("Merah");
+    }
+
+    [Fact]
+    public void AddItem_WithoutVariant_LeavesVariantNull()
+    {
+        var sale = SaleWithOneItem();
+
+        var item = sale.Items.Single();
+        item.VariantId.Should().BeNull();
+        item.ColorName.Should().BeNull();
+    }
+
+    [Fact]
+    public void Reconstitute_RestoresItemVariantAndColor()
+    {
+        var sale = Sale.Create("INV-0101", Staff);
+        var variantId = Guid.NewGuid();
+        sale.AddItem(Guid.NewGuid(), "Cat", "kaleng", 1m, 1m, 50_000m, Staff, variantId, "Biru");
+
+        var restored = Sale.Reconstitute(sale.DomainEvents.ToList());
+
+        var item = restored.Items.Single();
+        item.VariantId.Should().Be(variantId);
+        item.ColorName.Should().Be("Biru");
+    }
+
+    [Fact]
     public void Finalize_WithItems_RaisesSaleFinalizedWithStaffAndTotal()
     {
         var sale = SaleWithOneItem();

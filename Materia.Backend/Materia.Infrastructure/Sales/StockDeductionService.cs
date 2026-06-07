@@ -6,9 +6,9 @@ namespace Materia.Infrastructure.Sales;
 public class StockDeductionService(AdjustStockCommandHandler handler) : IStockDeductionService
 {
     public Task DeductAsync(
-        Guid productId, decimal quantityInBaseUnit,
+        Guid productId, Guid? variantId, decimal quantityInBaseUnit,
         string reason, string updatedBy,
         CancellationToken ct = default)
         => handler.HandleAsync(
-            new AdjustStockCommand(productId, -quantityInBaseUnit, reason, updatedBy), ct);
+            new AdjustStockCommand(productId, -quantityInBaseUnit, reason, updatedBy, variantId), ct);
 }

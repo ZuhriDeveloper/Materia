@@ -110,4 +110,41 @@ public class StockTests
         reconstituted.Unit.Should().Be("sak");
         reconstituted.DomainEvents.Should().BeEmpty();
     }
+
+    // ── Per-variant stock ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Initialize_WithoutVariant_HasNullVariantId()
+    {
+        var stock = Stock.Initialize(AnyProductId(), "kaleng", "user-1");
+
+        stock.VariantId.Should().BeNull();
+        stock.DomainEvents.OfType<StockInitialized>().Single().VariantId.Should().BeNull();
+    }
+
+    [Fact]
+    public void Initialize_ForVariant_CarriesVariantIdOnEventAndState()
+    {
+        var productId = AnyProductId();
+        var variantId = VariantId.New();
+
+        var stock = Stock.Initialize(productId, "kaleng", "user-1", variantId);
+
+        stock.VariantId.Should().Be(variantId);
+        stock.DomainEvents.OfType<StockInitialized>().Single()
+            .VariantId.Should().Be(variantId.Value);
+    }
+
+    [Fact]
+    public void Reconstitute_RestoresVariantId()
+    {
+        var variantId = VariantId.New();
+        var original = Stock.Initialize(AnyProductId(), "kaleng", "user-1", variantId);
+        original.Adjust(20m, "Stok awal warna", "user-1");
+
+        var restored = Stock.Reconstitute(original.DomainEvents);
+
+        restored.VariantId.Should().Be(variantId);
+        restored.Quantity.Should().Be(20m);
+    }
 }

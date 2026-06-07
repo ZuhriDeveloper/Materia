@@ -4,7 +4,9 @@ using Materia.Domain.Inventory;
 
 namespace Materia.Application.Commands.Inventory.AddColorVariant;
 
-public class AddColorVariantCommandHandler(IProductRepository repository)
+public class AddColorVariantCommandHandler(
+    IProductRepository repository,
+    IStockRepository stockRepository)
 {
     public async Task<Guid> HandleAsync(AddColorVariantCommand command, CancellationToken ct = default)
     {
@@ -18,6 +20,11 @@ public class AddColorVariantCommandHandler(IProductRepository repository)
             command.UpdatedBy);
 
         await repository.SaveAsync(product, ct);
+
+        // Each color variant is its own SKU — give it its own stock record (starts at 0).
+        var stock = Stock.Initialize(product.Id, product.BaseUnit.Value, command.UpdatedBy, variantId);
+        await stockRepository.SaveAsync(stock, ct);
+
         return variantId.Value;
     }
 }

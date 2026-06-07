@@ -81,7 +81,9 @@ public sealed class Sale : AggregateRoot<SaleId>
         decimal quantity,
         decimal quantityInBaseUnit,
         decimal unitPrice,
-        string  updatedBy)
+        string  updatedBy,
+        Guid?   variantId = null,
+        string? colorName = null)
     {
         EnsureDraft();
         if (quantity <= 0)
@@ -95,7 +97,9 @@ public sealed class Sale : AggregateRoot<SaleId>
             productId, productName.Trim(),
             unitName.Trim(),
             quantity, quantityInBaseUnit, unitPrice,
-            updatedBy, DateTime.UtcNow));
+            updatedBy, DateTime.UtcNow,
+            variantId,
+            string.IsNullOrWhiteSpace(colorName) ? null : colorName.Trim()));
 
         return itemId;
     }
@@ -208,7 +212,7 @@ public sealed class Sale : AggregateRoot<SaleId>
                 _items.Add(new SaleItem(
                     e.ItemId, e.ProductId, e.ProductName,
                     e.UnitName, e.Quantity, e.QuantityInBaseUnit,
-                    new Money(e.UnitPrice)));
+                    new Money(e.UnitPrice), e.VariantId, e.ColorName));
                 break;
 
             case SaleItemRemoved e:

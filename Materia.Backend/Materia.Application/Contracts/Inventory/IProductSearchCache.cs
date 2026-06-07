@@ -20,7 +20,16 @@ public record ProductSearchResult(
     string  BaseUnit,
     decimal SalePrice,
     string? Barcode,
-    IReadOnlyList<ProductUnitPrice> Units);
+    IReadOnlyList<ProductUnitPrice> Units,
+    IReadOnlyList<ProductVariantSearch>? Variants = null);
 
 /// <summary>A sellable unit for a product and its price (base unit + each conversion unit).</summary>
 public record ProductUnitPrice(string UnitName, decimal SalePrice);
+
+/// <summary>An active color variant of a product, for PoS selection and barcode scanning.</summary>
+public record ProductVariantSearch(
+    Guid    VariantId,
+    string  ColorName,
+    string? ColorCode,
+    string? Barcode,
+    decimal EffectivePrice);

@@ -8,4 +8,5 @@ public record StockInitialized(
     decimal Quantity,
     string Unit,
     string CreatedBy,
-    DateTime OccurredAt) : IDomainEvent;
+    DateTime OccurredAt,
+    Guid? VariantId = null) : IDomainEvent;

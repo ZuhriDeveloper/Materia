@@ -12,7 +12,9 @@ public record SaleItemDto(
     decimal Quantity,
     decimal QuantityInBaseUnit,
     decimal UnitPrice,
-    decimal Subtotal);
+    decimal Subtotal,
+    Guid?   VariantId = null,
+    string? ColorName = null);
 
 public record SalePaymentDto(
     decimal       PaidAmount,
@@ -52,6 +54,8 @@ public record FinalizeSaleItemInput(
     string  ProductName,
     string  UnitName,
     decimal Quantity,
-    decimal UnitPrice);
+    decimal UnitPrice,
+    Guid?   VariantId = null,
+    string? ColorName = null);
 
 public record FinalizeSaleResult(Guid SaleId, string ReferenceNo);

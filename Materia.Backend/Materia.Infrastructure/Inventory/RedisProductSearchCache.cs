@@ -32,8 +32,12 @@ public class RedisProductSearchCache(
         return catalog
             .Where(p => p.Name.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
                      || p.Sku.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
-                     || (p.Barcode is not null && p.Barcode.Contains(trimmed, StringComparison.OrdinalIgnoreCase)))
-            .OrderByDescending(p => p.Barcode == trimmed)   // exact barcode scan wins
+                     || (p.Barcode is not null && p.Barcode.Contains(trimmed, StringComparison.OrdinalIgnoreCase))
+                     || (p.Variants ?? []).Any(v =>
+                            v.ColorName.Contains(trimmed, StringComparison.OrdinalIgnoreCase)
+                         || (v.Barcode is not null && v.Barcode.Contains(trimmed, StringComparison.OrdinalIgnoreCase))))
+            .OrderByDescending(p => p.Barcode == trimmed
+                                 || (p.Variants ?? []).Any(v => v.Barcode == trimmed))   // exact barcode scan wins
             .ThenByDescending(p => p.Name.StartsWith(trimmed, StringComparison.OrdinalIgnoreCase))
             .ThenBy(p => p.Name)
             .Take(limit)
@@ -100,7 +104,8 @@ public class RedisProductSearchCache(
         var paged = await products.GetPagedAsync(1, 1000, isActive: true, ct);
         return paged.Items
             .Select(p => new ProductSearchResult(
-                p.Id, p.Name, Sku(p.Id), p.BaseUnit, p.SalePrice, p.Barcode, BuildUnits(p)))
+                p.Id, p.Name, Sku(p.Id), p.BaseUnit, p.SalePrice, p.Barcode,
+                BuildUnits(p), BuildVariants(p)))
             .ToList();
     }
 
@@ -113,4 +118,11 @@ public class RedisProductSearchCache(
         units.AddRange(p.UnitConversions.Select(c => new ProductUnitPrice(c.ToUnit, c.SalePrice)));
         return units;
     }
+
+    /// <summary>Active color variants, for PoS color selection and barcode scanning.</summary>
+    private static List<ProductVariantSearch> BuildVariants(ProductDto p) =>
+        p.ColorVariants
+            .Where(v => v.IsActive)
+            .Select(v => new ProductVariantSearch(v.Id, v.ColorName, v.ColorCode, v.Barcode, v.EffectivePrice))
+            .ToList();
 }
