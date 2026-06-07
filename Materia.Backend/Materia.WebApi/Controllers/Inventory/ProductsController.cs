@@ -59,9 +59,12 @@ public class ProductsController(
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] bool? isActive = null,
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? categoryId = null,
         CancellationToken ct = default)
     {
-        var result = await getPagedHandler.HandleAsync(new GetProductsQuery(page, pageSize, isActive), ct);
+        var result = await getPagedHandler.HandleAsync(
+            new GetProductsQuery(page, pageSize, isActive, search, categoryId), ct);
         return Ok(result);
     }
 

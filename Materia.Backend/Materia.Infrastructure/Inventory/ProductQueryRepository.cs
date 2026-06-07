@@ -26,12 +26,30 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
     }
 
     public async Task<PagedResult<ProductDto>> GetPagedAsync(
-        int page, int pageSize, bool? isActive, CancellationToken ct = default)
+        int page, int pageSize, bool? isActive,
+        string? search = null, Guid? categoryId = null,
+        CancellationToken ct = default)
     {
         var query = context.ProductReadModels.AsQueryable();
 
         if (isActive.HasValue)
             query = query.Where(p => p.IsActive == isActive.Value);
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            query = query.Where(p =>
+                p.Name.ToLower().Contains(s) ||
+                (p.Barcode != null && p.Barcode.ToLower().Contains(s)));
+        }
+
+        if (categoryId.HasValue)
+        {
+            // CategoryIdsJson is a JSON array of GUID strings; a simple Contains is
+            // safe because GUIDs are 36-char unique strings with no substring overlap.
+            var catStr = categoryId.Value.ToString();
+            query = query.Where(p => p.CategoryIdsJson.Contains(catStr));
+        }
 
         var total = await query.CountAsync(ct);
         var items = await query

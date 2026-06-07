@@ -101,7 +101,7 @@ public class RedisProductSearchCache(
 
     private async Task<IReadOnlyList<ProductSearchResult>> LoadFromDatabaseAsync(CancellationToken ct)
     {
-        var paged = await products.GetPagedAsync(1, 1000, isActive: true, ct);
+        var paged = await products.GetPagedAsync(1, 1000, isActive: true, ct: ct);
         return paged.Items
             .Select(p => new ProductSearchResult(
                 p.Id, p.Name, Sku(p.Id), p.BaseUnit, p.SalePrice, p.Barcode,
