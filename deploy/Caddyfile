@@ -16,3 +16,18 @@
     encode gzip
     reverse_proxy webapi:8080
 }
+
+# ── Renovin (separate repo/stack on the same VPS) ─────────────────────────────
+# Renovin.Web runs in its own compose stack and joins the shared external `edge`
+# network, so this Caddy reaches it by service name. Renovin's API stays private to
+# that stack (no public block here). To expose it later for the mobile app, add:
+#   api.renovin.co.id { encode gzip; reverse_proxy apiservice:8080 }
+# and attach Renovin's `apiservice` to the `edge` network too.
+renovin.co.id {
+    encode gzip
+    reverse_proxy renovin-web:8080
+}
+
+www.renovin.co.id {
+    redir https://renovin.co.id{uri} permanent
+}

@@ -83,6 +83,7 @@ services:
       - caddy_config:/config
     networks:
       - materia-net
+      - edge
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -118,3 +119,7 @@ volumes:
 networks:
   materia-net:
     driver: bridge
+  # Shared edge network so the separate Renovin stack (renovin-web) is reachable by this
+  # Caddy. Create once on the VPS:  docker network create edge
+  edge:
+    external: true
