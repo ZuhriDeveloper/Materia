@@ -49,6 +49,7 @@
                         <th class="text-end">Harga Jual</th>
                         <th>Barcode</th>
                         <th>Kategori</th>
+                        <th>Warna</th>
                         <th>Status</th>
                         <th>Diperbarui</th>
                         <th></th>
@@ -68,6 +69,19 @@
                             </td>
                             <td class="small text-muted">
                                 @(p.Categories.Count == 0 ? "—" : string.Join(", ", p.Categories.Select(c => c.Name)))
+                            </td>
+                            <td class="small">
+                                @{
+                                    var variantCount = p.ColorVariants?.Count ?? 0;
+                                }
+                                @if (variantCount > 0)
+                                {
+                                    <span class="badge bg-light text-dark border">@variantCount warna</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">—</span>
+                                }
                             </td>
                             <td>
                                 @if (p.IsActive)

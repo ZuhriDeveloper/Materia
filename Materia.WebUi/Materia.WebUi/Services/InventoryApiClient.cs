@@ -84,6 +84,46 @@ public class InventoryApiClient(HttpClient http)
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
+    // ── Color Variants ──────────────────────────────────────────────────────────
+
+    public async Task<(Guid? VariantId, string? Error)> AddColorVariantAsync(
+        Guid productId, string colorName, string? colorCode, string? barcode,
+        decimal? priceOverride, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync($"api/products/{productId}/color-variants",
+            new { colorName, colorCode, barcode, priceOverride }, ct);
+
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorAsync(response));
+
+        var result = await response.Content.ReadFromJsonAsync<VariantIdResponse>(cancellationToken: ct);
+        return (result?.VariantId, null);
+    }
+
+    public async Task<string?> UpdateColorVariantAsync(
+        Guid productId, Guid variantId, string colorName, string? colorCode, string? barcode,
+        decimal? priceOverride, CancellationToken ct = default)
+    {
+        var response = await http.PutAsJsonAsync($"api/products/{productId}/color-variants/{variantId}",
+            new { colorName, colorCode, barcode, priceOverride }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    public async Task<string?> RemoveColorVariantAsync(
+        Guid productId, Guid variantId, CancellationToken ct = default)
+    {
+        var response = await http.DeleteAsync($"api/products/{productId}/color-variants/{variantId}", ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    public async Task<string?> SetColorVariantStatusAsync(
+        Guid productId, Guid variantId, bool isActive, CancellationToken ct = default)
+    {
+        var response = await http.PatchAsJsonAsync(
+            $"api/products/{productId}/color-variants/{variantId}/status", new { isActive }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
     // ── Stock ─────────────────────────────────────────────────────────────────
 
     public async Task<StockDto?> GetStockByProductIdAsync(Guid productId, CancellationToken ct = default)
@@ -184,5 +224,6 @@ public class InventoryApiClient(HttpClient http)
     }
 
     private record IdResponse(Guid Id);
+    private record VariantIdResponse(Guid VariantId);
     private record ErrorBody(string? Message, List<string>? Errors);
 }

@@ -322,6 +322,158 @@ else
             </div>
         </div>
 
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Variasi Warna</span>
+                    <span class="badge bg-light text-dark border">@Variants.Count varian</span>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Setiap warna adalah SKU tersendiri (barcode &amp; stok sendiri). Kosongkan
+                        <em>harga khusus</em> untuk memakai harga produk
+                        (@(_product.SalePrice > 0 ? $"Rp {_product.SalePrice:N0}" : "belum diatur")).
+                    </p>
+
+                    @if (!string.IsNullOrEmpty(_variantError))
+                    {
+                        <div class="alert alert-danger py-2 small">@_variantError</div>
+                    }
+
+                    @if (Variants.Count > 0)
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-sm align-middle mb-3">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Warna</th>
+                                        <th>Kode</th>
+                                        <th>Barcode</th>
+                                        <th class="text-end">Harga</th>
+                                        <th>Status</th>
+                                        <th class="text-end" style="width:1%"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var v in Variants)
+                                    {
+                                        @if (_editingVariantId == v.Id)
+                                        {
+                                            <tr class="table-warning">
+                                                <td><input class="form-control form-control-sm" @bind="_editVariantForm.ColorName" placeholder="Nama warna" /></td>
+                                                <td><input class="form-control form-control-sm" @bind="_editVariantForm.ColorCode" placeholder="cth. #C0392B" /></td>
+                                                <td><input class="form-control form-control-sm" @bind="_editVariantForm.Barcode" placeholder="Barcode" /></td>
+                                                <td><input type="number" class="form-control form-control-sm text-end" @bind="_editVariantForm.PriceOverride" placeholder="Harga produk" /></td>
+                                                <td class="text-muted small">—</td>
+                                                <td class="text-end text-nowrap">
+                                                    <button class="btn btn-sm btn-primary" title="Simpan" @onclick="HandleUpdateVariant" disabled="@_variantBusy">
+                                                        <i class="bi bi-check-lg"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" title="Batal" @onclick="CancelEditVariant" disabled="@_variantBusy">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                        else
+                                        {
+                                            <tr class="@(v.IsActive ? "" : "opacity-50")">
+                                                <td class="fw-semibold">
+                                                    @if (IsHexColor(v.ColorCode))
+                                                    {
+                                                        <span class="d-inline-block rounded-circle border align-middle me-2"
+                                                              style="width:14px;height:14px;background-color:@v.ColorCode"></span>
+                                                    }
+                                                    @v.ColorName
+                                                </td>
+                                                <td class="small">@(string.IsNullOrEmpty(v.ColorCode) ? "—" : v.ColorCode)</td>
+                                                <td class="small">
+                                                    @if (string.IsNullOrEmpty(v.Barcode))
+                                                    {
+                                                        <span class="text-muted">—</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <code>@v.Barcode</code>
+                                                    }
+                                                </td>
+                                                <td class="text-end">
+                                                    @(v.EffectivePrice > 0 ? $"Rp {v.EffectivePrice:N0}" : "—")
+                                                    @if (v.PriceOverride.HasValue)
+                                                    {
+                                                        <span class="badge bg-info-subtle text-info-emphasis border ms-1">khusus</span>
+                                                    }
+                                                </td>
+                                                <td>
+                                                    @if (v.IsActive)
+                                                    {
+                                                        <span class="badge bg-success">Aktif</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="badge bg-secondary">Nonaktif</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end text-nowrap">
+                                                    <button class="btn btn-sm btn-outline-secondary" title="Ubah"
+                                                            @onclick="@(() => BeginEditVariant(v))" disabled="@_variantBusy">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm @(v.IsActive ? "btn-outline-warning" : "btn-outline-success")"
+                                                            title="@(v.IsActive ? "Nonaktifkan" : "Aktifkan")"
+                                                            @onclick="@(() => HandleToggleVariantStatus(v))" disabled="@_variantBusy">
+                                                        <i class="bi @(v.IsActive ? "bi-toggle-off" : "bi-toggle-on")"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-danger" title="Hapus"
+                                                            @onclick="@(() => HandleRemoveVariant(v.Id))" disabled="@_variantBusy">
+                                                        <i class="bi bi-trash"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        }
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Belum ada variasi warna. Tambahkan di bawah.</p>
+                    }
+
+                    <hr class="my-2" />
+                    <p class="fw-semibold mb-2">Tambah Variasi Warna</p>
+                    <EditForm Model="_addVariantForm" OnValidSubmit="HandleAddVariant" FormName="add-variant" method="post">
+                        <DataAnnotationsValidator />
+                        <div class="row g-2 align-items-start" style="max-width:780px">
+                            <div class="col-sm-3">
+                                <InputText class="form-control form-control-sm" @bind-Value="_addVariantForm.ColorName" placeholder="Nama warna *" />
+                                <ValidationMessage For="() => _addVariantForm.ColorName" class="small text-danger" />
+                            </div>
+                            <div class="col-sm-3">
+                                <InputText class="form-control form-control-sm" @bind-Value="_addVariantForm.ColorCode" placeholder="Kode (cth. #C0392B)" />
+                                <ValidationMessage For="() => _addVariantForm.ColorCode" class="small text-danger" />
+                            </div>
+                            <div class="col-sm-3">
+                                <InputText class="form-control form-control-sm" @bind-Value="_addVariantForm.Barcode" placeholder="Barcode (opsional)" />
+                                <ValidationMessage For="() => _addVariantForm.Barcode" class="small text-danger" />
+                            </div>
+                            <div class="col-sm-2">
+                                <InputNumber class="form-control form-control-sm" @bind-Value="_addVariantForm.PriceOverride" placeholder="Harga khusus" />
+                                <ValidationMessage For="() => _addVariantForm.PriceOverride" class="small text-danger" />
+                            </div>
+                            <div class="col-sm-1 d-grid">
+                                <button type="submit" class="btn btn-sm btn-outline-primary" title="Tambah" disabled="@_variantBusy">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-text">Harga khusus opsional — kosongkan untuk memakai harga produk.</div>
+                    </EditForm>
+                </div>
+            </div>
+        </div>
+
     </div>
 }
 
@@ -342,6 +494,9 @@ else
     [SupplyParameterFromForm(FormName = "adjust-stock")]
     private StockAdjustForm _stockForm { get; set; } = new();
 
+    [SupplyParameterFromForm(FormName = "add-variant")]
+    private AddVariantForm _addVariantForm { get; set; } = new();
+
     protected override void OnParametersSet() { }
 
     private ProductDto? _product;
@@ -351,6 +506,12 @@ else
     private string? _error;
     private string? _stockError;
     private string? _notice;
+
+    private string? _variantError;
+    private bool _variantBusy;
+    private Guid? _editingVariantId;
+    private VariantEditForm _editVariantForm = new();
+    private IReadOnlyList<ColorVariantDto> Variants => _product?.ColorVariants ?? [];
 
     protected override async Task OnInitializedAsync()
     {
@@ -444,6 +605,102 @@ else
         }
     }
 
+    // ── Color Variants ──────────────────────────────────────────────────────────
+
+    private async Task HandleAddVariant()
+    {
+        _variantError = null;
+        _variantBusy = true;
+        var (_, err) = await Api.AddColorVariantAsync(
+            Id,
+            _addVariantForm.ColorName.Trim(),
+            Clean(_addVariantForm.ColorCode),
+            Clean(_addVariantForm.Barcode),
+            _addVariantForm.PriceOverride);
+        _variantBusy = false;
+
+        if (err is null)
+        {
+            _addVariantForm = new();
+            Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+        }
+        else { _variantError = err; }
+    }
+
+    private void BeginEditVariant(ColorVariantDto v)
+    {
+        _variantError = null;
+        _editingVariantId = v.Id;
+        _editVariantForm = new VariantEditForm
+        {
+            ColorName = v.ColorName,
+            ColorCode = v.ColorCode,
+            Barcode = v.Barcode,
+            PriceOverride = v.PriceOverride,
+        };
+    }
+
+    private void CancelEditVariant()
+    {
+        _editingVariantId = null;
+        _variantError = null;
+    }
+
+    private async Task HandleUpdateVariant()
+    {
+        if (_editingVariantId is null) return;
+        if (string.IsNullOrWhiteSpace(_editVariantForm.ColorName))
+        {
+            _variantError = "Nama warna wajib diisi.";
+            return;
+        }
+
+        _variantError = null;
+        _variantBusy = true;
+        var err = await Api.UpdateColorVariantAsync(
+            Id, _editingVariantId.Value,
+            _editVariantForm.ColorName.Trim(),
+            Clean(_editVariantForm.ColorCode),
+            Clean(_editVariantForm.Barcode),
+            _editVariantForm.PriceOverride);
+        _variantBusy = false;
+
+        if (err is null)
+        {
+            _editingVariantId = null;
+            Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+        }
+        else { _variantError = err; }
+    }
+
+    private async Task HandleToggleVariantStatus(ColorVariantDto v)
+    {
+        _variantError = null;
+        _variantBusy = true;
+        var err = await Api.SetColorVariantStatusAsync(Id, v.Id, !v.IsActive);
+        _variantBusy = false;
+
+        if (err is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+        else _variantError = err;
+    }
+
+    private async Task HandleRemoveVariant(Guid variantId)
+    {
+        _variantError = null;
+        _variantBusy = true;
+        var err = await Api.RemoveColorVariantAsync(Id, variantId);
+        _variantBusy = false;
+
+        if (err is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+        else _variantError = err;
+    }
+
+    private static string? Clean(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
+
+    private static bool IsHexColor(string? code) =>
+        !string.IsNullOrWhiteSpace(code) &&
+        System.Text.RegularExpressions.Regex.IsMatch(code, "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
+
     private sealed class EditInfoForm
     {
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama produk wajib diisi.")]
@@ -490,5 +747,29 @@ else
 
         [System.ComponentModel.DataAnnotations.MaxLength(500)]
         public string? Reason { get; set; }
+    }
+
+    private sealed class AddVariantForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama warna wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string ColorName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.MaxLength(50)]
+        public string? ColorCode { get; set; }
+
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string? Barcode { get; set; }
+
+        [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Harga khusus tidak boleh negatif.")]
+        public decimal? PriceOverride { get; set; }
+    }
+
+    private sealed class VariantEditForm
+    {
+        public string ColorName { get; set; } = string.Empty;
+        public string? ColorCode { get; set; }
+        public string? Barcode { get; set; }
+        public decimal? PriceOverride { get; set; }
     }
 }
