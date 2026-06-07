@@ -562,6 +562,7 @@ public class CatalogSeeder(
         new("Paku, Sekrup & Pengikat", "Fisher S6 HPP", "Buah", 0m, HasBarcode: false),
         new("Paku, Sekrup & Pengikat", "Fisher S8", "Buah", 0m, HasBarcode: false),
 
+
         // -- Perekat & Kimia Konstruksi (8) --
         new("Perekat & Kimia Konstruksi", "Aquaproof 1 Kg", "Kg", 67000m, HasBarcode: false),
         new("Perekat & Kimia Konstruksi", "Aquaproof 4 Kg", "Kg", 245000m, HasBarcode: false),
