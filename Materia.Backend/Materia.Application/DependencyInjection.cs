@@ -9,6 +9,7 @@ using Materia.Application.Commands.Customers.SetDefaultAddress;
 using Materia.Application.Commands.Customers.UpdateCustomer;
 using Materia.Application.Commands.Customers.UpdateCustomerAddress;
 using Materia.Application.Queries.Customers;
+using Materia.Application.Commands.Inventory.AddColorVariant;
 using Materia.Application.Commands.Inventory.AddUnitConversion;
 using Materia.Application.Commands.Inventory.AdjustStock;
 using Materia.Application.Commands.Inventory.AssignCategory;
@@ -20,9 +21,12 @@ using Materia.Application.Commands.Inventory.SetUnitStatus;
 using Materia.Application.Commands.Inventory.UpdateCategory;
 using Materia.Application.Commands.Inventory.UpdateUnit;
 using Materia.Application.Commands.Inventory.RemoveCategory;
+using Materia.Application.Commands.Inventory.RemoveColorVariant;
 using Materia.Application.Commands.Inventory.RemoveUnitConversion;
+using Materia.Application.Commands.Inventory.SetColorVariantStatus;
 using Materia.Application.Commands.Inventory.SetProductStatus;
 using Materia.Application.Commands.Inventory.SyncProductCategories;
+using Materia.Application.Commands.Inventory.UpdateColorVariant;
 using Materia.Application.Commands.Inventory.UpdateProduct;
 using Materia.Application.Commands.Purchasing.CancelPurchaseOrder;
 using Materia.Application.Commands.Purchasing.ConfirmPurchaseOrder;
@@ -56,6 +60,10 @@ public static class DependencyInjection
         services.AddScoped<AddUnitConversionCommandHandler>();
         services.AddScoped<RemoveUnitConversionCommandHandler>();
         services.AddScoped<SyncProductCategoriesCommandHandler>();
+        services.AddScoped<AddColorVariantCommandHandler>();
+        services.AddScoped<UpdateColorVariantCommandHandler>();
+        services.AddScoped<RemoveColorVariantCommandHandler>();
+        services.AddScoped<SetColorVariantStatusCommandHandler>();
 
         // Inventory — category commands
         services.AddScoped<CreateCategoryCommandHandler>();

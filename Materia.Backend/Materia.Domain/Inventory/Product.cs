@@ -14,9 +14,11 @@ public class Product : AggregateRoot<ProductId>
 
     private readonly List<CategoryId> _categoryIds = [];
     private readonly List<UnitConversion> _unitConversions = [];
+    private readonly List<ColorVariant> _colorVariants = [];
 
     public IReadOnlyList<CategoryId> CategoryIds => _categoryIds.AsReadOnly();
     public IReadOnlyList<UnitConversion> UnitConversions => _unitConversions.AsReadOnly();
+    public IReadOnlyList<ColorVariant> ColorVariants => _colorVariants.AsReadOnly();
 
     // Required for Reconstitute
     private Product() { }
@@ -131,6 +133,64 @@ public class Product : AggregateRoot<ProductId>
         Raise(new ProductUnitConversionRemoved(Id, toUnit.Value, updatedBy, DateTime.UtcNow));
     }
 
+    // ── Color Variants ────────────────────────────────────────────────────────
+
+    public VariantId AddColorVariant(
+        Color color, string? barcode, decimal? priceOverride, string updatedBy)
+    {
+        EnsureVariantPriceValid(priceOverride);
+        EnsureColorNameAvailable(color.Name, exclude: null);
+
+        var normalizedBarcode = NormalizeBarcode(barcode);
+        EnsureVariantBarcodeAvailable(normalizedBarcode, exclude: null);
+
+        var variantId = VariantId.New();
+        Raise(new ProductColorVariantAdded(
+            Id, variantId, color.Name, color.Code, normalizedBarcode, priceOverride,
+            updatedBy, DateTime.UtcNow));
+        return variantId;
+    }
+
+    public void UpdateColorVariant(
+        VariantId variantId, Color color, string? barcode, decimal? priceOverride, string updatedBy)
+    {
+        _ = FindVariant(variantId);
+        EnsureVariantPriceValid(priceOverride);
+        EnsureColorNameAvailable(color.Name, exclude: variantId);
+
+        var normalizedBarcode = NormalizeBarcode(barcode);
+        EnsureVariantBarcodeAvailable(normalizedBarcode, exclude: variantId);
+
+        Raise(new ProductColorVariantUpdated(
+            Id, variantId, color.Name, color.Code, normalizedBarcode, priceOverride,
+            updatedBy, DateTime.UtcNow));
+    }
+
+    public void RemoveColorVariant(VariantId variantId, string updatedBy)
+    {
+        if (_colorVariants.All(v => v.Id != variantId)) return; // idempotent
+
+        Raise(new ProductColorVariantRemoved(Id, variantId, updatedBy, DateTime.UtcNow));
+    }
+
+    public void DeactivateColorVariant(VariantId variantId, string updatedBy)
+    {
+        var variant = FindVariant(variantId);
+        if (!variant.IsActive)
+            throw new DomainException("Color variant is already inactive.");
+
+        Raise(new ProductColorVariantDeactivated(Id, variantId, updatedBy, DateTime.UtcNow));
+    }
+
+    public void ActivateColorVariant(VariantId variantId, string updatedBy)
+    {
+        var variant = FindVariant(variantId);
+        if (variant.IsActive)
+            throw new DomainException("Color variant is already active.");
+
+        Raise(new ProductColorVariantActivated(Id, variantId, updatedBy, DateTime.UtcNow));
+    }
+
     // ── Event Application ─────────────────────────────────────────────────────
 
     protected override void Apply(IDomainEvent domainEvent)
@@ -190,6 +250,28 @@ public class Product : AggregateRoot<ProductId>
             case ProductUnitConversionRemoved e:
                 _unitConversions.RemoveAll(c => c.ToUnit.Value == e.ToUnit);
                 break;
+
+            case ProductColorVariantAdded e:
+                _colorVariants.Add(new ColorVariant(
+                    e.VariantId, new Color(e.ColorName, e.ColorCode), e.Barcode, e.PriceOverride));
+                break;
+
+            case ProductColorVariantUpdated e:
+                FindVariant(e.VariantId)
+                    .Update(new Color(e.ColorName, e.ColorCode), e.Barcode, e.PriceOverride);
+                break;
+
+            case ProductColorVariantRemoved e:
+                _colorVariants.RemoveAll(v => v.Id == e.VariantId);
+                break;
+
+            case ProductColorVariantDeactivated e:
+                FindVariant(e.VariantId).Deactivate();
+                break;
+
+            case ProductColorVariantActivated e:
+                FindVariant(e.VariantId).Activate();
+                break;
         }
     }
 
@@ -197,4 +279,29 @@ public class Product : AggregateRoot<ProductId>
 
     private static string? NormalizeBarcode(string? barcode)
         => string.IsNullOrWhiteSpace(barcode) ? null : barcode.Trim();
+
+    private ColorVariant FindVariant(VariantId variantId)
+        => _colorVariants.FirstOrDefault(v => v.Id == variantId)
+           ?? throw new DomainException($"Color variant '{variantId}' not found.");
+
+    private static void EnsureVariantPriceValid(decimal? priceOverride)
+    {
+        if (priceOverride is < 0)
+            throw new DomainException("Variant price override cannot be negative.");
+    }
+
+    private void EnsureColorNameAvailable(string colorName, VariantId? exclude)
+    {
+        if (_colorVariants.Any(v =>
+                v.Id != exclude &&
+                string.Equals(v.Color.Name, colorName, StringComparison.OrdinalIgnoreCase)))
+            throw new DomainException($"A color variant '{colorName}' already exists.");
+    }
+
+    private void EnsureVariantBarcodeAvailable(string? normalizedBarcode, VariantId? exclude)
+    {
+        if (normalizedBarcode is not null &&
+            _colorVariants.Any(v => v.Id != exclude && v.Barcode == normalizedBarcode))
+            throw new DomainException($"Barcode '{normalizedBarcode}' is already used by another variant.");
+    }
 }

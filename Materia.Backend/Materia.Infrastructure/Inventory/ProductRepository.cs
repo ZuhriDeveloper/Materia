@@ -86,6 +86,8 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
         projection.CategoryIdsJson = JsonSerializer.Serialize(
             product.CategoryIds.Select(id => id.Value));
 
+        await SyncColorVariantsAsync(product, ct);
+
         if (newEvents.Any(e => e is not ProductCreated))
         {
             projection.UpdatedBy = newEvents.Last() switch
@@ -100,9 +102,46 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
                 ProductCategoryRemoved e => e.UpdatedBy,
                 ProductUnitConversionAdded e => e.UpdatedBy,
                 ProductUnitConversionRemoved e => e.UpdatedBy,
+                ProductColorVariantAdded e => e.UpdatedBy,
+                ProductColorVariantUpdated e => e.UpdatedBy,
+                ProductColorVariantRemoved e => e.UpdatedBy,
+                ProductColorVariantDeactivated e => e.UpdatedBy,
+                ProductColorVariantActivated e => e.UpdatedBy,
                 _ => projection.UpdatedBy,
             };
             projection.UpdatedAt = newEvents.Last().OccurredAt;
+        }
+    }
+
+    /// <summary>
+    /// Reconciles the dedicated variant read-model rows with the aggregate's current
+    /// variant set: inserts new variants, updates changed ones, deletes removed ones.
+    /// </summary>
+    private async Task SyncColorVariantsAsync(Product product, CancellationToken ct)
+    {
+        var existing = await context.ProductVariantReadModels
+            .Where(v => v.ProductId == product.Id.Value)
+            .ToListAsync(ct);
+
+        var currentIds = product.ColorVariants.Select(v => v.Id.Value).ToHashSet();
+
+        foreach (var row in existing.Where(r => !currentIds.Contains(r.Id)))
+            context.ProductVariantReadModels.Remove(row);
+
+        var existingById = existing.ToDictionary(r => r.Id);
+        foreach (var variant in product.ColorVariants)
+        {
+            if (!existingById.TryGetValue(variant.Id.Value, out var row))
+            {
+                row = new ProductVariantReadModel { Id = variant.Id.Value, ProductId = product.Id.Value };
+                context.ProductVariantReadModels.Add(row);
+            }
+
+            row.ColorName = variant.Color.Name;
+            row.ColorCode = variant.Color.Code;
+            row.Barcode = variant.Barcode;
+            row.PriceOverride = variant.PriceOverride;
+            row.IsActive = variant.IsActive;
         }
     }
 }

@@ -11,6 +11,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
 {
     public DbSet<StoredEvent> StoredEvents => Set<StoredEvent>();
     public DbSet<ProductReadModel> ProductReadModels => Set<ProductReadModel>();
+    public DbSet<ProductVariantReadModel> ProductVariantReadModels => Set<ProductVariantReadModel>();
     public DbSet<CategoryReadModel> CategoryReadModels => Set<CategoryReadModel>();
     public DbSet<UnitReadModel> UnitReadModels => Set<UnitReadModel>();
     public DbSet<StockReadModel> StockReadModels => Set<StockReadModel>();
@@ -40,6 +41,18 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Barcode).HasMaxLength(100);
             // Unique per barcode; PostgreSQL treats NULLs as distinct, so products
             // without a barcode are unaffected.
+            e.HasIndex(x => x.Barcode).IsUnique();
+        });
+
+        builder.Entity<ProductVariantReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ProductId);
+            e.Property(x => x.ColorName).HasMaxLength(100).IsRequired();
+            e.Property(x => x.ColorCode).HasMaxLength(50);
+            e.Property(x => x.Barcode).HasMaxLength(100);
+            // Unique per barcode across all variants; PostgreSQL treats NULLs as distinct,
+            // so variants without a barcode are unaffected.
             e.HasIndex(x => x.Barcode).IsUnique();
         });
 
