@@ -7,10 +7,17 @@ public class InventoryApiClient(HttpClient http)
     // ── Products ──────────────────────────────────────────────────────────────
 
     public Task<PagedProductsDto?> GetProductsAsync(
-        int page = 1, int pageSize = 20, bool? isActive = null, CancellationToken ct = default)
+        int page = 1, int pageSize = 20, bool? isActive = null,
+        string? search = null, Guid? categoryId = null,
+        CancellationToken ct = default)
     {
         var url = $"api/products?page={page}&pageSize={pageSize}";
-        if (isActive.HasValue) url += $"&isActive={isActive.Value}";
+        if (isActive.HasValue)
+            url += $"&isActive={isActive.Value}";
+        if (!string.IsNullOrWhiteSpace(search))
+            url += $"&search={Uri.EscapeDataString(search.Trim())}";
+        if (categoryId.HasValue)
+            url += $"&categoryId={categoryId.Value}";
         return http.GetFromJsonAsync<PagedProductsDto>(url, ct);
     }
 

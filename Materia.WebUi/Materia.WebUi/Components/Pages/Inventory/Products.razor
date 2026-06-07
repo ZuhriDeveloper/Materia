@@ -16,28 +16,161 @@
 
 @if (!string.IsNullOrEmpty(_notice))
 {
-    <div class="alert alert-success">@_notice</div>
+    <div class="alert alert-success alert-dismissible">
+        @_notice
+        <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+    </div>
 }
 
+@* ── Filter card ──────────────────────────────────────────────────────────────── *@
 <div class="card mb-3">
-    <div class="card-body py-2">
-        <div class="btn-group btn-group-sm" role="group">
-            <a href="/products" class="btn @(_filter == null ? "btn-dark" : "btn-outline-secondary")">Semua</a>
-            <a href="/products?active=true" class="btn @(_filter == true ? "btn-success" : "btn-outline-secondary")">Aktif</a>
-            <a href="/products?active=false" class="btn @(_filter == false ? "btn-secondary" : "btn-outline-secondary")">Tidak Aktif</a>
+    <div class="card-body pb-2">
+        <div class="row g-2 align-items-end">
+
+            @* Search text *@
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">
+                    <i class="bi bi-search me-1"></i>Cari
+                </label>
+                <div class="input-group input-group-sm">
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Nama produk atau barcode…"
+                           @bind="_searchInput"
+                           @bind:event="oninput"
+                           @onkeydown="OnSearchKeyDown" />
+                    @if (!string.IsNullOrEmpty(_searchInput))
+                    {
+                        <button class="btn btn-outline-secondary" type="button"
+                                @onclick="ClearSearch" title="Hapus pencarian">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                </div>
+                <div class="form-text">Tekan Enter atau klik Cari</div>
+            </div>
+
+            @* Category dropdown *@
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">
+                    <i class="bi bi-tag me-1"></i>Kategori
+                </label>
+                <select class="form-select form-select-sm"
+                        value="@_categoryFilter"
+                        @onchange="OnCategoryChanged"
+                        disabled="@(_categories.Count == 0)">
+                    <option value="">Semua Kategori</option>
+                    @foreach (var cat in _categories)
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </select>
+            </div>
+
+            @* Status toggle *@
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">
+                    <i class="bi bi-toggle-on me-1"></i>Status
+                </label>
+                <div class="btn-group btn-group-sm d-flex" role="group">
+                    <button type="button"
+                            class="btn @(_statusFilter == null ? "btn-dark" : "btn-outline-secondary")"
+                            @onclick='() => SetStatusFilter(null)'>
+                        Semua
+                    </button>
+                    <button type="button"
+                            class="btn @(_statusFilter == true ? "btn-success" : "btn-outline-secondary")"
+                            @onclick='() => SetStatusFilter(true)'>
+                        Aktif
+                    </button>
+                    <button type="button"
+                            class="btn @(_statusFilter == false ? "btn-secondary" : "btn-outline-secondary")"
+                            @onclick='() => SetStatusFilter(false)'>
+                        Nonaktif
+                    </button>
+                </div>
+            </div>
+
+            @* Search button *@
+            <div class="col-md-2 d-grid">
+                <button type="button" class="btn btn-primary btn-sm" @onclick="ApplySearch"
+                        disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-search me-1"></i>
+                    }
+                    Cari
+                </button>
+            </div>
+
         </div>
+
+        @* Active-filter chips *@
+        @if (HasActiveFilters)
+        {
+            <div class="d-flex flex-wrap gap-1 mt-2">
+                @if (!string.IsNullOrEmpty(_appliedSearch))
+                {
+                    <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle fw-normal">
+                        <i class="bi bi-search me-1"></i>«@_appliedSearch»
+                        <button type="button" class="btn-close btn-close-sm ms-1"
+                                style="font-size:.6rem" @onclick="ClearSearch"></button>
+                    </span>
+                }
+                @if (!string.IsNullOrEmpty(_categoryFilter))
+                {
+                    var catName = _categories.FirstOrDefault(c => c.Id.ToString() == _categoryFilter)?.Name;
+                    <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle fw-normal">
+                        <i class="bi bi-tag me-1"></i>@catName
+                        <button type="button" class="btn-close btn-close-sm ms-1"
+                                style="font-size:.6rem" @onclick="ClearCategory"></button>
+                    </span>
+                }
+                @if (_statusFilter.HasValue)
+                {
+                    <span class="badge bg-secondary-subtle text-secondary-emphasis border fw-normal">
+                        @(_statusFilter.Value ? "Aktif" : "Nonaktif")
+                        <button type="button" class="btn-close btn-close-sm ms-1"
+                                style="font-size:.6rem" @onclick='() => SetStatusFilter(null)'></button>
+                    </span>
+                }
+                <button type="button" class="btn btn-link btn-sm text-danger p-0 ms-1"
+                        @onclick="ClearAllFilters">
+                    Hapus semua
+                </button>
+            </div>
+        }
     </div>
 </div>
 
+@* ── Results table ────────────────────────────────────────────────────────────── *@
 <div class="card">
     <div class="card-body p-0">
-        @if (_products is null)
+
+        @if (_loading)
         {
-            <div class="p-3 text-muted">Memuat…</div>
+            <div class="p-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Memuat…
+            </div>
         }
-        else if (_products.Items.Count == 0)
+        else if (_products is null || _products.Items.Count == 0)
         {
-            <div class="p-3 text-muted">Tidak ada produk ditemukan.</div>
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+                <p class="mb-1">Tidak ada produk ditemukan.</p>
+                @if (HasActiveFilters)
+                {
+                    <button type="button" class="btn btn-sm btn-outline-secondary mt-1"
+                            @onclick="ClearAllFilters">
+                        Hapus filter
+                    </button>
+                }
+            </div>
         }
         else
         {
@@ -60,15 +193,26 @@
                     {
                         <tr>
                             <td class="fw-semibold">@p.Name</td>
-                            <td><span class="badge bg-light text-dark border">@p.BaseUnit</span></td>
-                            <td class="text-end">@(p.SalePrice > 0 ? $"Rp {p.SalePrice:N0}" : "—")</td>
+                            <td>
+                                <span class="badge bg-light text-dark border">@p.BaseUnit</span>
+                            </td>
+                            <td class="text-end">
+                                @(p.SalePrice > 0 ? $"Rp {p.SalePrice:N0}" : "—")
+                            </td>
                             <td class="small">
-                                @(string.IsNullOrEmpty(p.Barcode)
-                                    ? (MarkupString)"<span class='text-muted'>—</span>"
-                                    : (MarkupString)$"<code>{p.Barcode}</code>")
+                                @if (string.IsNullOrEmpty(p.Barcode))
+                                {
+                                    <span class="text-muted">—</span>
+                                }
+                                else
+                                {
+                                    <code>@p.Barcode</code>
+                                }
                             </td>
                             <td class="small text-muted">
-                                @(p.Categories.Count == 0 ? "—" : string.Join(", ", p.Categories.Select(c => c.Name)))
+                                @(p.Categories.Count == 0
+                                    ? "—"
+                                    : string.Join(", ", p.Categories.Select(c => c.Name)))
                             </td>
                             <td class="small">
                                 @{
@@ -76,7 +220,9 @@
                                 }
                                 @if (variantCount > 0)
                                 {
-                                    <span class="badge bg-light text-dark border">@variantCount warna</span>
+                                    <span class="badge bg-light text-dark border">
+                                        @variantCount warna
+                                    </span>
                                 }
                                 else
                                 {
@@ -106,46 +252,200 @@
                 </tbody>
             </table>
 
-            @if (_products.TotalPages > 1)
-            {
-                <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top">
-                    <small class="text-muted">
-                        Menampilkan @((_products.Page - 1) * _products.PageSize + 1)–@(Math.Min(_products.Page * _products.PageSize, _products.TotalCount)) dari @_products.TotalCount produk
-                    </small>
-                    <div class="btn-group btn-group-sm">
-                        @if (_products.Page > 1)
-                        {
-                            <a href="@($"/products?page={_products.Page - 1}{FilterQuery}")" class="btn btn-outline-secondary">‹ Sebelumnya</a>
-                        }
-                        @if (_products.Page < _products.TotalPages)
-                        {
-                            <a href="@($"/products?page={_products.Page + 1}{FilterQuery}")" class="btn btn-outline-secondary">Berikutnya ›</a>
-                        }
-                    </div>
-                </div>
-            }
+            @* ── Pagination ── *@
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top flex-wrap gap-2">
+                <small class="text-muted">
+                    Menampilkan
+                    <strong>@((_page - 1) * PageSize + 1)</strong>–<strong>@(Math.Min(_page * PageSize, _products.TotalCount))</strong>
+                    dari <strong>@_products.TotalCount</strong> produk
+                </small>
+
+                @if (_products.TotalPages > 1)
+                {
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            @* Prev *@
+                            <li class="page-item @(_page <= 1 ? "disabled" : "")">
+                                <button type="button" class="page-link"
+                                        disabled="@(_page <= 1 || _loading)"
+                                        @onclick="() => SetPage(_page - 1)">
+                                    ‹
+                                </button>
+                            </li>
+
+                            @* Page numbers — show window of 5 around current *@
+                            @{
+                                var start = Math.Max(1, _page - 2);
+                                var end   = Math.Min(_products.TotalPages, _page + 2);
+                            }
+                            @if (start > 1)
+                            {
+                                <li class="page-item">
+                                    <button type="button" class="page-link" @onclick="() => SetPage(1)">1</button>
+                                </li>
+                                @if (start > 2)
+                                {
+                                    <li class="page-item disabled">
+                                        <span class="page-link">…</span>
+                                    </li>
+                                }
+                            }
+                            @for (int i = start; i <= end; i++)
+                            {
+                                var pg = i;
+                                <li class="page-item @(pg == _page ? "active" : "")">
+                                    <button type="button" class="page-link"
+                                            disabled="@_loading"
+                                            @onclick="() => SetPage(pg)">@pg</button>
+                                </li>
+                            }
+                            @if (end < _products.TotalPages)
+                            {
+                                @if (end < _products.TotalPages - 1)
+                                {
+                                    <li class="page-item disabled">
+                                        <span class="page-link">…</span>
+                                    </li>
+                                }
+                                <li class="page-item">
+                                    <button type="button" class="page-link"
+                                            @onclick="() => SetPage(_products.TotalPages)">
+                                        @_products.TotalPages
+                                    </button>
+                                </li>
+                            }
+
+                            @* Next *@
+                            <li class="page-item @(_page >= _products.TotalPages ? "disabled" : "")">
+                                <button type="button" class="page-link"
+                                        disabled="@(_page >= _products.TotalPages || _loading)"
+                                        @onclick="() => SetPage(_page + 1)">
+                                    ›
+                                </button>
+                            </li>
+                        </ul>
+                    </nav>
+                }
+            </div>
         }
+
     </div>
 </div>
 
 @code {
-    private PagedProductsDto? _products;
-    private bool? _filter;
-    private string? _notice;
+    // ── Constants ──────────────────────────────────────────────────────────────
+    private const int PageSize = 20;
 
-    private string FilterQuery => _filter.HasValue ? $"&active={_filter.Value}" : "";
+    // ── State ─────────────────────────────────────────────────────────────────
+    private PagedProductsDto?  _products;
+    private List<CategoryDto>  _categories = [];
+    private bool               _loading    = true;
+    private string?            _notice;
+    private int                _page       = 1;
 
+    // Filter state: _searchInput is the live text; _appliedSearch is what was last searched.
+    private string  _searchInput    = "";
+    private string  _appliedSearch  = "";  // tracks last committed search term
+    private string  _categoryFilter = "";  // empty = all categories
+    private bool?   _statusFilter;         // null = all statuses
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrEmpty(_appliedSearch) ||
+        !string.IsNullOrEmpty(_categoryFilter) ||
+        _statusFilter.HasValue;
+
+    // ── Init ──────────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
         var query = QueryHelpers.ParseQuery(new Uri(Navigation.Uri).Query);
-
         if (query.ContainsKey("created"))
             _notice = "Produk berhasil dibuat.";
 
-        var activeParam = query.TryGetValue("active", out var av) ? av.ToString() : "";
-        _filter = activeParam == "true" ? true : activeParam == "false" ? false : null;
+        // Load categories and first page of products in parallel.
+        var catsTask = Api.GetCategoriesAsync();
+        await LoadAsync();
+        _categories = (await catsTask)?
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToList() ?? [];
+    }
 
-        var page = query.TryGetValue("page", out var pv) && int.TryParse(pv, out var p) ? p : 1;
-        _products = await Api.GetProductsAsync(page, 20, _filter);
+    // ── Data loading ──────────────────────────────────────────────────────────
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        Guid? catId = Guid.TryParse(_categoryFilter, out var g) ? g : null;
+        string? searchArg = string.IsNullOrWhiteSpace(_appliedSearch) ? null : _appliedSearch.Trim();
+
+        _products = await Api.GetProductsAsync(
+            page: _page, pageSize: PageSize,
+            isActive: _statusFilter,
+            search: searchArg,
+            categoryId: catId);
+
+        _loading = false;
+    }
+
+    // ── Filter handlers ───────────────────────────────────────────────────────
+
+    /// Commits the typed search and reloads from page 1.
+    private async Task ApplySearch()
+    {
+        _appliedSearch = _searchInput;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await ApplySearch();
+    }
+
+    private async Task ClearSearch()
+    {
+        _searchInput   = "";
+        _appliedSearch = "";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        _categoryFilter = e.Value?.ToString() ?? "";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearCategory()
+    {
+        _categoryFilter = "";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task SetStatusFilter(bool? value)
+    {
+        _statusFilter = value;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearAllFilters()
+    {
+        _searchInput    = "";
+        _appliedSearch  = "";
+        _categoryFilter = "";
+        _statusFilter   = null;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    // ── Paging ────────────────────────────────────────────────────────────────
+    private async Task SetPage(int page)
+    {
+        _page = page;
+        await LoadAsync();
     }
 }
