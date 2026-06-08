@@ -42,6 +42,21 @@ public class PurchaseOrderApiClient(HttpClient http)
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
+    public async Task<(ScannedInvoiceDto? Result, string? Error)> ScanInvoiceAsync(
+        Stream imageStream, string fileName, CancellationToken ct = default)
+    {
+        using var content = new MultipartFormDataContent();
+        using var fileContent = new StreamContent(imageStream);
+        content.Add(fileContent, "file", fileName);
+
+        var response = await http.PostAsync("api/purchase-orders/scan-invoice", content, ct);
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorAsync(response));
+
+        var result = await response.Content.ReadFromJsonAsync<ScannedInvoiceDto>(cancellationToken: ct);
+        return (result, null);
+    }
+
     private static async Task<string> ReadErrorAsync(HttpResponseMessage r)
     {
         try
@@ -55,3 +70,17 @@ public class PurchaseOrderApiClient(HttpClient http)
     private record IdResponse(Guid Id);
     private record ErrorBody(string? Message, List<string>? Errors);
 }
+
+public record ScannedInvoiceDto(
+    string? SupplierName,
+    bool SupplierFound,
+    Guid? MatchedSupplierId,
+    IReadOnlyList<ScannedLineItemDto> Lines);
+
+public record ScannedLineItemDto(
+    string ProductName,
+    decimal Quantity,
+    string Unit,
+    decimal UnitPrice,
+    bool ProductFound,
+    Guid? MatchedProductId);
