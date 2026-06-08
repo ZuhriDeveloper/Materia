@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<SaleItemReadModel> SaleItemReadModels => Set<SaleItemReadModel>();
     public DbSet<SupplierReadModel> SupplierReadModels => Set<SupplierReadModel>();
     public DbSet<PurchaseOrderReadModel> PurchaseOrderReadModels => Set<PurchaseOrderReadModel>();
+    public DbSet<PurchaseInvoiceImage> PurchaseInvoiceImages => Set<PurchaseInvoiceImage>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -117,6 +118,16 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasIndex(x => x.SupplierId);
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.CreatedAt);
+        });
+
+        builder.Entity<PurchaseInvoiceImage>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.FileName).HasMaxLength(260).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Content).HasColumnType("bytea").IsRequired();
+            e.Property(x => x.UploadedBy).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.PurchaseOrderId);
         });
     }
 }

@@ -4,7 +4,9 @@
 @using Materia.WebUi.Services
 @using Microsoft.AspNetCore.Components.Forms
 @inject PurchaseOrderApiClient PoApi
-@inject NavigationManager Navigation
+@inject SupplierApiClient       SupplierApi
+@inject InventoryApiClient      InventoryApi
+@inject NavigationManager       Navigation
 
 <PageTitle>Import Pembelian — Materia</PageTitle>
 
@@ -24,7 +26,7 @@
 }
 
 @* ── Step 1: Upload ── *@
-@if (_result is null)
+@if (_supplier is null)
 {
     <div class="card" style="max-width:560px">
         <div class="card-header fw-semibold">
@@ -37,7 +39,7 @@
             </p>
 
             <InputFile OnChange="OnFileSelected"
-                       accept="image/*,.pdf"
+                       accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
                        class="form-control mb-3" />
 
             @if (_selectedFile is not null)
@@ -68,80 +70,285 @@
 }
 
 @* ── Step 2: Result ── *@
-@if (_result is not null)
+@if (_supplier is not null)
 {
     <div class="mb-3">
-        <div class="card mb-3" style="max-width:640px">
-            <div class="card-body py-2 px-3 d-flex align-items-center gap-3">
-                <div>
-                    <span class="text-muted small me-2">Pemasok:</span>
-                    <span class="fw-semibold">@(_result.SupplierName ?? "—")</span>
-                </div>
-                @if (!_result.SupplierFound)
+
+        @* ── Supplier card ── *@
+        <div class="card mb-3" style="max-width:720px">
+            <div class="card-header fw-semibold d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-truck me-1"></i> Pemasok</span>
+                @if (_supplier.Found)
                 {
-                    <span class="badge bg-warning text-dark">
-                        <i class="bi bi-exclamation-triangle me-1"></i>
-                        Pemasok tidak ditemukan di database
+                    <span class="badge bg-success">
+                        <i class="bi bi-check-circle me-1"></i> @_supplier.MatchedName
                     </span>
                 }
                 else
                 {
-                    <span class="badge bg-success">
-                        <i class="bi bi-check-circle me-1"></i>
-                        Pemasok ditemukan
+                    <span class="badge bg-warning text-dark">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Tidak ditemukan
                     </span>
+                }
+            </div>
+            <div class="card-body">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="text-muted small">Hasil pindai:</span>
+                    <span class="fw-semibold">@(_supplier.ScannedName ?? "—")</span>
+                </div>
+
+                @if (!_supplier.Found)
+                {
+                    @if (_supplier.Mode == "")
+                    {
+                        <div class="d-flex gap-2 mt-2">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => StartSupplierMap()">
+                                <i class="bi bi-link-45deg me-1"></i> Petakan ke pemasok
+                            </button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => StartSupplierCreate()">
+                                <i class="bi bi-plus-circle me-1"></i> Buat pemasok baru
+                            </button>
+                        </div>
+                    }
+
+                    @if (_supplier.Mode == "map")
+                    {
+                        <div class="border rounded p-3 mt-2 bg-light">
+                            <label class="form-label small fw-semibold">Pilih pemasok yang sudah ada</label>
+                            <select class="form-select form-select-sm mb-2" @bind="_supplier.MapSelectedId">
+                                <option value="@Guid.Empty">— pilih pemasok —</option>
+                                @foreach (var s in _allSuppliers)
+                                {
+                                    <option value="@s.Id">@s.Name</option>
+                                }
+                            </select>
+                            @if (_supplier.Error is not null)
+                            {
+                                <div class="small text-danger mb-2">@_supplier.Error</div>
+                            }
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-primary"
+                                        @onclick="() => ConfirmSupplierMap()"
+                                        disabled="@(_supplier.MapSelectedId == Guid.Empty)">
+                                    <i class="bi bi-check-lg me-1"></i> Gunakan
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CancelSupplier()">Batal</button>
+                            </div>
+                        </div>
+                    }
+
+                    @if (_supplier.Mode == "create")
+                    {
+                        <div class="border rounded p-3 mt-2 bg-light">
+                            <div class="row g-2">
+                                <div class="col-sm-7">
+                                    <label class="form-label small fw-semibold">Nama Pemasok</label>
+                                    <input class="form-control form-control-sm" @bind="_supplier.CreateName" />
+                                </div>
+                                <div class="col-sm-5">
+                                    <label class="form-label small">No. Telepon</label>
+                                    <input class="form-control form-control-sm" @bind="_supplier.CreatePhone" placeholder="opsional" />
+                                </div>
+                            </div>
+                            @if (_supplier.Error is not null)
+                            {
+                                <div class="small text-danger mt-2">@_supplier.Error</div>
+                            }
+                            <div class="d-flex gap-2 mt-2">
+                                <button class="btn btn-sm btn-success"
+                                        @onclick="() => SaveNewSupplier()"
+                                        disabled="@(_supplier.Busy || string.IsNullOrWhiteSpace(_supplier.CreateName))">
+                                    @if (_supplier.Busy)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                    }
+                                    <i class="bi bi-check-lg me-1"></i> Simpan
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CancelSupplier()">Batal</button>
+                            </div>
+                        </div>
+                    }
                 }
             </div>
         </div>
 
+        @* ── Line items ── *@
         <div class="card">
             <div class="card-header fw-semibold">
-                <i class="bi bi-list-check me-1"></i> Hasil Pindai (@_result.Lines.Count item)
+                <i class="bi bi-list-check me-1"></i> Hasil Pindai (@_lines.Count item)
+                <span class="text-muted small fw-normal ms-2">— qty, harga &amp; kategori dapat disunting</span>
             </div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>Produk</th>
-                            <th class="text-center">Qty</th>
+                            <th class="text-center" style="width:110px">Qty</th>
                             <th>Satuan</th>
-                            <th class="text-end">Harga Satuan</th>
+                            <th style="min-width:160px">Kategori</th>
+                            <th class="text-end" style="width:150px">Harga Satuan</th>
                             <th class="text-end">Subtotal</th>
-                            <th>Status</th>
+                            <th style="min-width:230px">Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach (var line in _result.Lines)
+                        @foreach (var line in _lines)
                         {
-                            <tr class="@(line.ProductFound ? "" : "table-warning")">
+                            <tr class="@(line.Found ? "" : "table-warning")">
                                 <td class="fw-semibold">@line.ProductName</td>
-                                <td class="text-center">@line.Quantity.ToString("G29")</td>
-                                <td>@line.Unit</td>
-                                <td class="text-end">Rp @line.UnitPrice.ToString("N0")</td>
-                                <td class="text-end">Rp @((line.Quantity * line.UnitPrice).ToString("N0"))</td>
                                 <td>
-                                    @if (line.ProductFound)
+                                    <input type="number" class="form-control form-control-sm text-center"
+                                           @bind="line.Quantity" min="0" step="0.001" />
+                                </td>
+                                <td>@line.Unit</td>
+                                <td>
+                                    <select class="form-select form-select-sm" @bind="line.CategoryId">
+                                        <option value="@Guid.Empty">— tanpa kategori —</option>
+                                        @foreach (var c in _categories)
+                                        {
+                                            <option value="@c.Id">@c.Name</option>
+                                        }
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" class="form-control form-control-sm text-end"
+                                           @bind="line.UnitPrice" min="0" step="100" />
+                                </td>
+                                <td class="text-end fw-semibold">Rp @((line.Quantity * line.UnitPrice).ToString("N0"))</td>
+                                <td>
+                                    @if (line.Found)
                                     {
                                         <span class="badge bg-success">
-                                            <i class="bi bi-check-circle"></i>
+                                            <i class="bi bi-check-circle me-1"></i> @line.MatchedName
                                         </span>
+                                    }
+                                    else if (line.Mode == "")
+                                    {
+                                        <div class="d-flex gap-1 flex-wrap">
+                                            <button class="btn btn-xs btn-outline-primary" @onclick="() => StartLineMap(line)">
+                                                <i class="bi bi-link-45deg me-1"></i> Petakan
+                                            </button>
+                                            <button class="btn btn-xs btn-outline-success" @onclick="() => StartLineCreate(line)">
+                                                <i class="bi bi-plus-circle me-1"></i> Buat baru
+                                            </button>
+                                        </div>
                                     }
                                     else
                                     {
                                         <span class="badge bg-warning text-dark">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>
-                                            Tidak ditemukan
+                                            <i class="bi bi-exclamation-triangle me-1"></i> Tidak ditemukan
                                         </span>
                                     }
                                 </td>
                             </tr>
+
+                            @* ── expandable form row ── *@
+                            @if (!line.Found && line.Mode == "map")
+                            {
+                                <tr class="bg-light">
+                                    <td colspan="7">
+                                        <div class="p-2">
+                                            <label class="form-label small fw-semibold">Petakan ke produk yang sudah ada</label>
+                                            <div class="row g-2 align-items-end">
+                                                <div class="col-md-8">
+                                                    <select class="form-select form-select-sm" @bind="line.MapSelectedId">
+                                                        <option value="@Guid.Empty">— pilih produk —</option>
+                                                        @foreach (var p in _allProducts)
+                                                        {
+                                                            <option value="@p.Id">@p.Name (@p.BaseUnit)</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-4 d-flex gap-2">
+                                                    <button class="btn btn-sm btn-primary"
+                                                            @onclick="() => ConfirmLineMap(line)"
+                                                            disabled="@(line.MapSelectedId == Guid.Empty)">
+                                                        <i class="bi bi-check-lg me-1"></i> Gunakan
+                                                    </button>
+                                                    <button class="btn btn-sm btn-outline-secondary" @onclick="() => CancelLine(line)">Batal</button>
+                                                </div>
+                                            </div>
+                                            @if (line.Error is not null)
+                                            {
+                                                <div class="small text-danger mt-2">@line.Error</div>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+
+                            @if (!line.Found && line.Mode == "create")
+                            {
+                                <tr class="bg-light">
+                                    <td colspan="7">
+                                        <div class="p-2">
+                                            <label class="form-label small fw-semibold">Buat produk baru</label>
+                                            <div class="row g-2">
+                                                <div class="col-md-4">
+                                                    <label class="form-label small">Nama Produk</label>
+                                                    <input class="form-control form-control-sm" @bind="line.CreateName" />
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label small">Satuan Dasar</label>
+                                                    @if (_units.Count == 0)
+                                                    {
+                                                        <input class="form-control form-control-sm" @bind="line.CreateBaseUnit"
+                                                               placeholder="cth. pcs" />
+                                                    }
+                                                    else
+                                                    {
+                                                        <select class="form-select form-select-sm" @bind="line.CreateBaseUnit">
+                                                            <option value="">— pilih satuan —</option>
+                                                            @foreach (var u in _units)
+                                                            {
+                                                                <option value="@u.Name">@u.Name@(u.Symbol is not null ? $" ({u.Symbol})" : "")</option>
+                                                            }
+                                                        </select>
+                                                    }
+                                                </div>
+                                                <div class="col-md-3">
+                                                    <label class="form-label small">Kategori</label>
+                                                    <select class="form-select form-select-sm" @bind="line.CategoryId">
+                                                        <option value="@Guid.Empty">— tanpa kategori —</option>
+                                                        @foreach (var c in _categories)
+                                                        {
+                                                            <option value="@c.Id">@c.Name</option>
+                                                        }
+                                                    </select>
+                                                </div>
+                                                <div class="col-md-2">
+                                                    <label class="form-label small">Harga Jual</label>
+                                                    <input type="number" class="form-control form-control-sm"
+                                                           @bind="line.CreateSalePrice" min="0" step="100" />
+                                                </div>
+                                            </div>
+                                            @if (line.Error is not null)
+                                            {
+                                                <div class="small text-danger mt-2">@line.Error</div>
+                                            }
+                                            <div class="d-flex gap-2 mt-2">
+                                                <button class="btn btn-sm btn-success"
+                                                        @onclick="() => SaveNewProduct(line)"
+                                                        disabled="@(line.Busy || string.IsNullOrWhiteSpace(line.CreateName) || string.IsNullOrWhiteSpace(line.CreateBaseUnit))">
+                                                    @if (line.Busy)
+                                                    {
+                                                        <span class="spinner-border spinner-border-sm me-1"></span>
+                                                    }
+                                                    <i class="bi bi-check-lg me-1"></i> Simpan
+                                                </button>
+                                                <button class="btn btn-sm btn-outline-secondary" @onclick="() => CancelLine(line)">Batal</button>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                     <tfoot class="table-light">
                         <tr>
-                            <td colspan="4" class="text-end fw-bold">Total Estimasi</td>
+                            <td colspan="5" class="text-end fw-bold">Total Estimasi</td>
                             <td class="text-end fw-bold">
-                                Rp @(_result.Lines.Sum(l => l.Quantity * l.UnitPrice).ToString("N0"))
+                                Rp @(_lines.Sum(l => l.Quantity * l.UnitPrice).ToString("N0"))
                             </td>
                             <td></td>
                         </tr>
@@ -150,39 +357,60 @@
             </div>
         </div>
 
-        @if (!_result.SupplierFound || _result.Lines.Any(l => !l.ProductFound))
+        @if (!_supplier.Found || _lines.Any(l => !l.Found))
         {
             <div class="alert alert-warning mt-3">
                 <i class="bi bi-exclamation-triangle-fill me-1"></i>
-                Beberapa pemasok atau produk tidak ditemukan di database. Pastikan data sudah
-                terdaftar sebelum membuat order.
+                Beberapa pemasok atau produk belum dipetakan. Petakan ke data yang ada atau buat data baru
+                pada baris yang ditandai.
             </div>
         }
 
         <div class="d-flex gap-2 mt-3">
-            <button class="btn btn-outline-secondary"
-                    @onclick="() => { _result = null; _selectedFile = null; }">
+            <button class="btn btn-outline-secondary" @onclick="ResetAll" disabled="@_finalizing">
                 <i class="bi bi-arrow-repeat me-1"></i> Pindai Ulang
             </button>
             <button class="btn btn-success"
                     @onclick="HandleConfirm"
-                    disabled="@(!_result.SupplierFound || _result.Lines.All(l => !l.ProductFound))">
-                <i class="bi bi-check-circle me-1"></i> Buat Order Pembelian
+                    disabled="@(_finalizing || !_supplier.Found || _lines.All(l => !l.Found))">
+                @if (_finalizing)
+                {
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span>Menyimpan...</span>
+                }
+                else
+                {
+                    <i class="bi bi-check-circle me-1"></i>
+                    <span>Buat Order Pembelian</span>
+                }
             </button>
         </div>
     </div>
 }
 
 @code {
-    private IBrowserFile?       _selectedFile;
-    private ScannedInvoiceDto?  _result;
-    private bool                _scanning;
-    private string?             _error;
+    private IBrowserFile? _selectedFile;
+    private bool          _scanning;
+    private bool          _finalizing;
+    private string?       _error;
+
+    // Buffered upload so we can both scan and persist the same bytes.
+    private byte[]? _imageBytes;
+    private string  _imageContentType = "";
+    private string  _imageFileName    = "";
+
+    private SupplierVm?  _supplier;
+    private List<LineVm> _lines = [];
+
+    // Lookups for map/create forms
+    private List<SupplierDto> _allSuppliers = [];
+    private List<ProductDto>  _allProducts  = [];
+    private List<UnitDto>     _units        = [];
+    private List<CategoryDto> _categories   = [];
 
     private void OnFileSelected(InputFileChangeEventArgs e)
     {
         _selectedFile = e.File;
-        _result       = null;
         _error        = null;
     }
 
@@ -195,11 +423,54 @@
 
         try
         {
-            await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
-            var (result, error) = await PoApi.ScanInvoiceAsync(stream, _selectedFile.Name);
+            // Buffer the file once; reuse the bytes for both the scan and the later upload.
+            await using (var s = _selectedFile.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024))
+            using (var ms = new MemoryStream())
+            {
+                await s.CopyToAsync(ms);
+                _imageBytes = ms.ToArray();
+            }
+            _imageContentType = _selectedFile.ContentType;
+            _imageFileName    = _selectedFile.Name;
 
-            if (error is not null) { _error = error; }
-            else { _result = result; }
+            using var scanStream = new MemoryStream(_imageBytes);
+            var (result, error) = await PoApi.ScanInvoiceAsync(scanStream, _imageFileName, _imageContentType);
+
+            if (error is not null) { _error = error; return; }
+            if (result is null)    { _error = "Tidak ada hasil dari pemindaian."; return; }
+
+            await LoadLookupsAsync();
+
+            _supplier = new SupplierVm
+            {
+                ScannedName = result.SupplierName,
+                Found       = result.SupplierFound,
+                MatchedId   = result.MatchedSupplierId,
+                MatchedName = result.MatchedSupplierId is { } sid
+                    ? _allSuppliers.FirstOrDefault(s => s.Id == sid)?.Name ?? result.SupplierName
+                    : null,
+            };
+
+            _lines = result.Lines.Select(l =>
+            {
+                var matched = l.MatchedProductId is { } pid
+                    ? _allProducts.FirstOrDefault(p => p.Id == pid)
+                    : null;
+                var catId = matched?.Categories.FirstOrDefault()?.Id ?? Guid.Empty;
+
+                return new LineVm
+                {
+                    ProductName        = l.ProductName,
+                    Quantity           = l.Quantity,
+                    Unit               = l.Unit,
+                    UnitPrice          = l.UnitPrice,
+                    Found              = l.ProductFound,
+                    MatchedId          = l.MatchedProductId,
+                    MatchedName        = matched?.Name ?? (l.ProductFound ? l.ProductName : null),
+                    CategoryId         = catId,
+                    OriginalCategoryId = catId,
+                };
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -211,16 +482,271 @@
         }
     }
 
-    private void HandleConfirm()
+    private async Task LoadLookupsAsync()
     {
-        if (_result?.MatchedSupplierId is null) return;
+        var suppliersTask  = SupplierApi.GetSuppliersAsync(activeOnly: true);
+        var productsTask   = InventoryApi.GetProductsAsync(pageSize: 500, isActive: true);
+        var unitsTask      = InventoryApi.GetUnitsAsync();
+        var categoriesTask = InventoryApi.GetCategoriesAsync();
 
-        var lines = _result.Lines
-            .Where(l => l.ProductFound && l.MatchedProductId is not null)
-            .Select(l => $"{l.MatchedProductId}:{l.Quantity}")
-            .ToArray();
+        _allSuppliers = (await suppliersTask)?.OrderBy(s => s.Name).ToList() ?? [];
+        _allProducts  = (await productsTask)?.Items.OrderBy(p => p.Name).ToList() ?? [];
+        _units        = (await unitsTask)?.Where(u => u.IsActive).OrderBy(u => u.Name).ToList() ?? [];
+        _categories   = (await categoriesTask)?.Where(c => c.IsActive).OrderBy(c => c.Name).ToList() ?? [];
+    }
 
-        var query = string.Join("&", lines.Select(l => $"line={Uri.EscapeDataString(l)}"));
-        Navigation.NavigateTo($"/purchase-orders/new?supplierId={_result.MatchedSupplierId}&{query}");
+    // ── Supplier actions ────────────────────────────────────────────────────
+
+    private void StartSupplierMap()
+    {
+        _supplier!.Mode = "map";
+        _supplier.Error = null;
+        var guess = _allSuppliers.FirstOrDefault(s =>
+            _supplier.ScannedName is not null &&
+            s.Name.Contains(_supplier.ScannedName, StringComparison.OrdinalIgnoreCase));
+        _supplier.MapSelectedId = guess?.Id ?? Guid.Empty;
+    }
+
+    private void StartSupplierCreate()
+    {
+        _supplier!.Mode = "create";
+        _supplier.Error = null;
+        _supplier.CreateName = _supplier.ScannedName ?? "";
+    }
+
+    private void CancelSupplier()
+    {
+        _supplier!.Mode = "";
+        _supplier.Error = null;
+    }
+
+    private void ConfirmSupplierMap()
+    {
+        var picked = _allSuppliers.FirstOrDefault(s => s.Id == _supplier!.MapSelectedId);
+        if (picked is null) { _supplier!.Error = "Pilih pemasok terlebih dahulu."; return; }
+
+        _supplier!.Found       = true;
+        _supplier.MatchedId   = picked.Id;
+        _supplier.MatchedName = picked.Name;
+        _supplier.Mode        = "";
+    }
+
+    private async Task SaveNewSupplier()
+    {
+        _supplier!.Busy  = true;
+        _supplier.Error = null;
+
+        var (id, error) = await SupplierApi.RegisterAsync(
+            _supplier.CreateName.Trim(),
+            string.IsNullOrWhiteSpace(_supplier.CreatePhone) ? null : _supplier.CreatePhone!.Trim());
+
+        _supplier.Busy = false;
+
+        if (error is not null) { _supplier.Error = error; return; }
+
+        _supplier.Found       = true;
+        _supplier.MatchedId   = id;
+        _supplier.MatchedName = _supplier.CreateName.Trim();
+        _supplier.Mode        = "";
+
+        _allSuppliers = (await SupplierApi.GetSuppliersAsync(activeOnly: true))?.OrderBy(s => s.Name).ToList() ?? _allSuppliers;
+    }
+
+    // ── Line (product) actions ──────────────────────────────────────────────
+
+    private void StartLineMap(LineVm line)
+    {
+        line.Mode  = "map";
+        line.Error = null;
+        var guess = _allProducts.FirstOrDefault(p =>
+            p.Name.Contains(line.ProductName, StringComparison.OrdinalIgnoreCase));
+        line.MapSelectedId = guess?.Id ?? Guid.Empty;
+    }
+
+    private void StartLineCreate(LineVm line)
+    {
+        line.Mode  = "create";
+        line.Error = null;
+        line.CreateName = line.ProductName;
+        var matchUnit = _units.FirstOrDefault(u => u.Name.Equals(line.Unit, StringComparison.OrdinalIgnoreCase));
+        line.CreateBaseUnit  = matchUnit?.Name ?? (_units.Count == 0 ? line.Unit : "");
+        line.CreateSalePrice = line.UnitPrice;
+    }
+
+    private void CancelLine(LineVm line)
+    {
+        line.Mode  = "";
+        line.Error = null;
+    }
+
+    private void ConfirmLineMap(LineVm line)
+    {
+        var picked = _allProducts.FirstOrDefault(p => p.Id == line.MapSelectedId);
+        if (picked is null) { line.Error = "Pilih produk terlebih dahulu."; return; }
+
+        line.Found       = true;
+        line.MatchedId   = picked.Id;
+        line.MatchedName = picked.Name;
+        line.Mode        = "";
+
+        var catId = picked.Categories.FirstOrDefault()?.Id ?? Guid.Empty;
+        line.CategoryId         = catId;
+        line.OriginalCategoryId = catId;
+    }
+
+    private async Task SaveNewProduct(LineVm line)
+    {
+        line.Busy  = true;
+        line.Error = null;
+
+        var (id, error) = await InventoryApi.CreateProductAsync(
+            line.CreateName.Trim(),
+            description: null,
+            baseUnit: line.CreateBaseUnit.Trim(),
+            categoryIds: line.CategoryId != Guid.Empty ? [line.CategoryId] : null,
+            salePrice: line.CreateSalePrice);
+
+        line.Busy = false;
+
+        if (error is not null) { line.Error = error; return; }
+
+        line.Found              = true;
+        line.MatchedId          = id;
+        line.MatchedName        = line.CreateName.Trim();
+        line.OriginalCategoryId = line.CategoryId;   // already assigned at creation
+        line.Mode               = "";
+
+        _allProducts = (await InventoryApi.GetProductsAsync(pageSize: 500, isActive: true))?.Items
+            .OrderBy(p => p.Name).ToList() ?? _allProducts;
+    }
+
+    // ── Finalize ────────────────────────────────────────────────────────────
+
+    private async Task HandleConfirm()
+    {
+        if (_supplier?.MatchedId is null) return;
+
+        var resolved = _lines.Where(l => l.Found && l.MatchedId is not null).ToList();
+        if (resolved.Count == 0) { _error = "Tidak ada produk yang dipetakan."; return; }
+
+        foreach (var l in resolved)
+        {
+            if (l.Quantity <= 0) { _error = $"Kuantitas untuk \"{l.ProductName}\" harus lebih dari 0."; return; }
+            if (l.UnitPrice <= 0) { _error = $"Harga untuk \"{l.ProductName}\" harus lebih dari 0."; return; }
+        }
+
+        _finalizing = true;
+        _error      = null;
+
+        try
+        {
+            var supplierId = _supplier.MatchedId.Value;
+
+            // 1. Apply category changes
+            foreach (var l in resolved)
+            {
+                if (l.CategoryId != Guid.Empty && l.CategoryId != l.OriginalCategoryId)
+                {
+                    var err = await InventoryApi.AssignCategoryAsync(l.MatchedId!.Value, l.CategoryId);
+                    if (err is not null)
+                    {
+                        _error = $"Gagal menetapkan kategori untuk \"{l.ProductName}\": {err}";
+                        return;
+                    }
+                }
+            }
+
+            // 2. Lock in the edited unit price as the supplier's catalog price
+            //    (the PO derives its line prices from the supplier catalog).
+            foreach (var l in resolved)
+            {
+                var unit = !string.IsNullOrWhiteSpace(l.Unit)
+                    ? l.Unit
+                    : _allProducts.FirstOrDefault(p => p.Id == l.MatchedId)?.BaseUnit ?? "unit";
+
+                var err = await SupplierApi.SetPriceAsync(
+                    supplierId, l.MatchedId!.Value, l.UnitPrice, "IDR", unit, DateTime.UtcNow);
+                if (err is not null)
+                {
+                    _error = $"Gagal menetapkan harga untuk \"{l.ProductName}\": {err}";
+                    return;
+                }
+            }
+
+            // 3. Create the purchase order
+            var inputs = resolved.Select(l => new CreatePoLineInput(l.MatchedId!.Value, l.Quantity)).ToList();
+            var (poId, createErr) = await PoApi.CreateAsync(supplierId, inputs);
+            if (createErr is not null) { _error = createErr; return; }
+
+            // 4. Persist the invoice image against the new PO
+            if (poId is not null && _imageBytes is not null)
+            {
+                var imgErr = await PoApi.UploadInvoiceImageAsync(
+                    poId.Value, _imageBytes, _imageContentType, _imageFileName);
+                if (imgErr is not null)
+                {
+                    // Order succeeded; surface the image issue but still navigate.
+                    _error = $"Order dibuat, tetapi gambar gagal disimpan: {imgErr}";
+                }
+            }
+
+            Navigation.NavigateTo($"/purchase-orders/{poId}");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Gagal membuat order: {ex.Message}";
+        }
+        finally
+        {
+            _finalizing = false;
+        }
+    }
+
+    private void ResetAll()
+    {
+        _supplier     = null;
+        _lines        = [];
+        _selectedFile = null;
+        _imageBytes   = null;
+        _error        = null;
+    }
+
+    // ── View models ─────────────────────────────────────────────────────────
+
+    private sealed class SupplierVm
+    {
+        public string? ScannedName { get; set; }
+        public bool    Found       { get; set; }
+        public Guid?   MatchedId   { get; set; }
+        public string? MatchedName { get; set; }
+
+        public string  Mode          { get; set; } = "";   // "", "map", "create"
+        public Guid    MapSelectedId { get; set; }
+        public string  CreateName    { get; set; } = "";
+        public string? CreatePhone   { get; set; }
+        public bool    Busy          { get; set; }
+        public string? Error         { get; set; }
+    }
+
+    private sealed class LineVm
+    {
+        public string  ProductName { get; set; } = "";
+        public decimal Quantity    { get; set; }
+        public string  Unit        { get; set; } = "";
+        public decimal UnitPrice   { get; set; }
+        public bool    Found       { get; set; }
+        public Guid?   MatchedId   { get; set; }
+        public string? MatchedName { get; set; }
+
+        public Guid CategoryId         { get; set; }
+        public Guid OriginalCategoryId { get; set; }
+
+        public string  Mode            { get; set; } = "";  // "", "map", "create"
+        public Guid    MapSelectedId   { get; set; }
+        public string  CreateName      { get; set; } = "";
+        public string  CreateBaseUnit  { get; set; } = "";
+        public decimal CreateSalePrice { get; set; }
+        public bool    Busy            { get; set; }
+        public string? Error           { get; set; }
     }
 }

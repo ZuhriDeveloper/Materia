@@ -116,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<GetSupplierByIdQueryHandler>();
         services.AddScoped<GetPurchaseOrdersQueryHandler>();
         services.AddScoped<GetPurchaseOrderByIdQueryHandler>();
+        services.AddScoped<ScanPurchaseInvoiceQueryHandler>();
 
         // Sales
         services.AddScoped<SaleService>();

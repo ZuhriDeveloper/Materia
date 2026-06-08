@@ -43,10 +43,12 @@ public class PurchaseOrderApiClient(HttpClient http)
     }
 
     public async Task<(ScannedInvoiceDto? Result, string? Error)> ScanInvoiceAsync(
-        Stream imageStream, string fileName, CancellationToken ct = default)
+        Stream imageStream, string fileName, string contentType, CancellationToken ct = default)
     {
         using var content = new MultipartFormDataContent();
         using var fileContent = new StreamContent(imageStream);
+        if (!string.IsNullOrWhiteSpace(contentType))
+            fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
         content.Add(fileContent, "file", fileName);
 
         var response = await http.PostAsync("api/purchase-orders/scan-invoice", content, ct);
@@ -55,6 +57,20 @@ public class PurchaseOrderApiClient(HttpClient http)
 
         var result = await response.Content.ReadFromJsonAsync<ScannedInvoiceDto>(cancellationToken: ct);
         return (result, null);
+    }
+
+    public async Task<string?> UploadInvoiceImageAsync(
+        Guid purchaseOrderId, byte[] content, string contentType, string fileName,
+        CancellationToken ct = default)
+    {
+        using var form = new MultipartFormDataContent();
+        using var fileContent = new ByteArrayContent(content);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(
+            string.IsNullOrWhiteSpace(contentType) ? "application/octet-stream" : contentType);
+        form.Add(fileContent, "file", fileName);
+
+        var response = await http.PostAsync($"api/purchase-orders/{purchaseOrderId}/invoice-image", form, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage r)
