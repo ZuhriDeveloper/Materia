@@ -743,8 +743,24 @@ else
         string value, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(value)) return [];
-        try { return await InventoryApi.SearchProductsAsync(value, 8, ct); }
-        catch { return []; }
+        try
+        {
+            return await InventoryApi.SearchProductsAsync(value, 8, ct);
+        }
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke — MudAutocomplete cancels the in-flight request.
+            // Expected; just drop this result set.
+            return [];
+        }
+        catch (Exception ex)
+        {
+            // A real failure (network, auth, server). Surface it instead of silently showing
+            // an empty dropdown, which looks like "no products found".
+            _scanMessage = $"Pencarian gagal: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+            return [];
+        }
     }
 
     private async Task OnProductSelected(ProductSearchDto? product)

@@ -35,6 +35,10 @@ builder.Services.AddRazorComponents()
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
 
+// Lets BearerTokenHandler reach the circuit-scoped AuthenticationStateProvider from the
+// IHttpClientFactory handler scope, so the JWT is attached on interactive (SignalR) requests.
+builder.Services.AddCircuitServicesAccessor();
+
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {

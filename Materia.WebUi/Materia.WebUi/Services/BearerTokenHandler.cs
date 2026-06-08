@@ -19,6 +19,7 @@ namespace Materia.WebUi.Services;
 /// </summary>
 public class BearerTokenHandler(
     IHttpContextAccessor accessor,
+    CircuitServicesAccessor circuitServices,
     IServiceProvider serviceProvider) : DelegatingHandler
 {
     protected override async Task<HttpResponseMessage> SendAsync(
@@ -27,10 +28,15 @@ public class BearerTokenHandler(
         // 1. SSR path — HttpContext is available on the initial request
         var token = accessor.HttpContext?.User.FindFirstValue("access_token");
 
-        // 2. Interactive Server path — HttpContext is null after SignalR handshake
+        // 2. Interactive Server path — HttpContext is null after SignalR handshake.
+        //    This handler lives in IHttpClientFactory's handler scope, NOT the circuit scope,
+        //    so we must resolve AuthenticationStateProvider from the *circuit's* provider —
+        //    otherwise we get a fresh anonymous instance with no access_token claim. Fall back
+        //    to the handler-scope provider only when no circuit is active.
         if (string.IsNullOrEmpty(token))
         {
-            var authProvider = serviceProvider.GetService<AuthenticationStateProvider>();
+            var provider = circuitServices.Services ?? serviceProvider;
+            var authProvider = provider.GetService<AuthenticationStateProvider>();
             if (authProvider is not null)
             {
                 var state = await authProvider.GetAuthenticationStateAsync();
