@@ -4,6 +4,7 @@ using Materia.Application.Commands.Purchasing.CancelPurchaseOrder;
 using Materia.Application.Commands.Purchasing.ConfirmPurchaseOrder;
 using Materia.Application.Commands.Purchasing.CreatePurchaseOrder;
 using Materia.Application.Commands.Purchasing.ReceivePurchaseOrder;
+using Materia.Application.Contracts.Purchasing;
 using Materia.Application.Queries.Purchasing;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,6 +21,8 @@ public class PurchaseOrdersController(
     CancelPurchaseOrderCommandHandler        cancelHandler,
     GetPurchaseOrdersQueryHandler            getAllHandler,
     GetPurchaseOrderByIdQueryHandler         getByIdHandler,
+    ScanPurchaseInvoiceQueryHandler          scanHandler,
+    IPurchaseInvoiceImageRepository          invoiceImageRepository,
     IValidator<CreatePurchaseOrderCommand>   createValidator,
     IValidator<ReceivePurchaseOrderCommand>  receiveValidator,
     IValidator<CancelPurchaseOrderCommand>   cancelValidator) : ControllerBase
@@ -43,6 +46,75 @@ public class PurchaseOrdersController(
     {
         var result = await getByIdHandler.HandleAsync(id, ct);
         return result is null ? NotFound() : Ok(result);
+    }
+
+    // ── OCR / Invoice Scan ────────────────────────────────────────────────────
+
+    [HttpPost("scan-invoice")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> ScanInvoice(IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded." });
+
+        var mediaType = ResolveMediaType(file);
+        if (mediaType is null)
+            return BadRequest(new { message = "Unsupported file type. Please upload a JPG, PNG, or PDF." });
+
+        var bytes = await ReadAllBytesAsync(file, ct);
+        var result = await scanHandler.HandleAsync(bytes, mediaType, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("{id:guid}/invoice-image")]
+    [Consumes("multipart/form-data")]
+    public async Task<IActionResult> UploadInvoiceImage(Guid id, IFormFile file, CancellationToken ct)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded." });
+
+        var mediaType = ResolveMediaType(file);
+        if (mediaType is null)
+            return BadRequest(new { message = "Unsupported file type. Please upload a JPG, PNG, or PDF." });
+
+        var bytes = await ReadAllBytesAsync(file, ct);
+        await invoiceImageRepository.SaveAsync(id, bytes, mediaType, file.FileName, CurrentUser, ct);
+        return NoContent();
+    }
+
+    [HttpGet("{id:guid}/invoice-image")]
+    public async Task<IActionResult> GetInvoiceImage(Guid id, CancellationToken ct)
+    {
+        var image = await invoiceImageRepository.GetByPurchaseOrderIdAsync(id, ct);
+        return image is null
+            ? NotFound()
+            : File(image.Content, image.ContentType, image.FileName);
+    }
+
+    // Resolve by content-type first, then fall back to the file extension
+    // (browsers/HttpClient sometimes send application/octet-stream).
+    private static string? ResolveMediaType(IFormFile file) =>
+        file.ContentType.ToLowerInvariant() switch
+        {
+            "image/jpeg"      => "image/jpeg",
+            "image/jpg"       => "image/jpeg",
+            "image/png"       => "image/png",
+            "application/pdf" => "application/pdf",
+            _ => Path.GetExtension(file.FileName).ToLowerInvariant() switch
+            {
+                ".jpg"  => "image/jpeg",
+                ".jpeg" => "image/jpeg",
+                ".png"  => "image/png",
+                ".pdf"  => "application/pdf",
+                _ => null,
+            },
+        };
+
+    private static async Task<byte[]> ReadAllBytesAsync(IFormFile file, CancellationToken ct)
+    {
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms, ct);
+        return ms.ToArray();
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────
