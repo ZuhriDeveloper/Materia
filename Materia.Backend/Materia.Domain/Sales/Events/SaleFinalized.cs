@@ -7,4 +7,6 @@ public record SaleFinalized(
     decimal  GrandTotal,
     string   ServedBy,
     bool     IsDeliveryRequired,
-    DateTime OccurredAt) : IDomainEvent;
+    DateTime OccurredAt,
+    decimal  Discount = 0m,
+    decimal  Tax      = 0m) : IDomainEvent;

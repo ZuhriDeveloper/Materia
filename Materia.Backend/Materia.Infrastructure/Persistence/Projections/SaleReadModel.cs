@@ -14,7 +14,11 @@ public class SaleReadModel
     public SaleStatus    Status            { get; set; }
     public bool          IsDeliveryRequired { get; set; }
     public decimal       Subtotal          { get; set; }
+    public decimal       Discount          { get; set; }
+    public decimal       Tax               { get; set; }
     public decimal       GrandTotal        { get; set; }
+    public decimal       AmountPaid        { get; set; }
+    public decimal       OutstandingAmount { get; set; }
     public string        CreatedBy         { get; set; } = default!;
     public string?       ServedBy          { get; set; }
     public DateTime      CreatedAt         { get; set; }

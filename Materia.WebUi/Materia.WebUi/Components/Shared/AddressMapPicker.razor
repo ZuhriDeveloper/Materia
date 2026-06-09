@@ -1,0 +1,140 @@
+@namespace Materia.WebUi.Components.Shared
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+
+<div>
+    <div class="input-group input-group-sm mb-2">
+        <span class="input-group-text"><i class="bi bi-search"></i></span>
+        <input class="form-control" placeholder="Cari lokasi (cth. nama jalan, daerah)…"
+               @bind="_query" @bind:event="oninput" @onkeyup="OnSearchKeyUp" />
+        <button class="btn btn-outline-primary" type="button"
+                @onclick="SearchAsync" disabled="@_searching">
+            @if (_searching)
+            {
+                <span class="spinner-border spinner-border-sm"></span>
+            }
+            else
+            {
+                <span>Cari</span>
+            }
+        </button>
+    </div>
+
+    <div id="@_mapId" class="border rounded"
+         style="height:@Height;width:100%;z-index:0"></div>
+
+    <div class="form-text d-flex justify-content-between align-items-center">
+        <span>
+            <i class="bi bi-hand-index-thumb me-1"></i>
+            Klik peta atau geser pin untuk menandai lokasi.
+        </span>
+        @if (HasPoint)
+        {
+            <span class="badge text-bg-light border">
+                <i class="bi bi-geo-alt me-1"></i>@Latitude!.Value.ToString("F6"), @Longitude!.Value.ToString("F6")
+            </span>
+        }
+        else
+        {
+            <span class="text-muted">Belum ditandai (opsional)</span>
+        }
+    </div>
+
+    @if (!string.IsNullOrEmpty(_searchNote))
+    {
+        <div class="form-text text-muted"><i class="bi bi-info-circle me-1"></i>@_searchNote</div>
+    }
+</div>
+
+@code {
+    [Parameter] public decimal? Latitude { get; set; }
+    [Parameter] public EventCallback<decimal?> LatitudeChanged { get; set; }
+    [Parameter] public decimal? Longitude { get; set; }
+    [Parameter] public EventCallback<decimal?> LongitudeChanged { get; set; }
+    [Parameter] public string Height { get; set; } = "260px";
+
+    private readonly string _mapId = $"map-{Guid.NewGuid():N}";
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<AddressMapPicker>? _selfRef;
+    private string   _query = "";
+    private string?  _searchNote;
+    private bool     _searching;
+    private decimal? _lastLat, _lastLng;
+
+    private bool HasPoint => Latitude.HasValue && Longitude.HasValue;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _module  = await JS.InvokeAsync<IJSObjectReference>("import", "./js/address-map.js");
+            _selfRef = DotNetObjectReference.Create(this);
+            _lastLat = Latitude;
+            _lastLng = Longitude;
+            await _module.InvokeVoidAsync(
+                "init", _mapId, (double)(Latitude ?? 0m), (double)(Longitude ?? 0m), HasPoint, _selfRef);
+        }
+        else if (_module is not null && (Latitude != _lastLat || Longitude != _lastLng))
+        {
+            // Coordinates changed from outside (e.g. switched to editing a different address)
+            // — move the pin to match. Guarded so the map→Blazor callback doesn't loop.
+            _lastLat = Latitude;
+            _lastLng = Longitude;
+            if (HasPoint)
+                await _module.InvokeVoidAsync(
+                    "setPoint", _mapId, (double)Latitude!.Value, (double)Longitude!.Value);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnPointPicked(double lat, double lng)
+    {
+        decimal? la = (decimal)lat;
+        decimal? ln = (decimal)lng;
+        _lastLat = la;
+        _lastLng = ln;
+        Latitude  = la;
+        Longitude = ln;
+        await LatitudeChanged.InvokeAsync(la);
+        await LongitudeChanged.InvokeAsync(ln);
+        StateHasChanged();
+    }
+
+    private async Task OnSearchKeyUp(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        if (_module is null || string.IsNullOrWhiteSpace(_query)) return;
+        _searching  = true;
+        _searchNote = null;
+        try
+        {
+            var found = await _module.InvokeAsync<string?>("search", _mapId, _query);
+            _searchNote = found is null
+                ? "Lokasi tidak ditemukan. Coba kata kunci lain atau klik peta langsung."
+                : found;
+        }
+        catch
+        {
+            _searchNote = "Pencarian lokasi gagal.";
+        }
+        _searching = false;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (_module is not null)
+            {
+                await _module.InvokeVoidAsync("dispose", _mapId);
+                await _module.DisposeAsync();
+            }
+        }
+        catch { /* circuit already torn down */ }
+        _selfRef?.Dispose();
+    }
+}

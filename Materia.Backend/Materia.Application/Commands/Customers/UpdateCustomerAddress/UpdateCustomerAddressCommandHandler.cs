@@ -11,12 +11,17 @@ public class UpdateCustomerAddressCommandHandler(ICustomerRepository repository)
         var customer = await repository.GetByIdAsync(CustomerId.From(command.CustomerId), ct)
             ?? throw new DomainException($"Pelanggan '{command.CustomerId}' tidak ditemukan.");
 
+        var coordinates = command.Latitude is { } lat && command.Longitude is { } lng
+            ? new Coordinates(lat, lng)
+            : null;
+
         customer.UpdateAddress(
             AddressId.From(command.AddressId),
             command.Label, command.Street, command.City,
             command.Province, command.PostalCode,
-            new Coordinates(command.Latitude, command.Longitude),
-            command.UpdatedBy);
+            coordinates,
+            command.UpdatedBy,
+            command.Subdistrict, command.District);
 
         await repository.SaveAsync(customer, ct);
     }

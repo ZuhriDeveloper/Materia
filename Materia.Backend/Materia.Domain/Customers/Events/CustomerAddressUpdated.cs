@@ -10,7 +10,11 @@ public record CustomerAddressUpdated(
     string     City,
     string     Province,
     string?    PostalCode,
-    decimal    Latitude,
-    decimal    Longitude,
+    decimal?   Latitude,
+    decimal?   Longitude,
     string     UpdatedBy,
-    DateTime   OccurredAt) : IDomainEvent;
+    DateTime   OccurredAt,
+    // Appended (with defaults) so older stored events stay deserializable.
+    string?    Subdistrict = null,   // Kelurahan / Desa
+    string?    District    = null    // Kecamatan
+    ) : IDomainEvent;

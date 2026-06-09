@@ -21,12 +21,14 @@
 {
     <MudStack AlignItems="AlignItems.Center" Spacing="4" Class="py-8">
 
-        <MudIcon Icon="@Icons.Material.Filled.CheckCircle"
-                 Color="Color.Success"
+        <MudIcon Icon="@(_receipt.IsCredit ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.CheckCircle)"
+                 Color="@(_receipt.IsCredit ? Color.Warning : Color.Success)"
                  Style="font-size:5rem" />
 
         <div class="text-center">
-            <MudText Typo="Typo.h5" Style="font-weight:700">Penjualan Berhasil!</MudText>
+            <MudText Typo="Typo.h5" Style="font-weight:700">
+                @(_receipt.IsCredit ? "Bon / Piutang Tercatat!" : "Penjualan Berhasil!")
+            </MudText>
             <MudText Typo="Typo.body1" Color="Color.Secondary" Class="mt-1">
                 <b>@_receipt.ReferenceNo</b> &nbsp;·&nbsp;
                 @_receipt.IssuedAt.ToString("dd MMM yyyy, HH:mm")
@@ -36,6 +38,27 @@
                 &nbsp;·&nbsp;
                 Grand Total: <b>Rp @_receipt.GrandTotal.ToString("N0")</b>
             </MudText>
+
+            @if (_receipt.IsCredit)
+            {
+                <MudStack Row="true" Spacing="2" Justify="Justify.Center" Class="mt-3 flex-wrap">
+                    <MudChip T="string" Color="Color.Success" Variant="Variant.Filled"
+                             Icon="@Icons.Material.Filled.Payments">
+                        Dibayar (DP): Rp @_receipt.AmountPaid.ToString("N0")
+                    </MudChip>
+                    <MudChip T="string" Color="Color.Warning" Variant="Variant.Filled"
+                             Icon="@Icons.Material.Filled.AccountBalanceWallet">
+                        Sisa Piutang: Rp @_receipt.Outstanding.ToString("N0")
+                    </MudChip>
+                </MudStack>
+            }
+            else if (_receipt.Change > 0)
+            {
+                <MudText Typo="Typo.body2" Color="Color.Secondary" Class="mt-1">
+                    Dibayar (@_receipt.PaymentMethodLabel): <b>Rp @_receipt.AmountPaid.ToString("N0")</b>
+                    &nbsp;·&nbsp; Kembali: <b>Rp @_receipt.Change.ToString("N0")</b>
+                </MudText>
+            }
         </div>
 
         <MudStack Row="true" Spacing="2" Justify="Justify.Center" Class="flex-wrap">
@@ -301,7 +324,7 @@ else
                             @foreach (var c in _customers)
                             {
                                 <MudSelectItem T="Guid?" Value="@((Guid?)c.Id)">
-                                    @c.Name — @c.Phone
+                                    @c.Name — @c.Phone@(c.OutstandingDebt > 0 ? $" · Piutang: Rp {c.OutstandingDebt:N0}" : "")
                                 </MudSelectItem>
                             }
                         }
@@ -362,17 +385,73 @@ else
                         </MudText>
                     </div>
                     <MudDivider Class="my-3" />
-                    <div class="d-flex justify-space-between align-center mb-4">
+                    <div class="d-flex justify-space-between align-center mb-3">
                         <MudText Typo="Typo.h6" Style="font-weight:700">Grand Total</MudText>
                         <MudText Style="font-size:1.4rem;font-weight:800;
                                        color:var(--mud-palette-success)">
                             Rp @GrandTotal.ToString("N0")
                         </MudText>
                     </div>
+
+                    @* ── Payment ──────────────────────────────────────────── *@
+                    <MudSelect T="PaymentMethod"
+                               Value="_paymentMethod"
+                               ValueChanged="@(m => _paymentMethod = m)"
+                               Label="Metode pembayaran"
+                               Variant="Variant.Outlined" Dense="true" Margin="Margin.Dense"
+                               Adornment="Adornment.Start"
+                               AdornmentIcon="@Icons.Material.Filled.Payments"
+                               Class="mb-2">
+                        <MudSelectItem T="PaymentMethod" Value="PaymentMethod.Cash">Tunai</MudSelectItem>
+                        <MudSelectItem T="PaymentMethod" Value="PaymentMethod.BankTransfer">Transfer Bank</MudSelectItem>
+                        <MudSelectItem T="PaymentMethod" Value="PaymentMethod.QRIS">QRIS</MudSelectItem>
+                        <MudSelectItem T="PaymentMethod" Value="PaymentMethod.Debit">Kartu Debit</MudSelectItem>
+                    </MudSelect>
+
+                    <div class="d-flex align-center justify-space-between mb-1">
+                        <div class="d-flex align-center gap-1">
+                            <MudIcon Icon="@Icons.Material.Filled.CreditScore"
+                                     Size="Size.Small" Color="Color.Secondary" />
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Penjualan kredit (Bon)</MudText>
+                        </div>
+                        <MudSwitch T="bool" Value="_isCredit" ValueChanged="OnCreditToggled"
+                                   Color="Color.Warning" Disabled="@IsWalkIn" />
+                    </div>
+                    @if (IsWalkIn)
+                    {
+                        <MudText Typo="Typo.caption" Color="Color.Secondary" Class="d-block mb-2">
+                            Pilih pelanggan terdaftar untuk penjualan dengan piutang.
+                        </MudText>
+                    }
+
+                    @if (_isCredit)
+                    {
+                        <div class="d-flex align-center justify-space-between mb-2">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Uang Muka (DP)</MudText>
+                            <MudNumericField T="decimal"
+                                             Value="_downPayment" ValueChanged="OnDownPaymentChanged"
+                                             Min="0m" Max="GrandTotal" Step="10000m" Format="N0"
+                                             Variant="Variant.Outlined" Margin="Margin.Dense"
+                                             HideSpinButtons="true" Style="width:140px" />
+                        </div>
+                        <div class="d-flex justify-space-between align-center mb-3">
+                            <MudText Typo="Typo.body2" Style="font-weight:700">Sisa Piutang</MudText>
+                            <MudText Typo="Typo.h6"
+                                     Style="font-weight:800;color:var(--mud-palette-warning)">
+                                Rp @Outstanding.ToString("N0")
+                            </MudText>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="mb-3"></div>
+                    }
+
                     <MudButton FullWidth="true"
-                               Variant="Variant.Filled" Color="Color.Success"
+                               Variant="Variant.Filled"
+                               Color="@(_isCredit ? Color.Warning : Color.Success)"
                                Size="Size.Large"
-                               StartIcon="@Icons.Material.Filled.CheckCircle"
+                               StartIcon="@(_isCredit ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.CheckCircle)"
                                OnClick="FinalizeAsync"
                                Disabled="@(_lines.Count == 0 || _processing)"
                                Style="font-size:.95rem;font-weight:700;height:48px">
@@ -381,7 +460,7 @@ else
                             <MudProgressCircular Size="Size.Small" Indeterminate="true"
                                                  Class="mr-2" Color="Color.Inherit" />
                         }
-                        Selesaikan Penjualan
+                        @(_isCredit ? "Simpan & Buat Bon" : "Selesaikan Penjualan")
                     </MudButton>
                     @if (_lines.Count > 0)
                     {
@@ -531,6 +610,30 @@ else
                 </tfoot>
             </table>
 
+            @* ─── Payment status (credit / bon) ────────── *@
+            @if (_receipt.IsCredit)
+            {
+                <table style="width:100%;border-collapse:collapse;font-size:9.5pt;
+                              border:2px solid #000;margin-bottom:5mm">
+                    <tr>
+                        <td style="padding:2mm;font-weight:700;width:60%">
+                            STATUS: BELUM LUNAS (BON)
+                        </td>
+                        <td style="padding:2mm;text-align:right">
+                            Bayar (@_receipt.PaymentMethodLabel): Rp @_receipt.AmountPaid.ToString("N0")
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:2mm;font-weight:700;border-top:1px solid #000">
+                            SISA PIUTANG
+                        </td>
+                        <td style="padding:2mm;text-align:right;font-weight:700;border-top:1px solid #000">
+                            Rp @_receipt.Outstanding.ToString("N0")
+                        </td>
+                    </tr>
+                </table>
+            }
+
             @* ─── 3-column signature matrix ────────────── *@
             <table style="width:100%;border-collapse:collapse;text-align:center;
                           font-size:9pt;margin-top:10mm">
@@ -658,6 +761,39 @@ else
                 <span>Rp @_receipt.GrandTotal.ToString("N0")</span>
             </div>
 
+            @* ─── Payment / debt ────────────────────────── *@
+            <div style="font-size:8pt;margin-bottom:2mm">
+                <div style="display:flex;justify-content:space-between">
+                    <span>Bayar (@_receipt.PaymentMethodLabel)</span>
+                    <span>@_receipt.AmountPaid.ToString("N0")</span>
+                </div>
+                @if (_receipt.Change > 0)
+                {
+                    <div style="display:flex;justify-content:space-between">
+                        <span>Kembali</span>
+                        <span>@_receipt.Change.ToString("N0")</span>
+                    </div>
+                }
+            </div>
+
+            @if (_receipt.IsCredit)
+            {
+                <div style="border:2px solid #000;padding:2mm;margin-bottom:3mm;
+                            text-align:center;font-size:9pt;font-weight:700">
+                    *** BELUM LUNAS / PIUTANG ***
+                    <div style="display:flex;justify-content:space-between;
+                                font-size:9.5pt;margin-top:2mm">
+                        <span>SISA PIUTANG</span>
+                        <span>Rp @_receipt.Outstanding.ToString("N0")</span>
+                    </div>
+                    <div style="font-weight:400;margin-top:2mm;font-size:8pt">
+                        Tanda Tangan Penerima Bon:
+                        <div style="border-bottom:1px solid #000;margin-top:5mm;
+                                    width:60%;margin-left:auto;margin-right:auto"></div>
+                    </div>
+                </div>
+            }
+
             @* ─── Delivery notice (simple receipt with delivery) ─ *@
             @if (_receipt.IsDeliveryRequired)
             {
@@ -717,8 +853,22 @@ else
     // ── Computed totals ──────────────────────────────────────────────────────
     private decimal Subtotal       => _lines.Sum(l => l.Total);
     private decimal DiscountAmount => Math.Clamp(_discount, 0m, Subtotal);
-    private decimal TaxAmount      => _taxEnabled ? Math.Round((Subtotal - DiscountAmount) * 0.11m, 0) : 0m;
+    // PPN rounding mirrors the server (MidpointRounding.AwayFromZero) so the displayed and
+    // printed Grand Total exactly match the persisted amount and the recorded debt.
+    private decimal TaxAmount      => _taxEnabled
+        ? Math.Round((Subtotal - DiscountAmount) * 0.11m, 0, MidpointRounding.AwayFromZero)
+        : 0m;
     private decimal GrandTotal     => Subtotal - DiscountAmount + TaxAmount;
+
+    // ── Payment / credit (Bon) ───────────────────────────────────────────────
+    private bool          _isCredit;
+    private decimal       _downPayment;
+    private PaymentMethod _paymentMethod = PaymentMethod.Cash;
+
+    /// Amount tendered now: full grand total for a normal sale, the DP for a credit sale.
+    private decimal AmountPaid  => _isCredit ? Math.Clamp(_downPayment, 0m, GrandTotal) : GrandTotal;
+    /// Remaining customer debt (piutang) for a credit sale.
+    private decimal Outstanding => Math.Max(0m, GrandTotal - AmountPaid);
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
@@ -854,7 +1004,15 @@ else
     private void OnCustomerChanged(Guid? id)
     {
         _customerId = id;
-        if (id is null) { _customerName = null; _isDeliveryRequired = false; return; }
+        if (id is null)
+        {
+            // Walk-in cannot buy on credit — drop back to a full-payment sale.
+            _customerName       = null;
+            _isDeliveryRequired = false;
+            _isCredit           = false;
+            _downPayment        = 0m;
+            return;
+        }
         var c = _customers?.FirstOrDefault(x => x.Id == id);
         _customerName = c?.Name;
     }
@@ -886,12 +1044,32 @@ else
         => line.UnitPrice = price < 0 ? 0 : price;
 
     private void OnDiscountChanged(decimal value)
-        => _discount = value < 0 ? 0 : value;
+    {
+        _discount = value < 0 ? 0 : value;
+        // Keep the DP within the (possibly lowered) grand total.
+        if (_downPayment > GrandTotal) _downPayment = GrandTotal;
+    }
+
+    private void OnCreditToggled(bool value)
+    {
+        _isCredit = value;
+        if (!value) _downPayment = 0m;
+    }
+
+    private void OnDownPaymentChanged(decimal value)
+        => _downPayment = Math.Clamp(value, 0m, GrandTotal);
 
     // ── Finalize ─────────────────────────────────────────────────────────────
     private async Task FinalizeAsync()
     {
         if (_lines.Count == 0 || _processing) return;
+
+        // Business rule: a credit (bon) sale requires a registered customer.
+        if (_isCredit && IsWalkIn)
+        {
+            _error = "Penjualan dengan piutang (bon) hanya untuk pelanggan terdaftar.";
+            return;
+        }
 
         _processing = true;
         _error      = null;
@@ -903,7 +1081,8 @@ else
             .ToList();
 
         var (result, error) = await SaleApi.FinalizeAsync(
-            _customerId, _customerName, items, _isDeliveryRequired);
+            _customerId, _customerName, items, _isDeliveryRequired,
+            DiscountAmount, _taxEnabled, AmountPaid, _paymentMethod);
 
         _processing = false;
         if (error is not null) { _error = error; return; }
@@ -937,7 +1116,12 @@ else
             Subtotal            : Subtotal,
             Discount            : DiscountAmount,
             Tax                 : TaxAmount,
-            GrandTotal          : GrandTotal
+            GrandTotal          : result.GrandTotal,
+            AmountPaid          : result.AmountPaid,
+            Change              : result.Change,
+            Outstanding         : result.OutstandingAmount,
+            IsCredit            : result.IsCredit,
+            PaymentMethod       : _paymentMethod
         );
 
         _saleFinalized = true;
@@ -949,6 +1133,9 @@ else
         _lines.Clear();
         _discount           = 0;
         _taxEnabled         = false;
+        _isCredit           = false;
+        _downPayment        = 0m;
+        _paymentMethod      = PaymentMethod.Cash;
         _scanMessage        = null;
         _error              = null;
         _customerId         = null;
@@ -963,6 +1150,8 @@ else
         _lines.Clear();
         _discount    = 0;
         _taxEnabled  = false;
+        _isCredit    = false;
+        _downPayment = 0m;
         _scanMessage = null;
         _error       = null;
         await FocusScanAsync();
@@ -1010,11 +1199,26 @@ else
         decimal  Subtotal,
         decimal  Discount,
         decimal  Tax,
-        decimal  GrandTotal)
+        decimal  GrandTotal,
+        decimal  AmountPaid,
+        decimal  Change,
+        decimal  Outstanding,
+        bool     IsCredit,
+        PaymentMethod PaymentMethod)
     {
         /// Surat Jalan condition: registered customer + delivery required.
         /// Walk-in buyers with delivery → simple receipt with "*** DIANTAR ***".
         public bool IsSuratJalan => IsRegisteredCustomer && IsDeliveryRequired;
+
+        public string PaymentMethodLabel => PaymentMethod switch
+        {
+            Materia.WebUi.Services.PaymentMethod.Cash         => "Tunai",
+            Materia.WebUi.Services.PaymentMethod.BankTransfer => "Transfer Bank",
+            Materia.WebUi.Services.PaymentMethod.QRIS         => "QRIS",
+            Materia.WebUi.Services.PaymentMethod.Debit        => "Kartu Debit",
+            Materia.WebUi.Services.PaymentMethod.Credit       => "Kredit",
+            _                                                 => PaymentMethod.ToString(),
+        };
     }
 
     private sealed record ReceiptLine(

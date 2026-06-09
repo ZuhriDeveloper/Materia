@@ -7,7 +7,9 @@ public record UpdateCustomerAddressCommand(
     string  Street,
     string  City,
     string  Province,
-    string? PostalCode,
-    decimal Latitude,
-    decimal Longitude,
-    string  UpdatedBy);
+    string?  PostalCode,
+    decimal? Latitude,
+    decimal? Longitude,
+    string   UpdatedBy,
+    string? Subdistrict = null,   // Kelurahan / Desa
+    string? District    = null);  // Kecamatan

@@ -103,8 +103,16 @@ else
                             <dd class="col-7">@_sale.Payment.Method</dd>
                             <dt class="col-5 text-muted fw-normal">Dibayar</dt>
                             <dd class="col-7">Rp @_sale.Payment.PaidAmount.ToString("N0")</dd>
-                            <dt class="col-5 text-muted fw-normal">Kembalian</dt>
-                            <dd class="col-7">Rp @_sale.Payment.Change.ToString("N0")</dd>
+                            @if (_sale.OutstandingAmount > 0)
+                            {
+                                <dt class="col-5 text-muted fw-normal">Sisa Piutang</dt>
+                                <dd class="col-7 fw-bold text-warning">Rp @_sale.OutstandingAmount.ToString("N0")</dd>
+                            }
+                            else
+                            {
+                                <dt class="col-5 text-muted fw-normal">Kembalian</dt>
+                                <dd class="col-7">Rp @_sale.Payment.Change.ToString("N0")</dd>
+                            }
                         </dl>
                     </div>
                 </div>
@@ -463,10 +471,20 @@ else
                         <span>Bayar</span>
                         <span>Rp @_sale.Payment.PaidAmount.ToString("N0")</span>
                     </div>
-                    <div style="display:flex;justify-content:space-between;font-weight:700">
-                        <span>Kembali</span>
-                        <span>Rp @_sale.Payment.Change.ToString("N0")</span>
-                    </div>
+                    @if (_sale.OutstandingAmount > 0)
+                    {
+                        <div style="display:flex;justify-content:space-between;font-weight:700">
+                            <span>Sisa Piutang</span>
+                            <span>Rp @_sale.OutstandingAmount.ToString("N0")</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div style="display:flex;justify-content:space-between;font-weight:700">
+                            <span>Kembali</span>
+                            <span>Rp @_sale.Payment.Change.ToString("N0")</span>
+                        </div>
+                    }
                 </div>
             }
 
@@ -543,10 +561,11 @@ else
 
     private static MarkupString StatusBadge(SaleStatus status) => status switch
     {
-        SaleStatus.Draft     => (MarkupString)"<span class='badge bg-warning text-dark'>Draft</span>",
-        SaleStatus.Confirmed => (MarkupString)"<span class='badge bg-primary'>Selesai</span>",
-        SaleStatus.Paid      => (MarkupString)"<span class='badge bg-success'>Lunas</span>",
-        SaleStatus.Cancelled => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
-        _                    => (MarkupString)"<span class='badge bg-secondary'>—</span>",
+        SaleStatus.Draft         => (MarkupString)"<span class='badge bg-warning text-dark'>Draft</span>",
+        SaleStatus.Confirmed     => (MarkupString)"<span class='badge bg-primary'>Selesai</span>",
+        SaleStatus.Paid          => (MarkupString)"<span class='badge bg-success'>Lunas</span>",
+        SaleStatus.PartiallyPaid => (MarkupString)"<span class='badge bg-warning text-dark'>Piutang (Bon)</span>",
+        SaleStatus.Cancelled     => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
+        _                        => (MarkupString)"<span class='badge bg-secondary'>—</span>",
     };
 }

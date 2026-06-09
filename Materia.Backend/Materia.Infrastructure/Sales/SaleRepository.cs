@@ -81,7 +81,11 @@ public class SaleRepository(AppDbContext context) : ISaleRepository
         projection.IsDeliveryRequired = sale.IsDeliveryRequired;
         projection.ServedBy           = sale.ServedBy;
         projection.Subtotal           = sale.Subtotal.Amount;
+        projection.Discount           = sale.Discount.Amount;
+        projection.Tax                = sale.Tax.Amount;
         projection.GrandTotal         = sale.GrandTotal.Amount;
+        projection.AmountPaid         = sale.AmountPaid.Amount;
+        projection.OutstandingAmount  = sale.OutstandingAmount.Amount;
 
         if (sale.Payment is not null)
         {

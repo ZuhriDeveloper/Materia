@@ -1,3 +1,5 @@
+using Materia.Domain.Sales;
+
 namespace Materia.Application.Commands.Sales.FinalizeSale;
 
 public record FinalizeSaleCommand(
@@ -5,7 +7,12 @@ public record FinalizeSaleCommand(
     string?                              CustomerName,
     IReadOnlyList<FinalizeSaleItemInput> Items,
     bool                                 IsDeliveryRequired,
-    string                               ServedBy);
+    string                               ServedBy,
+    decimal                              Discount      = 0m,
+    bool                                 TaxEnabled    = false,
+    // Amount tendered up front. null ⇒ treat as full payment of the grand total.
+    decimal?                             AmountPaid    = null,
+    PaymentMethod                        PaymentMethod = PaymentMethod.Cash);
 
 public record FinalizeSaleItemInput(
     Guid    ProductId,
@@ -16,4 +23,11 @@ public record FinalizeSaleItemInput(
     Guid?   VariantId = null,
     string? ColorName = null);
 
-public record FinalizeSaleResult(Guid SaleId, string ReferenceNo);
+public record FinalizeSaleResult(
+    Guid    SaleId,
+    string  ReferenceNo,
+    decimal GrandTotal,
+    decimal AmountPaid,
+    decimal Change,
+    decimal OutstandingAmount,
+    bool    IsCredit);

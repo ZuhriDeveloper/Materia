@@ -3,6 +3,7 @@ using System;
 using Materia.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Materia.Infrastructure.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260608122350_AddCreditSalesAndCustomerDebt")]
+    partial class AddCreditSalesAndCustomerDebt
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -176,9 +179,6 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<Guid>("CustomerId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("District")
-                        .HasColumnType("text");
-
                     b.Property<bool>("IsDefault")
                         .HasColumnType("boolean");
 
@@ -186,10 +186,10 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<decimal?>("Latitude")
+                    b.Property<decimal>("Latitude")
                         .HasColumnType("decimal(11,8)");
 
-                    b.Property<decimal?>("Longitude")
+                    b.Property<decimal>("Longitude")
                         .HasColumnType("decimal(11,8)");
 
                     b.Property<string>("PostalCode")
@@ -201,9 +201,6 @@ namespace Materia.Infrastructure.Migrations
 
                     b.Property<string>("Street")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Subdistrict")
                         .HasColumnType("text");
 
                     b.HasKey("Id");
