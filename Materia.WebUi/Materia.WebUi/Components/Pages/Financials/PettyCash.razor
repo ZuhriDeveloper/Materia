@@ -1,0 +1,172 @@
+@page "/petty-cash"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject PettyCashApiClient Api
+
+<PageTitle>Kas Kecil — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Kas Kecil</h4>
+    <a href="/petty-cash/new" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i> Catat Pengeluaran
+    </a>
+</div>
+
+@if (Recorded == 1)
+{
+    <div class="alert alert-success py-2">
+        <i class="bi bi-check-circle me-1"></i> Pengeluaran berhasil dicatat.
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small mb-0">Dari</label>
+                <input type="date" class="form-control form-control-sm"
+                       @bind="_from" @bind:after="ReloadFromStart" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label small mb-0">Sampai</label>
+                <input type="date" class="form-control form-control-sm"
+                       @bind="_to" @bind:after="ReloadFromStart" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label small mb-0">Kategori</label>
+                <select class="form-select form-select-sm" @bind="_categoryFilter" @bind:after="ReloadFromStart">
+                    <option value="">Semua Kategori</option>
+                    @foreach (var cat in PettyCashCategoryLabels.All)
+                    {
+                        <option value="@((int)cat)">@cat.Label()</option>
+                    }
+                </select>
+            </div>
+            @if (_from is not null || _to is not null || !string.IsNullOrEmpty(_categoryFilter))
+            {
+                <div class="col-auto">
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="ClearFilters">
+                        <i class="bi bi-x-lg me-1"></i> Reset
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@if (_data is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else if (_data.Items.Count == 0)
+{
+    <div class="alert alert-info">Belum ada pengeluaran kas kecil.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>No. Ref</th>
+                        <th>Penerima</th>
+                        <th>Alasan</th>
+                        <th>Catatan</th>
+                        <th class="text-end">Jumlah</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var e in _data.Items)
+                    {
+                        <tr>
+                            <td class="small text-muted">@e.RecordedAt.ToLocalTime().ToString("dd/MM/yy HH:mm")</td>
+                            <td class="small" style="font-family:monospace">@e.ReferenceNo</td>
+                            <td class="fw-semibold">@e.Recipient</td>
+                            <td>
+                                <span class="badge bg-light text-dark border">@e.Category.Label()</span>
+                                @if (e.Category == PettyCashCategory.Lainnya && !string.IsNullOrWhiteSpace(e.ReasonDetail))
+                                {
+                                    <span class="small text-muted ms-1">@e.ReasonDetail</span>
+                                }
+                            </td>
+                            <td class="small text-muted">@(string.IsNullOrWhiteSpace(e.Notes) ? "—" : e.Notes)</td>
+                            <td class="text-end fw-semibold">Rp @e.Amount.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="5" class="text-end fw-semibold">Total halaman ini</td>
+                        <td class="text-end fw-bold">Rp @_data.Items.Sum(i => i.Amount).ToString("N0")</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    @if (_data.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+                @((_page - 1) * _pageSize + 1)–@(Math.Min(_page * _pageSize, _data.TotalCount))
+                dari @_data.TotalCount pengeluaran
+            </small>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" disabled="@(_page <= 1)"
+                        @onclick="() => ChangePage(_page - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="btn btn-outline-secondary" disabled="@(_page >= _data.TotalPages)"
+                        @onclick="() => ChangePage(_page + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery] public int? Recorded { get; set; }
+
+    private PagedPettyCashResult? _data;
+    private DateTime?     _from;
+    private DateTime?     _to;
+    private string        _categoryFilter = string.Empty;
+    private int           _page = 1;
+    private const int     _pageSize = 20;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        PettyCashCategory? category = int.TryParse(_categoryFilter, out var c)
+            ? (PettyCashCategory)c
+            : null;
+
+        _data = await Api.GetExpensesAsync(_page, _pageSize, _from, _to, category);
+    }
+
+    private async Task ReloadFromStart()
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        _from = null;
+        _to = null;
+        _categoryFilter = string.Empty;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+}

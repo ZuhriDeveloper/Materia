@@ -110,6 +110,16 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
                 "Penjualan"))
             .ToList();
 
+        // Outflows — petty cash (kas kecil) expenses paid out of the drawer
+        var pettyCashRaw = await context.PettyCashExpenseReadModels
+            .AsNoTracking()
+            .Where(e => !e.IsVoided
+                     && e.RecordedAt >= from
+                     && e.RecordedAt <= to)
+            .OrderBy(e => e.RecordedAt)
+            .Select(e => new { e.ReasonText, e.Recipient, e.RecordedAt, e.ReferenceNo, e.Amount })
+            .ToListAsync(ct);
+
         var outflows = new List<CashFlowLineDto>();
         foreach (var po in posRaw)
         {
@@ -124,6 +134,13 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
                 totalCost,
                 "Pembelian"));
         }
+
+        outflows.AddRange(pettyCashRaw.Select(e => new CashFlowLineDto(
+            $"Kas Kecil — {e.ReasonText} ({e.Recipient})",
+            e.RecordedAt,
+            e.ReferenceNo,
+            e.Amount,
+            "Kas Kecil")));
 
         var totalInflows  = inflows.Sum(i => i.Amount);
         var totalOutflows = outflows.Sum(o => o.Amount);

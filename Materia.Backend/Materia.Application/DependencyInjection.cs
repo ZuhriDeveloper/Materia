@@ -39,6 +39,7 @@ using Materia.Application.Commands.Purchasing.UpdateSupplier;
 using Materia.Application.Queries.Inventory;
 using Materia.Application.Queries.Purchasing;
 using Materia.Application.Commands.Sales.FinalizeSale;
+using Materia.Application.Commands.Financials.RecordPettyCashExpense;
 using Materia.Application.Financials.Queries;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -125,6 +126,8 @@ public static class DependencyInjection
         // Financials
         services.AddScoped<GetProfitAndLossQueryHandler>();
         services.AddScoped<GetCashFlowQueryHandler>();
+        services.AddScoped<RecordPettyCashExpenseCommandHandler>();
+        services.AddScoped<GetPettyCashExpensesQueryHandler>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();

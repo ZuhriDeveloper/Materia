@@ -22,6 +22,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<SupplierReadModel> SupplierReadModels => Set<SupplierReadModel>();
     public DbSet<PurchaseOrderReadModel> PurchaseOrderReadModels => Set<PurchaseOrderReadModel>();
     public DbSet<PurchaseInvoiceImage> PurchaseInvoiceImages => Set<PurchaseInvoiceImage>();
+    public DbSet<PettyCashExpenseReadModel> PettyCashExpenseReadModels => Set<PettyCashExpenseReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -128,6 +129,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.Content).HasColumnType("bytea").IsRequired();
             e.Property(x => x.UploadedBy).HasMaxLength(100).IsRequired();
             e.HasIndex(x => x.PurchaseOrderId);
+        });
+
+        builder.Entity<PettyCashExpenseReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Recipient).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ReasonDetail).HasMaxLength(300);
+            e.Property(x => x.ReasonText).HasMaxLength(300).IsRequired();
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.ReferenceNo).HasMaxLength(30).IsRequired();
+            e.Property(x => x.RecordedBy).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.RecordedAt);
+            e.HasIndex(x => x.Category);
+            e.HasIndex(x => x.ReferenceNo).IsUnique();
         });
     }
 }

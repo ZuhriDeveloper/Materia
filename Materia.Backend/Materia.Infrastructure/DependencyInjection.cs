@@ -109,6 +109,9 @@ public static class DependencyInjection
 
         // Financials
         services.AddScoped<Application.Contracts.Financials.IFinancialQueryRepository, Financials.FinancialQueryRepository>();
+        services.AddScoped<Application.Contracts.Financials.IPettyCashRepository, Financials.PettyCashRepository>();
+        services.AddScoped<Application.Contracts.Financials.IPettyCashQueryRepository, Financials.PettyCashQueryRepository>();
+        services.AddScoped<Application.Contracts.Financials.IPettyCashReferenceGenerator, Financials.PettyCashReferenceNumberGenerator>();
 
         // Sales
         services.AddScoped<Application.Contracts.Sales.ISaleRepository, Sales.SaleRepository>();

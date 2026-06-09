@@ -1,5 +1,6 @@
 ﻿using Materia.Domain.Common;
 using Materia.Domain.Customers.Events;
+using Materia.Domain.Financials.Events;
 using Materia.Domain.Inventory.Events;
 using Materia.Domain.Purchasing.Events;
 using Materia.Domain.Sales.Events;
@@ -83,6 +84,9 @@ public static class EventTypeRegistry
         [nameof(SaleCancelled)]          = typeof(SaleCancelled),
         [nameof(SaleFinalized)]          = typeof(SaleFinalized),
         [nameof(DeliveryRequested)]      = typeof(DeliveryRequested),
+
+        // Petty cash (financials) events
+        [nameof(PettyCashExpenseRecorded)] = typeof(PettyCashExpenseRecorded),
     };
 
     public static Type Resolve(string eventType) =>

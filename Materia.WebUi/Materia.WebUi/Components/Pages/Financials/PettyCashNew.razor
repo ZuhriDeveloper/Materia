@@ -1,0 +1,143 @@
+@page "/petty-cash/new"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Materia.WebUi.Services
+@inject PettyCashApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Catat Pengeluaran Kas Kecil — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/petty-cash" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Catat Pengeluaran Kas Kecil</h4>
+</div>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<div class="card" style="max-width:640px">
+    <div class="card-body">
+        <EditForm Model="_form" OnValidSubmit="HandleSubmit">
+            <DataAnnotationsValidator />
+
+            <p class="text-muted small mb-3">
+                Pengeluaran di luar pembelian utama (mis. bensin, sparepart kendaraan,
+                belanja lainnya). Tercatat sebagai arus kas keluar.
+            </p>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Jumlah (Rp) <span class="text-danger">*</span></label>
+                    <InputNumber class="form-control" @bind-Value="_form.Amount"
+                                 placeholder="cth. 50000" />
+                    <ValidationMessage For="() => _form.Amount" class="small text-danger" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Penerima <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="_form.Recipient"
+                               placeholder="cth. Budi (sopir)" />
+                    <ValidationMessage For="() => _form.Recipient" class="small text-danger" />
+                </div>
+
+                <div class="col-12">
+                    <label class="form-label">Alasan <span class="text-danger">*</span></label>
+                    <select class="form-select" @bind="_form.Category" @bind:after="OnCategoryChanged">
+                        @foreach (var cat in PettyCashCategoryLabels.All)
+                        {
+                            <option value="@cat">@cat.Label()</option>
+                        }
+                    </select>
+                </div>
+
+                @if (_form.Category == PettyCashCategory.Lainnya)
+                {
+                    <div class="col-12">
+                        <label class="form-label">Sebutkan <span class="text-danger">*</span></label>
+                        <InputText class="form-control" @bind-Value="_form.ReasonDetail"
+                                   placeholder="Jelaskan pengeluaran ini" />
+                        <ValidationMessage For="() => _form.ReasonDetail" class="small text-danger" />
+                    </div>
+                }
+
+                <div class="col-12">
+                    <label class="form-label">Catatan</label>
+                    <InputTextArea class="form-control" rows="2" @bind-Value="_form.Notes"
+                                   placeholder="Opsional" />
+                    <ValidationMessage For="() => _form.Notes" class="small text-danger" />
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary" disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
+                    <i class="bi bi-check-lg me-1"></i> Simpan
+                </button>
+                <a href="/petty-cash" class="btn btn-outline-secondary">Batal</a>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@code {
+    private readonly ExpenseForm _form = new();
+    private string? _error;
+    private bool    _saving;
+
+    private void OnCategoryChanged()
+    {
+        // Drop any stray "Sebutkan" text when leaving the Lainnya template.
+        if (_form.Category != PettyCashCategory.Lainnya)
+            _form.ReasonDetail = null;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _error = null;
+
+        if (_form.Category == PettyCashCategory.Lainnya
+            && string.IsNullOrWhiteSpace(_form.ReasonDetail))
+        {
+            _error = "Sebutkan alasan untuk kategori 'Lainnya'.";
+            return;
+        }
+
+        _saving = true;
+
+        var (id, error) = await Api.RecordExpenseAsync(
+            _form.Amount,
+            _form.Recipient.Trim(),
+            _form.Category,
+            string.IsNullOrWhiteSpace(_form.ReasonDetail) ? null : _form.ReasonDetail!.Trim(),
+            string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes!.Trim());
+
+        if (error is not null) { _saving = false; _error = error; return; }
+
+        Navigation.NavigateTo("/petty-cash?recorded=1", forceLoad: true);
+    }
+
+    private sealed class ExpenseForm
+    {
+        [Range(0.01, double.MaxValue, ErrorMessage = "Jumlah harus lebih dari nol.")]
+        public decimal Amount { get; set; }
+
+        [Required(ErrorMessage = "Penerima wajib diisi.")]
+        [MaxLength(200)]
+        public string Recipient { get; set; } = string.Empty;
+
+        public PettyCashCategory Category { get; set; } = PettyCashCategory.Bensin;
+
+        [MaxLength(300)]
+        public string? ReasonDetail { get; set; }
+
+        [MaxLength(500)]
+        public string? Notes { get; set; }
+    }
+}

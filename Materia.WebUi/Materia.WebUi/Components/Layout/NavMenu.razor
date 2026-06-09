@@ -48,6 +48,24 @@
             Pelanggan
         </MudNavLink>
 
+        @* Section: Kas Kecil *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Kas Kecil
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="petty-cash" Icon="@Icons.Material.Filled.Payments">
+            Kas Kecil
+        </MudNavLink>
+
     </AuthorizeView>
 
     <AuthorizeView Roles="Admin">
