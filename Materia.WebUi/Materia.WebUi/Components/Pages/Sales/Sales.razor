@@ -21,16 +21,55 @@
 
 <div class="card mb-3">
     <div class="card-body py-2">
-        <div class="d-flex gap-2 align-items-center">
-            <select class="form-select form-select-sm" style="width:auto"
-                    @bind="_statusFilter" @bind:after="LoadAsync">
-                <option value="">Semua Status</option>
-                <option value="Draft">Draft</option>
-                <option value="Confirmed">Dikonfirmasi</option>
-                <option value="Paid">Lunas</option>
-                <option value="PartiallyPaid">Piutang (Bon)</option>
-                <option value="Cancelled">Dibatalkan</option>
-            </select>
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label form-label-sm mb-1 text-muted">No. Referensi</label>
+                <input type="text" class="form-control form-control-sm" style="width:160px"
+                       placeholder="Cari no. referensi…"
+                       @bind="_referenceNoFilter" @bind:after="ResetAndLoad" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label form-label-sm mb-1 text-muted">Pelanggan</label>
+                <input type="text" class="form-control form-control-sm" style="width:180px"
+                       placeholder="Cari pelanggan…"
+                       @bind="_customerFilter" @bind:after="ResetAndLoad" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label form-label-sm mb-1 text-muted">Tipe</label>
+                <select class="form-select form-select-sm" style="width:130px"
+                        @bind="_typeFilter" @bind:after="ResetAndLoad">
+                    <option value="">Semua Tipe</option>
+                    <option value="Pickup">Ambil</option>
+                    <option value="Delivery">Kirim</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label form-label-sm mb-1 text-muted">Status</label>
+                <select class="form-select form-select-sm" style="width:160px"
+                        @bind="_statusFilter" @bind:after="ResetAndLoad">
+                    <option value="">Semua Status</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Confirmed">Dikonfirmasi</option>
+                    <option value="Paid">Lunas</option>
+                    <option value="PartiallyPaid">Piutang (Bon)</option>
+                    <option value="Cancelled">Dibatalkan</option>
+                </select>
+            </div>
+            <div class="col-auto">
+                <label class="form-label form-label-sm mb-1 text-muted">Dari</label>
+                <input type="date" class="form-control form-control-sm" style="width:150px"
+                       @bind="_fromFilter" @bind:after="ResetAndLoad" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label form-label-sm mb-1 text-muted">Sampai</label>
+                <input type="date" class="form-control form-control-sm" style="width:150px"
+                       @bind="_toFilter" @bind:after="ResetAndLoad" />
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-outline-secondary btn-sm" @onclick="ClearFilters">
+                    <i class="bi bi-x-circle me-1"></i> Reset
+                </button>
+            </div>
         </div>
     </div>
 </div>
@@ -120,14 +159,44 @@ else
 
 @code {
     private PagedSalesDto? _sales;
-    private string _statusFilter = "";
-    private int    _page         = 1;
-    private const int _pageSize  = 20;
+    private string    _statusFilter    = "";
+    private string    _customerFilter  = "";
+    private string    _typeFilter      = "";
+    private string    _referenceNoFilter = "";
+    private DateTime? _fromFilter;
+    private DateTime? _toFilter;
+    private int       _page            = 1;
+    private const int _pageSize        = 20;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
-        => _sales = await Api.GetSalesAsync(_page, _pageSize, string.IsNullOrEmpty(_statusFilter) ? null : _statusFilter);
+        => _sales = await Api.GetSalesAsync(
+            _page, _pageSize,
+            status:       string.IsNullOrEmpty(_statusFilter)   ? null : _statusFilter,
+            customerName: string.IsNullOrEmpty(_customerFilter) ? null : _customerFilter,
+            saleType:     string.IsNullOrEmpty(_typeFilter)     ? null : _typeFilter,
+            referenceNo:  string.IsNullOrEmpty(_referenceNoFilter) ? null : _referenceNoFilter,
+            from: _fromFilter,
+            to:   _toFilter.HasValue ? _toFilter.Value.AddDays(1).AddSeconds(-1) : null);
+
+    private async Task ResetAndLoad()
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task ClearFilters()
+    {
+        _statusFilter      = "";
+        _customerFilter    = "";
+        _typeFilter        = "";
+        _referenceNoFilter = "";
+        _fromFilter        = null;
+        _toFilter          = null;
+        _page              = 1;
+        await LoadAsync();
+    }
 
     private async Task ChangePage(int page)
     {

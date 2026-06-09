@@ -11,5 +11,6 @@ public interface ISaleQueryRepository
         int page, int pageSize,
         SaleStatus? status,
         DateTime? from, DateTime? to,
+        string? customerName = null, SaleType? saleType = null, string? referenceNo = null,
         CancellationToken ct = default);
 }

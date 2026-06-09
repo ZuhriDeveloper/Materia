@@ -24,14 +24,17 @@ public class SalesController(
 
     [HttpGet]
     public async Task<IActionResult> GetAll(
-        [FromQuery] int         page     = 1,
-        [FromQuery] int         pageSize = 20,
-        [FromQuery] SaleStatus? status   = null,
-        [FromQuery] DateTime?   from     = null,
-        [FromQuery] DateTime?   to       = null,
+        [FromQuery] int         page         = 1,
+        [FromQuery] int         pageSize     = 20,
+        [FromQuery] SaleStatus? status       = null,
+        [FromQuery] DateTime?   from         = null,
+        [FromQuery] DateTime?   to           = null,
+        [FromQuery] string?     customerName = null,
+        [FromQuery] SaleType?   saleType     = null,
+        [FromQuery] string?     referenceNo  = null,
         CancellationToken ct = default)
     {
-        var result = await saleService.GetPagedAsync(page, pageSize, status, from, to, ct);
+        var result = await saleService.GetPagedAsync(page, pageSize, status, from, to, customerName, saleType, referenceNo, ct);
         return Ok(result);
     }
 

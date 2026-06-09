@@ -23,6 +23,7 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
     public async Task<PagedResult<SaleDto>> GetPagedAsync(
         int page, int pageSize,
         SaleStatus? status, DateTime? from, DateTime? to,
+        string? customerName = null, SaleType? saleType = null, string? referenceNo = null,
         CancellationToken ct = default)
     {
         var query = context.SaleReadModels
@@ -30,9 +31,12 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
             .Include(x => x.Items)
             .AsQueryable();
 
-        if (status.HasValue) query = query.Where(x => x.Status == status.Value);
-        if (from.HasValue)   query = query.Where(x => x.CreatedAt >= from.Value);
-        if (to.HasValue)     query = query.Where(x => x.CreatedAt <= to.Value);
+        if (status.HasValue)                    query = query.Where(x => x.Status == status.Value);
+        if (from.HasValue)                      query = query.Where(x => x.CreatedAt >= from.Value);
+        if (to.HasValue)                        query = query.Where(x => x.CreatedAt <= to.Value);
+        if (!string.IsNullOrEmpty(customerName)) query = query.Where(x => x.CustomerName.Contains(customerName));
+        if (saleType.HasValue)                  query = query.Where(x => x.SaleType == saleType.Value);
+        if (!string.IsNullOrEmpty(referenceNo)) query = query.Where(x => x.ReferenceNo.Contains(referenceNo));
 
         var total = await query.CountAsync(ct);
         var items = await query
