@@ -17,6 +17,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     public DbSet<StockReadModel> StockReadModels => Set<StockReadModel>();
     public DbSet<CustomerReadModel> CustomerReadModels => Set<CustomerReadModel>();
     public DbSet<CustomerAddressReadModel> CustomerAddressReadModels => Set<CustomerAddressReadModel>();
+    public DbSet<ReceivablePaymentReadModel> ReceivablePaymentReadModels => Set<ReceivablePaymentReadModel>();
     public DbSet<SaleReadModel> SaleReadModels => Set<SaleReadModel>();
     public DbSet<SaleItemReadModel> SaleItemReadModels => Set<SaleItemReadModel>();
     public DbSet<SupplierReadModel> SupplierReadModels => Set<SupplierReadModel>();
@@ -96,6 +97,20 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasIndex(x => new { x.Latitude, x.Longitude });
             e.Property(x => x.Latitude).HasColumnType("decimal(11,8)");
             e.Property(x => x.Longitude).HasColumnType("decimal(11,8)");
+        });
+
+        builder.Entity<ReceivablePaymentReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            // Idempotency: at most one payment per client key. PostgreSQL enforces this even
+            // under a concurrent race, so a duplicate submission can never over-collect.
+            e.HasIndex(x => x.IdempotencyKey).IsUnique();
+            e.HasIndex(x => x.CustomerId);
+            e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            e.Property(x => x.NewBalance).HasColumnType("decimal(18,2)");
+            e.Property(x => x.ReceivedBy).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.AllocationsJson).HasColumnType("jsonb").IsRequired();
         });
 
         builder.ApplyConfiguration(new Configurations.SaleReadModelConfiguration());

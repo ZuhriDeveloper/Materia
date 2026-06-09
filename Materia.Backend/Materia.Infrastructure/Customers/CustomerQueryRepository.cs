@@ -96,6 +96,29 @@ public class CustomerQueryRepository(AppDbContext context) : ICustomerQueryRepos
                 .AnyAsync(c => c.Phone == trimmed, ct);
     }
 
+    public async Task<PagedResult<ReceivableSummaryDto>> GetOutstandingReceivablesAsync(
+        int page, int pageSize, string? search, CancellationToken ct = default)
+    {
+        var query = context.CustomerReadModels
+            .AsNoTracking()
+            .Where(c => c.OutstandingDebt > 0);
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(c =>
+                EF.Functions.ILike(c.Name,  $"%{search}%") ||
+                EF.Functions.ILike(c.Phone, $"%{search}%"));
+
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderByDescending(c => c.OutstandingDebt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(c => new ReceivableSummaryDto(c.Id, c.Name, c.Phone, c.OutstandingDebt))
+            .ToListAsync(ct);
+
+        return new PagedResult<ReceivableSummaryDto>(items, total, page, pageSize);
+    }
+
     private static CustomerDto Map(CustomerReadModel c) => new(
         c.Id, c.Name, c.Phone, c.Email, c.IsActive, c.OutstandingDebt,
         c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt,
