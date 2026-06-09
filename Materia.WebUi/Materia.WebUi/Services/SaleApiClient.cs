@@ -6,10 +6,21 @@ public class SaleApiClient(HttpClient http)
 {
     public Task<PagedSalesDto?> GetSalesAsync(
         int page = 1, int pageSize = 20,
-        string? status = null, CancellationToken ct = default)
+        string? status = null,
+        string? customerName = null,
+        string? saleType = null,
+        string? referenceNo = null,
+        DateTime? from = null,
+        DateTime? to = null,
+        CancellationToken ct = default)
     {
         var url = $"api/sales?page={page}&pageSize={pageSize}";
-        if (!string.IsNullOrEmpty(status)) url += $"&status={status}";
+        if (!string.IsNullOrEmpty(status))       url += $"&status={status}";
+        if (!string.IsNullOrEmpty(customerName)) url += $"&customerName={Uri.EscapeDataString(customerName)}";
+        if (!string.IsNullOrEmpty(saleType))     url += $"&saleType={saleType}";
+        if (!string.IsNullOrEmpty(referenceNo))  url += $"&referenceNo={Uri.EscapeDataString(referenceNo)}";
+        if (from.HasValue) url += $"&from={from.Value:O}";
+        if (to.HasValue)   url += $"&to={to.Value:O}";
         return http.GetFromJsonAsync<PagedSalesDto>(url, ct);
     }
 

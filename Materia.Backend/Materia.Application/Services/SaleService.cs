@@ -136,8 +136,9 @@ public class SaleService(
     public Task<PagedResult<SaleDto>> GetPagedAsync(
         int page, int pageSize,
         SaleStatus? status = null, DateTime? from = null, DateTime? to = null,
+        string? customerName = null, SaleType? saleType = null, string? referenceNo = null,
         CancellationToken ct = default)
-        => saleQueryRepository.GetPagedAsync(page, pageSize, status, from, to, ct);
+        => saleQueryRepository.GetPagedAsync(page, pageSize, status, from, to, customerName, saleType, referenceNo, ct);
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
