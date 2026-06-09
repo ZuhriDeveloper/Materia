@@ -1,0 +1,150 @@
+@page "/receivables"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject ReceivableApiClient Api
+
+<PageTitle>Piutang — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Piutang Pelanggan</h4>
+</div>
+
+@if (Paid == 1)
+{
+    <div class="alert alert-success py-2">
+        <i class="bi bi-check-circle me-1"></i> Pembayaran berhasil dicatat.
+    </div>
+}
+
+<div class="card mb-3">
+    <div class="card-body py-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small mb-0">Cari Pelanggan</label>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" placeholder="Nama atau no. HP…"
+                           @bind="_search" @bind:event="oninput" @onkeydown="OnSearchKeyDown" />
+                    @if (!string.IsNullOrEmpty(_search))
+                    {
+                        <button class="btn btn-outline-secondary" type="button" @onclick="ClearSearch">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    }
+                    <button class="btn btn-outline-primary" type="button" @onclick="ReloadFromStart">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (_data is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
+}
+else if (_data.Items.Count == 0)
+{
+    <div class="alert alert-info">Tidak ada pelanggan dengan piutang.</div>
+}
+else
+{
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Pelanggan</th>
+                        <th>No. HP</th>
+                        <th class="text-end">Sisa Piutang</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var r in _data.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@r.Name</td>
+                            <td class="small text-muted">@r.Phone</td>
+                            <td class="text-end fw-semibold text-danger">Rp @r.OutstandingDebt.ToString("N0")</td>
+                            <td class="text-end">
+                                <a href="/receivables/@r.CustomerId/pay"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-cash-coin me-1"></i> Terima Pembayaran
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="2" class="text-end fw-semibold">Total piutang halaman ini</td>
+                        <td class="text-end fw-bold text-danger">Rp @_data.Items.Sum(i => i.OutstandingDebt).ToString("N0")</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    @if (_data.TotalPages > 1)
+    {
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <small class="text-muted">
+                @((_page - 1) * _pageSize + 1)–@(Math.Min(_page * _pageSize, _data.TotalCount))
+                dari @_data.TotalCount pelanggan
+            </small>
+            <div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-secondary" disabled="@(_page <= 1)"
+                        @onclick="() => ChangePage(_page - 1)">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+                <button class="btn btn-outline-secondary" disabled="@(_page >= _data.TotalPages)"
+                        @onclick="() => ChangePage(_page + 1)">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery] public int? Paid { get; set; }
+
+    private PagedReceivablesResult? _data;
+    private string _search = string.Empty;
+    private int    _page   = 1;
+    private const int _pageSize = 20;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _data = await Api.GetOutstandingAsync(_page, _pageSize,
+            string.IsNullOrWhiteSpace(_search) ? null : _search.Trim());
+    }
+
+    private async Task ReloadFromStart()
+    {
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await ReloadFromStart();
+    }
+
+    private async Task ClearSearch()
+    {
+        _search = string.Empty;
+        await ReloadFromStart();
+    }
+
+    private async Task ChangePage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+}

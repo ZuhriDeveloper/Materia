@@ -1,0 +1,253 @@
+@page "/receivables/{CustomerId:guid}/pay"
+@attribute [Authorize(Roles = "Admin,Cashier")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Materia.WebUi.Services
+@inject ReceivableApiClient ReceivableApi
+@inject CustomerApiClient CustomerApi
+@inject NavigationManager Navigation
+
+<PageTitle>Terima Pembayaran Piutang — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-4">
+    <a href="/receivables" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Terima Pembayaran / Pelunasan Piutang</h4>
+</div>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger">@_loadError</div>
+}
+else if (_customer is null)
+{
+    <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat data pelanggan…</div>
+}
+else
+{
+    @* Customer summary card *@
+    <div class="card mb-4" style="max-width:640px">
+        <div class="card-body">
+            <div class="row g-2">
+                <div class="col-6">
+                    <div class="small text-muted">Nama Pelanggan</div>
+                    <div class="fw-semibold fs-5">@_customer.Name</div>
+                </div>
+                <div class="col-6">
+                    <div class="small text-muted">No. HP</div>
+                    <div class="fw-semibold">@_customer.Phone</div>
+                </div>
+                <div class="col-12 mt-2">
+                    <div class="small text-muted">Sisa Piutang Saat Ini</div>
+                    <div class="fw-bold fs-4 text-danger">Rp @_customer.OutstandingDebt.ToString("N0")</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_successResult is not null)
+    {
+        @* Success panel shown briefly before navigation *@
+        <div class="card border-success mb-4" style="max-width:640px">
+            <div class="card-header bg-success text-white fw-semibold">
+                <i class="bi bi-check-circle me-1"></i> Pembayaran Berhasil Dicatat
+            </div>
+            <div class="card-body">
+                <p class="mb-1">
+                    <strong>Sisa Piutang Baru:</strong>
+                    <span class="text-danger fw-bold">Rp @_successResult.NewBalance.ToString("N0")</span>
+                </p>
+                <hr />
+                <p class="small text-muted mb-1 fw-semibold">Rincian Alokasi Pembayaran:</p>
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>No. Faktur</th>
+                            <th class="text-end">Dibayarkan</th>
+                            <th class="text-end">Sisa</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var alloc in _successResult.Allocations)
+                        {
+                            <tr>
+                                <td style="font-family:monospace" class="small">@alloc.ReferenceNo</td>
+                                <td class="text-end">Rp @alloc.AppliedAmount.ToString("N0")</td>
+                                <td class="text-end @(alloc.RemainingAfter == 0 ? "text-success" : "text-danger")">
+                                    Rp @alloc.RemainingAfter.ToString("N0")
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+                <div class="mt-3">
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span class="small text-muted">Mengalihkan ke halaman piutang…</span>
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+
+        <div class="card" style="max-width:640px">
+            <div class="card-body">
+                <EditForm Model="_form" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">
+                                Jumlah Pembayaran (Rp) <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <InputNumber class="form-control" @bind-Value="_form.Amount"
+                                             placeholder="cth. 500000" />
+                                <button type="button" class="btn btn-outline-secondary"
+                                        @onclick="PrefillFullAmount"
+                                        title="Bayar lunas sejumlah sisa piutang">
+                                    Bayar Lunas
+                                </button>
+                            </div>
+                            <ValidationMessage For="() => _form.Amount" class="small text-danger" />
+                            @if (_form.Amount > _customer.OutstandingDebt && _form.Amount > 0)
+                            {
+                                <div class="small text-warning mt-1">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    Jumlah melebihi sisa piutang (Rp @_customer.OutstandingDebt.ToString("N0")).
+                                </div>
+                            }
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Metode Pembayaran <span class="text-danger">*</span></label>
+                            <select class="form-select" @bind="_form.Method">
+                                @foreach (var method in PaymentMethodLabels.All)
+                                {
+                                    <option value="@method">@method.Label()</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Catatan</label>
+                            <InputTextArea class="form-control" rows="2" @bind-Value="_form.Notes"
+                                           placeholder="Opsional (maks. 500 karakter)" />
+                            <ValidationMessage For="() => _form.Notes" class="small text-danger" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@_saving">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-check-lg me-1"></i> Catat Pembayaran
+                        </button>
+                        <a href="/receivables" class="btn btn-outline-secondary">Batal</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public Guid CustomerId { get; set; }
+
+    private CustomerDto? _customer;
+    private string?      _loadError;
+    private string?      _error;
+    private bool         _saving;
+    private RecordPaymentResult? _successResult;
+
+    // Idempotency key: generated ONCE per form instance in OnInitialized.
+    // Reused on every submit/retry so a timed-out-and-retried call can't double-post.
+    // Only regenerated after a confirmed success.
+    private Guid _idempotencyKey = Guid.NewGuid();
+
+    private readonly PaymentForm _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _customer = await CustomerApi.GetCustomerByIdAsync(CustomerId);
+            if (_customer is null)
+                _loadError = "Data pelanggan tidak ditemukan.";
+        }
+        catch
+        {
+            _loadError = "Gagal memuat data pelanggan. Silakan coba lagi.";
+        }
+    }
+
+    private void PrefillFullAmount()
+    {
+        if (_customer is not null)
+            _form.Amount = _customer.OutstandingDebt;
+    }
+
+    private async Task HandleSubmit()
+    {
+        _error = null;
+
+        if (_customer is null) return;
+
+        // Client-side guard: amount must be > 0 and ≤ outstanding debt.
+        // Server is still authoritative — its error text is surfaced on rejection.
+        if (_form.Amount <= 0)
+        {
+            _error = "Jumlah pembayaran harus lebih dari nol.";
+            return;
+        }
+        if (_form.Amount > _customer.OutstandingDebt)
+        {
+            _error = $"Jumlah pembayaran tidak boleh melebihi sisa piutang (Rp {_customer.OutstandingDebt:N0}).";
+            return;
+        }
+
+        _saving = true;
+
+        var (result, error) = await ReceivableApi.RecordPaymentAsync(
+            CustomerId,
+            _form.Amount,
+            _form.Method,
+            string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes!.Trim(),
+            _idempotencyKey);
+
+        if (error is not null)
+        {
+            _saving = false;
+            _error = error;
+            return;
+        }
+
+        // Payment confirmed — show success panel then navigate.
+        _successResult = result;
+        _saving = false;
+        StateHasChanged();
+
+        // Brief pause so the user can see the allocation breakdown before redirect.
+        await Task.Delay(2500);
+        Navigation.NavigateTo("/receivables?paid=1", forceLoad: true);
+    }
+
+    private sealed class PaymentForm
+    {
+        [Range(0.01, double.MaxValue, ErrorMessage = "Jumlah pembayaran harus lebih dari nol.")]
+        public decimal Amount { get; set; }
+
+        public PaymentMethod Method { get; set; } = PaymentMethod.Cash;
+
+        [MaxLength(500, ErrorMessage = "Catatan maksimal 500 karakter.")]
+        public string? Notes { get; set; }
+    }
+}

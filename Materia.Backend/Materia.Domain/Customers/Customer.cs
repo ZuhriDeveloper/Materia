@@ -1,11 +1,13 @@
 using Materia.Domain.Common;
 using Materia.Domain.Customers.Events;
+using Materia.Domain.Sales;
 
 namespace Materia.Domain.Customers;
 
 public sealed class Customer : AggregateRoot<CustomerId>
 {
-    private readonly List<CustomerAddress> _addresses = [];
+    private readonly List<CustomerAddress> _addresses      = [];
+    private readonly List<ReceivableLine>  _openReceivables = [];
 
     public string      Name     { get; private set; } = default!;
     public PhoneNumber Phone    { get; private set; } = default!;
@@ -14,6 +16,16 @@ public sealed class Customer : AggregateRoot<CustomerId>
 
     /// <summary>Total unpaid balance owed by this customer across all credit (bon) sales.</summary>
     public decimal     OutstandingDebt { get; private set; }
+
+    /// <summary>
+    /// Open (or partially-paid) receivable lines, oldest first.
+    /// Rebuilt by replaying CustomerDebtIncurred and ReceivablePaymentRecorded events.
+    /// </summary>
+    public IReadOnlyList<ReceivableLine> OpenReceivables
+        => _openReceivables.Where(l => l.RemainingAmount > 0)
+                           .OrderBy(l => l.IncurredAt)
+                           .ToList()
+                           .AsReadOnly();
 
     public IReadOnlyList<CustomerAddress> Addresses => _addresses.AsReadOnly();
 
@@ -79,6 +91,68 @@ public sealed class Customer : AggregateRoot<CustomerId>
             string.IsNullOrWhiteSpace(referenceNo) ? string.Empty : referenceNo.Trim(),
             amount, OutstandingDebt + amount,
             incurredBy, DateTime.UtcNow));
+    }
+
+    /// <summary>
+    /// Records a cash collection (pelunasan piutang) against this customer's open receivables.
+    /// FIFO allocation (oldest invoice first) is computed at call time and baked into the event
+    /// so that replaying events is always deterministic.
+    ///
+    /// NOTE: repayment is intentionally allowed even when the customer is inactive.
+    /// Once a credit sale is made, the debt is real regardless of account status;
+    /// blocking repayment would strand the outstanding balance with no way to clear it.
+    /// Contrast with IncurDebt, which DOES block inactive customers.
+    ///
+    /// <paramref name="idempotencyKey"/> is the client-supplied de-duplication token, baked
+    /// into the event so the payment projection can reject duplicate submissions. The domain
+    /// does not enforce idempotency itself (it holds no key history); enforcement lives in the
+    /// projection's unique index. When omitted, a fresh key is generated so internal callers
+    /// still produce a unique, non-empty value.
+    /// </summary>
+    public Guid RecordRepayment(
+        decimal amount, PaymentMethod method, string? notes, string receivedBy,
+        Guid? idempotencyKey = null)
+    {
+        if (amount <= 0)
+            throw new DomainException("Jumlah pembayaran harus lebih dari nol.");
+        if (OutstandingDebt <= 0)
+            throw new DomainException("Pelanggan tidak memiliki sisa piutang.");
+        if (amount > OutstandingDebt)
+            throw new DomainException("Jumlah pembayaran melebihi sisa piutang.");
+
+        // FIFO allocation — oldest open invoices settled first
+        var ordered   = OpenReceivables; // already ordered by IncurredAt ascending
+        var remaining = amount;
+        var allocations = new List<ReceivableAllocation>();
+
+        foreach (var line in ordered)
+        {
+            if (remaining <= 0) break;
+
+            var applied       = Math.Min(remaining, line.RemainingAmount);
+            var remainingAfter = line.RemainingAmount - applied;
+            allocations.Add(new ReceivableAllocation(
+                line.SaleId, line.ReferenceNo, applied, remainingAfter));
+            remaining -= applied;
+        }
+
+        // Invariant: OutstandingDebt equals the sum of open-line remainders, and the guard
+        // above ensures amount <= OutstandingDebt, so the payment must allocate fully. Fail
+        // loudly if a future path ever desyncs them rather than silently swallowing cash.
+        if (remaining != 0)
+            throw new DomainException(
+                "Pembayaran tidak dapat dialokasikan sepenuhnya ke piutang yang terbuka.");
+
+        var paymentId = Guid.NewGuid();
+        var key = idempotencyKey is { } k && k != Guid.Empty ? k : Guid.NewGuid();
+        var trimmedNotes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim();
+        Raise(new ReceivablePaymentRecorded(
+            Id, paymentId, key, amount,
+            OutstandingDebt - amount,
+            allocations.AsReadOnly(),
+            method, trimmedNotes, receivedBy, DateTime.UtcNow));
+
+        return paymentId;
     }
 
     public void Deactivate(string deactivatedBy)
@@ -194,6 +268,23 @@ public sealed class Customer : AggregateRoot<CustomerId>
 
             case CustomerDebtIncurred e:
                 OutstandingDebt = e.NewBalance;
+                // Build the open-receivable line so FIFO allocation has the full invoice list.
+                // Backward-compatible: existing stored events replay correctly since all
+                // required fields (SaleId, ReferenceNo, Amount, OccurredAt) are already present.
+                _openReceivables.Add(new ReceivableLine(
+                    e.SaleId, e.ReferenceNo,
+                    originalAmount:  e.Amount,
+                    remainingAmount: e.Amount,
+                    incurredAt:      e.OccurredAt));
+                break;
+
+            case ReceivablePaymentRecorded e:
+                OutstandingDebt = e.NewBalance;
+                foreach (var alloc in e.Allocations)
+                {
+                    var line = _openReceivables.FirstOrDefault(l => l.SaleId == alloc.SaleId);
+                    line?.ApplyPayment(alloc.AppliedAmount);
+                }
                 break;
 
             case CustomerDeactivated:

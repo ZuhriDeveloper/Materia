@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Materia.Application.Contracts.Customers;
 using Materia.Domain.Customers;
 using Materia.Domain.Customers.Events;
@@ -5,6 +6,7 @@ using Materia.Infrastructure.Persistence;
 using Materia.Infrastructure.Persistence.EventStore;
 using Materia.Infrastructure.Persistence.Projections;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Materia.Infrastructure.Customers;
 
@@ -46,9 +48,45 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
         }
 
         await UpdateProjectionAsync(customer, newEvents, ct);
-        await context.SaveChangesAsync(ct);
+
+        // Translate a duplicate-idempotency-key collision (a concurrent payment with the same
+        // client key committed first) into an application-level signal the handler can replay,
+        // without leaking the persistence technology into the Application layer.
+        var paymentKey = newEvents.OfType<ReceivablePaymentRecorded>()
+            .Select(e => (Guid?)e.IdempotencyKey)
+            .FirstOrDefault();
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex)
+            when (paymentKey is not null && IsUniqueViolation(ex, "IdempotencyKey"))
+        {
+            throw new DuplicateReceivablePaymentException(paymentKey.Value);
+        }
+
         customer.ClearDomainEvents();
     }
+
+    public async Task<StoredReceivablePayment?> FindReceivablePaymentByKeyAsync(
+        Guid idempotencyKey, CancellationToken ct = default)
+    {
+        var row = await context.ReceivablePaymentReadModels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.IdempotencyKey == idempotencyKey, ct);
+
+        if (row is null) return null;
+
+        var allocations =
+            JsonSerializer.Deserialize<List<StoredReceivableAllocation>>(row.AllocationsJson)
+            ?? [];
+
+        return new StoredReceivablePayment(row.Id, row.NewBalance, allocations);
+    }
+
+    private static bool IsUniqueViolation(DbUpdateException ex, string constraintFragment) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg &&
+        (pg.ConstraintName?.Contains(constraintFragment, StringComparison.OrdinalIgnoreCase) ?? false);
 
     private async Task UpdateProjectionAsync(
         Customer customer,
@@ -89,6 +127,7 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
                 CustomerAddressRemoved e        => e.UpdatedBy,
                 CustomerDefaultAddressChanged e => e.UpdatedBy,
                 CustomerDebtIncurred e          => e.IncurredBy,
+                ReceivablePaymentRecorded e     => e.ReceivedBy,
                 _                               => projection.UpdatedBy,
             };
             projection.UpdatedAt = newEvents.Last().OccurredAt;
@@ -98,6 +137,27 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
         // Never Clear() + re-add: EF Core would try to DELETE and INSERT the same PK
         // in one SaveChanges when an address is updated, causing a concurrency exception.
         MergeAddresses(projection, customer);
+
+        // Append a payment-history row per collection. The unique index on IdempotencyKey
+        // makes this insert the idempotency enforcement point.
+        foreach (var pay in newEvents.OfType<ReceivablePaymentRecorded>())
+        {
+            context.ReceivablePaymentReadModels.Add(new ReceivablePaymentReadModel
+            {
+                Id              = pay.PaymentId,
+                IdempotencyKey  = pay.IdempotencyKey,
+                CustomerId      = customer.Id.Value,
+                Amount          = pay.Amount,
+                NewBalance      = pay.NewBalance,
+                Method          = pay.Method,
+                Notes           = pay.Notes,
+                ReceivedBy      = pay.ReceivedBy,
+                RecordedAt      = pay.OccurredAt,
+                AllocationsJson = JsonSerializer.Serialize(
+                    pay.Allocations.Select(a => new StoredReceivableAllocation(
+                        a.SaleId, a.ReferenceNo, a.AppliedAmount, a.RemainingAfter))),
+            });
+        }
     }
 
     private void MergeAddresses(CustomerReadModel projection, Customer customer)
