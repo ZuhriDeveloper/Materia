@@ -17,6 +17,7 @@ public record SaleItemDto(
 public record SalePaymentDto(
     decimal       PaidAmount,
     decimal       Change,
+    decimal       Outstanding,
     PaymentMethod Method,
     DateTime      PaidAt);
 
@@ -31,7 +32,11 @@ public record SaleDto(
     SaleStatus      Status,
     bool            IsDeliveryRequired,
     decimal         Subtotal,
+    decimal         Discount,
+    decimal         Tax,
     decimal         GrandTotal,
+    decimal         AmountPaid,
+    decimal         OutstandingAmount,
     string          CreatedBy,
     string?         ServedBy,
     DateTime        CreatedAt,

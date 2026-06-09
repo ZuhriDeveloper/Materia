@@ -50,10 +50,13 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
         s.CustomerAddressId, s.DeliveryAddress,
         s.SaleType, s.Status,
         s.IsDeliveryRequired,
-        s.Subtotal, s.GrandTotal,
+        s.Subtotal, s.Discount, s.Tax, s.GrandTotal,
+        s.AmountPaid, s.OutstandingAmount,
         s.CreatedBy, s.ServedBy, s.CreatedAt,
         s.PaidAmount.HasValue
-            ? new SalePaymentDto(s.PaidAmount.Value, s.Change!.Value, s.PaymentMethod!.Value, s.PaidAt!.Value)
+            ? new SalePaymentDto(
+                s.PaidAmount.Value, s.Change!.Value, s.OutstandingAmount,
+                s.PaymentMethod!.Value, s.PaidAt!.Value)
             : null,
         s.Items.Select(i => new SaleItemDto(
             i.Id, i.ProductId, i.ProductName,

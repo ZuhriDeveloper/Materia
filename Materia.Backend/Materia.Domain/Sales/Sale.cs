@@ -5,6 +5,9 @@ namespace Materia.Domain.Sales;
 
 public sealed class Sale : AggregateRoot<SaleId>
 {
+    /// <summary>PPN (VAT) rate applied when tax is enabled on finalization.</summary>
+    public const decimal TaxRate = 0.11m;
+
     private readonly List<SaleItem> _items = [];
 
     public string       ReferenceNo       { get; private set; } = default!;
@@ -18,11 +21,17 @@ public sealed class Sale : AggregateRoot<SaleId>
     public string       CreatedBy         { get; private set; } = default!;
     public string?      ServedBy          { get; private set; }
     public bool         IsDeliveryRequired { get; private set; }
+    public Money        Discount          { get; private set; } = Money.Zero;
+    public Money        Tax               { get; private set; } = Money.Zero;
+    public Money        AmountPaid        { get; private set; } = Money.Zero;
 
     public IReadOnlyList<SaleItem> Items => _items.AsReadOnly();
 
     public Money Subtotal   => new(_items.Sum(i => i.Subtotal.Amount));
-    public Money GrandTotal => Subtotal;
+    public Money GrandTotal => new(Math.Max(0m, Subtotal.Amount - Discount.Amount + Tax.Amount));
+
+    /// <summary>Remaining customer debt (piutang) after the recorded settlement.</summary>
+    public Money OutstandingAmount => new(Math.Max(0m, GrandTotal.Amount - AmountPaid.Amount));
 
     private Sale() { }
 
@@ -137,16 +146,58 @@ public sealed class Sale : AggregateRoot<SaleId>
     /// Finalizes a consumer sale in a single step: locks the sale, records the serving
     /// staff, and emits the event the application layer uses to decrement inventory.
     /// </summary>
-    public void Finalize(string servedBy)
+    public void Finalize(string servedBy, decimal discount = 0m, bool taxEnabled = false)
     {
         EnsureDraft();
         if (string.IsNullOrWhiteSpace(servedBy))
             throw new DomainException("Staf yang melayani (ServedBy) tidak boleh kosong.");
         if (_items.Count == 0)
             throw new DomainException("Tidak dapat menyelesaikan penjualan tanpa item.");
+        if (discount < 0)
+            throw new DomainException("Diskon tidak boleh negatif.");
+
+        var subtotal        = Subtotal.Amount;
+        var clampedDiscount = Math.Min(discount, subtotal);
+        var taxable         = subtotal - clampedDiscount;
+        var tax             = taxEnabled
+            ? Math.Round(taxable * TaxRate, 0, MidpointRounding.AwayFromZero)
+            : 0m;
+        var grandTotal      = taxable + tax;
 
         Raise(new SaleFinalized(
-            Id, GrandTotal.Amount, servedBy.Trim(), IsDeliveryRequired, DateTime.UtcNow));
+            Id, grandTotal, servedBy.Trim(), IsDeliveryRequired, DateTime.UtcNow,
+            clampedDiscount, tax));
+    }
+
+    /// <summary>
+    /// Records the customer's payment against a finalized sale. A full payment settles the
+    /// sale (<see cref="SaleStatus.Paid"/>); a partial payment (down payment / DP) leaves an
+    /// outstanding balance (<see cref="SaleStatus.PartiallyPaid"/>) — a credit sale (piutang).
+    /// </summary>
+    public void RecordSettlement(decimal amountPaid, PaymentMethod method, string settledBy)
+    {
+        if (Status is SaleStatus.Paid or SaleStatus.PartiallyPaid)
+            return;  // already settled — idempotent
+
+        if (Status != SaleStatus.Confirmed)
+            throw new DomainException("Penjualan harus difinalisasi sebelum pembayaran dicatat.");
+        if (string.IsNullOrWhiteSpace(settledBy))
+            throw new DomainException("Staf yang mencatat pembayaran tidak boleh kosong.");
+        if (amountPaid < 0)
+            throw new DomainException("Jumlah pembayaran tidak boleh negatif.");
+
+        var payment  = SalePayment.Settle(new Money(amountPaid), GrandTotal, method, DateTime.UtcNow);
+        var isCredit = payment.Outstanding.Amount > 0;
+
+        // BUSINESS RULE: a sale that leaves an outstanding balance (piutang / bon) is only
+        // allowed for a registered customer — never an anonymous "Umum" walk-in.
+        if (isCredit && CustomerId is null)
+            throw new DomainException(
+                "Penjualan dengan piutang (bon) hanya tersedia untuk pelanggan terdaftar.");
+
+        Raise(new SaleSettled(
+            Id, payment.PaidAmount.Amount, payment.Change.Amount, payment.Outstanding.Amount,
+            method, isCredit, payment.PaidAt, DateTime.UtcNow));
     }
 
     public void Pay(decimal paidAmount, PaymentMethod method, string paidBy)
@@ -231,11 +282,21 @@ public sealed class Sale : AggregateRoot<SaleId>
                 Status             = SaleStatus.Confirmed;
                 ServedBy           = e.ServedBy;
                 IsDeliveryRequired = e.IsDeliveryRequired;
+                Discount           = new Money(e.Discount);
+                Tax                = new Money(e.Tax);
                 break;
 
             case SalePaid e:
-                Status  = SaleStatus.Paid;
-                Payment = new SalePayment(e.PaidAmount, e.Change, e.PaymentMethod, e.PaidAt);
+                Status     = SaleStatus.Paid;
+                AmountPaid = new Money(e.PaidAmount);
+                Payment    = new SalePayment(e.PaidAmount, e.Change, 0m, e.PaymentMethod, e.PaidAt);
+                break;
+
+            case SaleSettled e:
+                Status     = e.OutstandingAmount > 0 ? SaleStatus.PartiallyPaid : SaleStatus.Paid;
+                AmountPaid = new Money(e.AmountPaid);
+                Payment    = new SalePayment(
+                    e.AmountPaid, e.Change, e.OutstandingAmount, e.Method, e.PaidAt);
                 break;
 
             case SaleCancelled:

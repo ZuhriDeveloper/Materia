@@ -61,6 +61,7 @@ public class CustomerQueryRepository(AppDbContext context) : ICustomerQueryRepos
         var rows = await context.CustomerAddressReadModels
             .AsNoTracking()
             .Where(a =>
+                a.Latitude.HasValue && a.Longitude.HasValue &&
                 a.Latitude  >= latitude  - latDelta &&
                 a.Latitude  <= latitude  + latDelta &&
                 a.Longitude >= longitude - lonDelta &&
@@ -78,8 +79,8 @@ public class CustomerQueryRepository(AppDbContext context) : ICustomerQueryRepos
             x.Address.Id,
             x.Address.Label,
             $"{x.Address.Street}, {x.Address.City}, {x.Address.Province}",
-            x.Address.Latitude,
-            x.Address.Longitude,
+            x.Address.Latitude!.Value,
+            x.Address.Longitude!.Value,
             0d   // DistanceKm filled in by GetNearbyCustomersQueryHandler
         )).ToList();
     }
@@ -96,13 +97,14 @@ public class CustomerQueryRepository(AppDbContext context) : ICustomerQueryRepos
     }
 
     private static CustomerDto Map(CustomerReadModel c) => new(
-        c.Id, c.Name, c.Phone, c.Email, c.IsActive,
+        c.Id, c.Name, c.Phone, c.Email, c.IsActive, c.OutstandingDebt,
         c.CreatedBy, c.CreatedAt, c.UpdatedBy, c.UpdatedAt,
         c.Addresses
             .OrderByDescending(a => a.IsDefault)
             .ThenBy(a => a.Label)
             .Select(a => new CustomerAddressDto(
                 a.Id, a.Label, a.Street, a.City, a.Province,
-                a.PostalCode, a.Latitude, a.Longitude, a.IsDefault))
+                a.PostalCode, a.Latitude, a.Longitude, a.IsDefault,
+                a.Subdistrict, a.District))
             .ToList());
 }

@@ -72,10 +72,16 @@ public class SaleApiClient(HttpClient http)
     public async Task<(FinalizeSaleResult? Result, string? Error)> FinalizeAsync(
         Guid? customerId, string? customerName,
         IReadOnlyList<FinalizeSaleItemInput> items, bool isDeliveryRequired,
+        decimal discount = 0m, bool taxEnabled = false,
+        decimal? amountPaid = null, PaymentMethod paymentMethod = PaymentMethod.Cash,
         CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/sales/finalize",
-            new { customerId, customerName, items, isDeliveryRequired }, ct);
+            new
+            {
+                customerId, customerName, items, isDeliveryRequired,
+                discount, taxEnabled, amountPaid, paymentMethod,
+            }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
         var result = await response.Content.ReadFromJsonAsync<FinalizeSaleResult>(cancellationToken: ct);

@@ -28,6 +28,7 @@
                 <option value="Draft">Draft</option>
                 <option value="Confirmed">Dikonfirmasi</option>
                 <option value="Paid">Lunas</option>
+                <option value="PartiallyPaid">Piutang (Bon)</option>
                 <option value="Cancelled">Dibatalkan</option>
             </select>
         </div>
@@ -136,10 +137,11 @@ else
 
     private static MarkupString StatusBadge(SaleStatus status) => status switch
     {
-        SaleStatus.Draft     => (MarkupString)"<span class='badge bg-warning text-dark'>Draft</span>",
-        SaleStatus.Confirmed => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
-        SaleStatus.Paid      => (MarkupString)"<span class='badge bg-success'>Lunas</span>",
-        SaleStatus.Cancelled => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
-        _                    => (MarkupString)"<span class='badge bg-secondary'>—</span>",
+        SaleStatus.Draft         => (MarkupString)"<span class='badge bg-warning text-dark'>Draft</span>",
+        SaleStatus.Confirmed     => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
+        SaleStatus.Paid          => (MarkupString)"<span class='badge bg-success'>Lunas</span>",
+        SaleStatus.PartiallyPaid => (MarkupString)"<span class='badge bg-warning text-dark'>Piutang (Bon)</span>",
+        SaleStatus.Cancelled     => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
+        _                        => (MarkupString)"<span class='badge bg-secondary'>—</span>",
     };
 }

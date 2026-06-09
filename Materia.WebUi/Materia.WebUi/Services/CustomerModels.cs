@@ -6,10 +6,12 @@ public record CustomerAddressDto(
     string  Street,
     string  City,
     string  Province,
-    string? PostalCode,
-    decimal Latitude,
-    decimal Longitude,
-    bool    IsDefault);
+    string?  PostalCode,
+    decimal? Latitude,
+    decimal? Longitude,
+    bool     IsDefault,
+    string?  Subdistrict = null,   // Kelurahan / Desa
+    string?  District    = null);  // Kecamatan
 
 public record CustomerDto(
     Guid     Id,
@@ -17,6 +19,7 @@ public record CustomerDto(
     string   Phone,
     string?  Email,
     bool     IsActive,
+    decimal  OutstandingDebt,
     string   CreatedBy,
     DateTime CreatedAt,
     string?  UpdatedBy,

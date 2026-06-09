@@ -57,11 +57,12 @@ public class CustomerApiClient(HttpClient http)
 
     public async Task<(Guid? AddressId, string? Error)> AddAddressAsync(
         Guid customerId, string label, string street, string city,
-        string province, string? postalCode, decimal latitude, decimal longitude,
+        string province, string? postalCode, decimal? latitude, decimal? longitude,
+        string? subdistrict = null, string? district = null,
         CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync($"api/customers/{customerId}/addresses",
-            new { label, street, city, province, postalCode, latitude, longitude }, ct);
+            new { label, street, city, province, postalCode, latitude, longitude, subdistrict, district }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
         var result = await response.Content.ReadFromJsonAsync<AddressIdResponse>(cancellationToken: ct);
@@ -71,12 +72,13 @@ public class CustomerApiClient(HttpClient http)
     public async Task<string?> UpdateAddressAsync(
         Guid customerId, Guid addressId,
         string label, string street, string city,
-        string province, string? postalCode, decimal latitude, decimal longitude,
+        string province, string? postalCode, decimal? latitude, decimal? longitude,
+        string? subdistrict = null, string? district = null,
         CancellationToken ct = default)
     {
         var response = await http.PutAsJsonAsync(
             $"api/customers/{customerId}/addresses/{addressId}",
-            new { label, street, city, province, postalCode, latitude, longitude }, ct);
+            new { label, street, city, province, postalCode, latitude, longitude, subdistrict, district }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

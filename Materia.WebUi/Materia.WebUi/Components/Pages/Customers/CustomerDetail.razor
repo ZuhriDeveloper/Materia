@@ -126,16 +126,25 @@ else
                                         }
                                         <div class="small text-muted mt-1">
                                             @addr.Street<br />
-                                            @addr.City, @addr.Province @addr.PostalCode
+                                            @FormatArea(addr) @addr.PostalCode
                                         </div>
-                                        <div class="small text-muted mt-1">
-                                            <i class="bi bi-geo-alt me-1"></i>
-                                            @addr.Latitude.ToString("F6"), @addr.Longitude.ToString("F6")
-                                            <a href="https://www.google.com/maps?q=@addr.Latitude,@addr.Longitude"
-                                               target="_blank" class="ms-1 small">
-                                                <i class="bi bi-box-arrow-up-right"></i> Maps
-                                            </a>
-                                        </div>
+                                        @if (addr.Latitude.HasValue && addr.Longitude.HasValue)
+                                        {
+                                            <div class="small text-muted mt-1">
+                                                <i class="bi bi-geo-alt me-1"></i>
+                                                @addr.Latitude.Value.ToString("F6"), @addr.Longitude.Value.ToString("F6")
+                                                <a href="https://www.google.com/maps?q=@addr.Latitude.Value,@addr.Longitude.Value"
+                                                   target="_blank" class="ms-1 small">
+                                                    <i class="bi bi-box-arrow-up-right"></i> Maps
+                                                </a>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <div class="small text-muted mt-1">
+                                                <i class="bi bi-geo-alt me-1"></i> Lokasi belum ditandai
+                                            </div>
+                                        }
                                     </div>
                                     <div class="d-flex gap-1 flex-shrink-0 ms-2">
                                         @if (!addr.IsDefault)
@@ -180,43 +189,43 @@ else
                                 <div class="col-md-6">
                                     <label class="form-label small">Kode Pos</label>
                                     <InputText class="form-control form-control-sm"
-                                               @bind-Value="_addrForm.PostalCode" placeholder="cth. 12345" />
+                                               @bind-Value="_addrForm.PostalCode" placeholder="cth. 40123" />
                                 </div>
                                 <div class="col-12">
                                     <label class="form-label small">Jalan <span class="text-danger">*</span></label>
                                     <InputText class="form-control form-control-sm"
-                                               @bind-Value="_addrForm.Street" placeholder="Jl. Merdeka No. 1" />
+                                               @bind-Value="_addrForm.Street" placeholder="Jl. Merdeka No. 1, RT 01/RW 02" />
                                     <ValidationMessage For="() => _addrForm.Street" class="small text-danger" />
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label small">Kota <span class="text-danger">*</span></label>
+                                    <label class="form-label small">Kelurahan / Desa</label>
                                     <InputText class="form-control form-control-sm"
-                                               @bind-Value="_addrForm.City" placeholder="Jakarta" />
+                                               @bind-Value="_addrForm.Subdistrict" placeholder="cth. Cibadak" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Kecamatan</label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.District" placeholder="cth. Astanaanyar" />
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label small">Kota / Kabupaten <span class="text-danger">*</span></label>
+                                    <InputText class="form-control form-control-sm"
+                                               @bind-Value="_addrForm.City" placeholder="Bandung" />
                                     <ValidationMessage For="() => _addrForm.City" class="small text-danger" />
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label small">Provinsi <span class="text-danger">*</span></label>
                                     <InputText class="form-control form-control-sm"
-                                               @bind-Value="_addrForm.Province" placeholder="DKI Jakarta" />
+                                               @bind-Value="_addrForm.Province" placeholder="Jawa Barat" />
                                     <ValidationMessage For="() => _addrForm.Province" class="small text-danger" />
                                 </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small">Latitude <span class="text-danger">*</span></label>
-                                    <InputNumber class="form-control form-control-sm"
-                                                 @bind-Value="_addrForm.Latitude" />
-                                    <ValidationMessage For="() => _addrForm.Latitude" class="small text-danger" />
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label small">Longitude <span class="text-danger">*</span></label>
-                                    <InputNumber class="form-control form-control-sm"
-                                                 @bind-Value="_addrForm.Longitude" />
-                                    <ValidationMessage For="() => _addrForm.Longitude" class="small text-danger" />
-                                </div>
-                                <div class="col-12">
-                                    <small class="text-muted">
-                                        <i class="bi bi-info-circle me-1"></i>
-                                        Koordinat dari Google Maps: klik kanan pada peta → salin koordinat.
-                                    </small>
+                                <div class="col-12 mt-2">
+                                    <label class="form-label small">
+                                        Titik Lokasi <span class="text-muted">(untuk pengiriman)</span>
+                                    </label>
+                                    <AddressMapPicker @key="_editingAddressId"
+                                                      @bind-Latitude="_addrForm.Latitude"
+                                                      @bind-Longitude="_addrForm.Longitude" />
                                 </div>
                             </div>
                             <div class="d-flex gap-2 mt-3">
@@ -255,6 +264,12 @@ else
 
     protected override async Task OnInitializedAsync()
     {
+        var query = QueryHelpers.ParseQuery(Navigation.ToAbsoluteUri(Navigation.Uri).Query);
+        if (query.ContainsKey("addrError"))
+            _error = "Pelanggan dibuat, tetapi alamat gagal disimpan. Silakan tambahkan alamat di bawah.";
+        else if (query.ContainsKey("created"))
+            _notice = "Pelanggan berhasil dibuat.";
+
         await LoadAsync();
         if (_customer is not null)
         {
@@ -306,14 +321,16 @@ else
                 Id, _editingAddressId.Value,
                 _addrForm.Label, _addrForm.Street, _addrForm.City,
                 _addrForm.Province, _addrForm.PostalCode,
-                _addrForm.Latitude, _addrForm.Longitude);
+                _addrForm.Latitude, _addrForm.Longitude,
+                _addrForm.Subdistrict, _addrForm.District);
         }
         else
         {
             var (_, err) = await Api.AddAddressAsync(
                 Id, _addrForm.Label, _addrForm.Street, _addrForm.City,
                 _addrForm.Province, _addrForm.PostalCode,
-                _addrForm.Latitude, _addrForm.Longitude);
+                _addrForm.Latitude, _addrForm.Longitude,
+                _addrForm.Subdistrict, _addrForm.District);
             error = err;
         }
 
@@ -327,16 +344,23 @@ else
 
     private void StartEditAddress(CustomerAddressDto addr)
     {
-        _editingAddressId   = addr.Id;
-        _addrForm.Label     = addr.Label;
-        _addrForm.Street    = addr.Street;
-        _addrForm.City      = addr.City;
-        _addrForm.Province  = addr.Province;
+        _editingAddressId    = addr.Id;
+        _addrForm.Label      = addr.Label;
+        _addrForm.Street     = addr.Street;
+        _addrForm.Subdistrict = addr.Subdistrict;
+        _addrForm.District   = addr.District;
+        _addrForm.City       = addr.City;
+        _addrForm.Province   = addr.Province;
         _addrForm.PostalCode = addr.PostalCode;
-        _addrForm.Latitude  = addr.Latitude;
-        _addrForm.Longitude = addr.Longitude;
+        _addrForm.Latitude   = addr.Latitude;
+        _addrForm.Longitude  = addr.Longitude;
         _error  = null;
     }
+
+    // Joins the area fields (Kelurahan, Kecamatan, Kota, Provinsi) present on the address.
+    private static string FormatArea(CustomerAddressDto a) =>
+        string.Join(", ", new[] { a.Subdistrict, a.District, a.City, a.Province }
+            .Where(s => !string.IsNullOrWhiteSpace(s)));
 
     private void CancelEditAddress()
     {
@@ -387,6 +411,12 @@ else
         [System.ComponentModel.DataAnnotations.MaxLength(500)]
         public string Street { get; set; } = string.Empty;
 
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string? Subdistrict { get; set; }   // Kelurahan / Desa
+
+        [System.ComponentModel.DataAnnotations.MaxLength(100)]
+        public string? District { get; set; }       // Kecamatan
+
         [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kota wajib diisi.")]
         [System.ComponentModel.DataAnnotations.MaxLength(100)]
         public string City { get; set; } = string.Empty;
@@ -398,10 +428,8 @@ else
         [System.ComponentModel.DataAnnotations.MaxLength(10)]
         public string? PostalCode { get; set; }
 
-        [System.ComponentModel.DataAnnotations.Range(-90.0, 90.0, ErrorMessage = "Latitude harus antara -90 dan 90.")]
-        public decimal Latitude { get; set; }
-
-        [System.ComponentModel.DataAnnotations.Range(-180.0, 180.0, ErrorMessage = "Longitude harus antara -180 dan 180.")]
-        public decimal Longitude { get; set; }
+        // Optional map pin — null until the user marks a point on the map.
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
     }
 }

@@ -12,6 +12,9 @@ public sealed class Customer : AggregateRoot<CustomerId>
     public string?     Email    { get; private set; }
     public bool        IsActive { get; private set; }
 
+    /// <summary>Total unpaid balance owed by this customer across all credit (bon) sales.</summary>
+    public decimal     OutstandingDebt { get; private set; }
+
     public IReadOnlyList<CustomerAddress> Addresses => _addresses.AsReadOnly();
 
     private Customer() { }
@@ -61,6 +64,23 @@ public sealed class Customer : AggregateRoot<CustomerId>
         Raise(new CustomerActivated(Id, activatedBy, DateTime.UtcNow));
     }
 
+    /// <summary>
+    /// Adds the unpaid remainder of a credit (bon) sale to this customer's outstanding debt.
+    /// </summary>
+    public void IncurDebt(decimal amount, Guid saleId, string referenceNo, string incurredBy)
+    {
+        if (!IsActive)
+            throw new DomainException("Tidak dapat menambah piutang pada pelanggan yang tidak aktif.");
+        if (amount <= 0)
+            throw new DomainException("Jumlah piutang harus lebih dari nol.");
+
+        Raise(new CustomerDebtIncurred(
+            Id, saleId,
+            string.IsNullOrWhiteSpace(referenceNo) ? string.Empty : referenceNo.Trim(),
+            amount, OutstandingDebt + amount,
+            incurredBy, DateTime.UtcNow));
+    }
+
     public void Deactivate(string deactivatedBy)
     {
         if (!IsActive) throw new DomainException("Pelanggan sudah tidak aktif.");
@@ -68,13 +88,15 @@ public sealed class Customer : AggregateRoot<CustomerId>
     }
 
     public AddressId AddAddress(
-        string      label,
-        string      street,
-        string      city,
-        string      province,
-        string?     postalCode,
-        Coordinates coordinates,
-        string      updatedBy)
+        string       label,
+        string       street,
+        string       city,
+        string       province,
+        string?      postalCode,
+        Coordinates? coordinates,
+        string       updatedBy,
+        string?      subdistrict = null,   // Kelurahan / Desa
+        string?      district    = null)   // Kecamatan
     {
         if (!IsActive)
             throw new DomainException("Tidak dapat menambah alamat pada pelanggan yang tidak aktif.");
@@ -87,21 +109,24 @@ public sealed class Customer : AggregateRoot<CustomerId>
         Raise(new CustomerAddressAdded(
             Id, addressId,
             label.Trim(), street.Trim(), city.Trim(), province.Trim(), postalCode?.Trim(),
-            coordinates.Latitude, coordinates.Longitude,
-            isDefault, updatedBy, DateTime.UtcNow));
+            coordinates?.Latitude, coordinates?.Longitude,
+            isDefault, updatedBy, DateTime.UtcNow,
+            Normalize(subdistrict), Normalize(district)));
 
         return addressId;
     }
 
     public void UpdateAddress(
-        AddressId   addressId,
-        string      label,
-        string      street,
-        string      city,
-        string      province,
-        string?     postalCode,
-        Coordinates coordinates,
-        string      updatedBy)
+        AddressId    addressId,
+        string       label,
+        string       street,
+        string       city,
+        string       province,
+        string?      postalCode,
+        Coordinates? coordinates,
+        string       updatedBy,
+        string?      subdistrict = null,   // Kelurahan / Desa
+        string?      district    = null)   // Kecamatan
     {
         if (!IsActive)
             throw new DomainException("Tidak dapat mengubah alamat pelanggan yang tidak aktif.");
@@ -113,8 +138,9 @@ public sealed class Customer : AggregateRoot<CustomerId>
         Raise(new CustomerAddressUpdated(
             Id, addressId,
             label.Trim(), street.Trim(), city.Trim(), province.Trim(), postalCode?.Trim(),
-            coordinates.Latitude, coordinates.Longitude,
-            updatedBy, DateTime.UtcNow));
+            coordinates?.Latitude, coordinates?.Longitude,
+            updatedBy, DateTime.UtcNow,
+            Normalize(subdistrict), Normalize(district)));
     }
 
     public void RemoveAddress(AddressId addressId, string updatedBy)
@@ -166,6 +192,10 @@ public sealed class Customer : AggregateRoot<CustomerId>
                 IsActive = true;
                 break;
 
+            case CustomerDebtIncurred e:
+                OutstandingDebt = e.NewBalance;
+                break;
+
             case CustomerDeactivated:
                 IsActive = false;
                 break;
@@ -173,13 +203,15 @@ public sealed class Customer : AggregateRoot<CustomerId>
             case CustomerAddressAdded e:
                 _addresses.Add(new CustomerAddress(
                     e.AddressId, e.Label, e.Street, e.City, e.Province, e.PostalCode,
-                    new Coordinates(e.Latitude, e.Longitude), e.IsDefault));
+                    ToCoordinates(e.Latitude, e.Longitude), e.IsDefault,
+                    e.Subdistrict, e.District));
                 break;
 
             case CustomerAddressUpdated e:
                 _addresses.First(a => a.Id == e.AddressId)
                     .Update(e.Label, e.Street, e.City, e.Province, e.PostalCode,
-                            new Coordinates(e.Latitude, e.Longitude));
+                            ToCoordinates(e.Latitude, e.Longitude),
+                            e.Subdistrict, e.District);
                 break;
 
             case CustomerAddressRemoved e:
@@ -194,6 +226,14 @@ public sealed class Customer : AggregateRoot<CustomerId>
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
+
+    /// <summary>Trims and collapses blank/whitespace optional fields to null.</summary>
+    private static string? Normalize(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    /// <summary>Builds a coordinate only when both components are present; otherwise null (no map pin).</summary>
+    private static Coordinates? ToCoordinates(decimal? latitude, decimal? longitude)
+        => latitude is { } lat && longitude is { } lng ? new Coordinates(lat, lng) : null;
 
     private static void ValidateAddressFields(
         string label, string street, string city, string province)

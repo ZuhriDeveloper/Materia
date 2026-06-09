@@ -113,7 +113,8 @@ public class CustomersController(
         var command = new AddCustomerAddressCommand(
             id, request.Label, request.Street, request.City,
             request.Province, request.PostalCode,
-            request.Latitude, request.Longitude, CurrentUser);
+            request.Latitude, request.Longitude, CurrentUser,
+            request.Subdistrict, request.District);
 
         var validation = await addAddressValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
@@ -130,7 +131,8 @@ public class CustomersController(
         await updateAddressHandler.HandleAsync(new UpdateCustomerAddressCommand(
             id, addressId, request.Label, request.Street, request.City,
             request.Province, request.PostalCode,
-            request.Latitude, request.Longitude, CurrentUser), ct);
+            request.Latitude, request.Longitude, CurrentUser,
+            request.Subdistrict, request.District), ct);
         return NoContent();
     }
 
@@ -156,11 +158,13 @@ public class CustomersController(
 public record CreateCustomerRequest(string Name, string Phone, string? Email);
 public record UpdateCustomerRequest(string Name, string Phone, string? Email);
 public record AddressRequest(
-    string  Label,
-    string  Street,
-    string  City,
-    string  Province,
-    string? PostalCode,
-    decimal Latitude,
-    decimal Longitude);
+    string   Label,
+    string   Street,
+    string   City,
+    string   Province,
+    string?  PostalCode,
+    decimal? Latitude,
+    decimal? Longitude,
+    string?  Subdistrict = null,   // Kelurahan / Desa
+    string?  District    = null);  // Kecamatan
 public record SetStatusRequest(bool IsActive);

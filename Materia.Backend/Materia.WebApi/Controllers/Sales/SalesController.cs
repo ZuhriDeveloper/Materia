@@ -94,7 +94,11 @@ public class SalesController(
             request.CustomerName,
             request.Items,
             request.IsDeliveryRequired,
-            CurrentUser);
+            CurrentUser,
+            request.Discount,
+            request.TaxEnabled,
+            request.AmountPaid,
+            request.PaymentMethod);
 
         var validation = await finalizeValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
@@ -109,4 +113,8 @@ public record FinalizeSaleRequest(
     Guid?                                CustomerId,
     string?                              CustomerName,
     IReadOnlyList<FinalizeSaleItemInput> Items,
-    bool                                 IsDeliveryRequired);
+    bool                                 IsDeliveryRequired,
+    decimal                              Discount      = 0m,
+    bool                                 TaxEnabled    = false,
+    decimal?                             AmountPaid    = null,
+    PaymentMethod                        PaymentMethod = PaymentMethod.Cash);

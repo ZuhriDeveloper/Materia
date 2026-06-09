@@ -7,6 +7,7 @@ public class CustomerReadModel
     public string    Phone     { get; set; } = default!;
     public string?   Email     { get; set; }
     public bool      IsActive  { get; set; }
+    public decimal   OutstandingDebt { get; set; }
     public string    CreatedBy { get; set; } = default!;
     public DateTime  CreatedAt { get; set; }
     public string?   UpdatedBy { get; set; }

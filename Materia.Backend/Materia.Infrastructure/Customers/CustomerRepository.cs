@@ -71,10 +71,11 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
             context.CustomerReadModels.Add(projection);
         }
 
-        projection.Name     = customer.Name;
-        projection.Phone    = customer.Phone.Value;
-        projection.Email    = customer.Email;
-        projection.IsActive = customer.IsActive;
+        projection.Name            = customer.Name;
+        projection.Phone           = customer.Phone.Value;
+        projection.Email           = customer.Email;
+        projection.IsActive        = customer.IsActive;
+        projection.OutstandingDebt = customer.OutstandingDebt;
 
         if (newEvents.Any(e => e is not CustomerCreated))
         {
@@ -87,6 +88,7 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
                 CustomerAddressUpdated e        => e.UpdatedBy,
                 CustomerAddressRemoved e        => e.UpdatedBy,
                 CustomerDefaultAddressChanged e => e.UpdatedBy,
+                CustomerDebtIncurred e          => e.IncurredBy,
                 _                               => projection.UpdatedBy,
             };
             projection.UpdatedAt = newEvents.Last().OccurredAt;
@@ -112,29 +114,33 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
         {
             if (tracked.TryGetValue(addr.Id.Value, out var row))
             {
-                row.Label      = addr.Label;
-                row.Street     = addr.Street;
-                row.City       = addr.City;
-                row.Province   = addr.Province;
-                row.PostalCode = addr.PostalCode;
-                row.Latitude   = addr.Coordinates.Latitude;
-                row.Longitude  = addr.Coordinates.Longitude;
-                row.IsDefault  = addr.IsDefault;
+                row.Label       = addr.Label;
+                row.Street      = addr.Street;
+                row.Subdistrict = addr.Subdistrict;
+                row.District    = addr.District;
+                row.City        = addr.City;
+                row.Province    = addr.Province;
+                row.PostalCode  = addr.PostalCode;
+                row.Latitude    = addr.Coordinates?.Latitude;
+                row.Longitude   = addr.Coordinates?.Longitude;
+                row.IsDefault   = addr.IsDefault;
             }
             else
             {
                 context.CustomerAddressReadModels.Add(new CustomerAddressReadModel
                 {
-                    Id         = addr.Id.Value,
-                    CustomerId = customer.Id.Value,
-                    Label      = addr.Label,
-                    Street     = addr.Street,
-                    City       = addr.City,
-                    Province   = addr.Province,
-                    PostalCode = addr.PostalCode,
-                    Latitude   = addr.Coordinates.Latitude,
-                    Longitude  = addr.Coordinates.Longitude,
-                    IsDefault  = addr.IsDefault,
+                    Id          = addr.Id.Value,
+                    CustomerId  = customer.Id.Value,
+                    Label       = addr.Label,
+                    Street      = addr.Street,
+                    Subdistrict = addr.Subdistrict,
+                    District    = addr.District,
+                    City        = addr.City,
+                    Province    = addr.Province,
+                    PostalCode  = addr.PostalCode,
+                    Latitude    = addr.Coordinates?.Latitude,
+                    Longitude   = addr.Coordinates?.Longitude,
+                    IsDefault   = addr.IsDefault,
                 });
             }
         }

@@ -156,5 +156,176 @@ public class CustomerTests
         reconstituted.Addresses[0].IsDefault.Should().BeTrue();
         reconstituted.DomainEvents.Should().BeEmpty();
     }
+
+    // ── Outstanding debt (piutang) ─────────────────────────────────────────────
+
+    [Fact]
+    public void IncurDebt_IncreasesOutstandingBalanceAndRaisesEvent()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+        customer.ClearDomainEvents();
+        var saleId = Guid.NewGuid();
+
+        customer.IncurDebt(145_000m, saleId, "INV-0500", "kasir-01");
+
+        customer.OutstandingDebt.Should().Be(145_000m);
+        var evt = customer.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<CustomerDebtIncurred>().Subject;
+        evt.Amount.Should().Be(145_000m);
+        evt.NewBalance.Should().Be(145_000m);
+        evt.SaleId.Should().Be(saleId);
+        evt.ReferenceNo.Should().Be("INV-0500");
+    }
+
+    [Fact]
+    public void IncurDebt_MultipleSales_AccumulatesBalance()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+
+        customer.IncurDebt(100_000m, Guid.NewGuid(), "INV-1", "kasir-01");
+        customer.IncurDebt(50_000m,  Guid.NewGuid(), "INV-2", "kasir-01");
+
+        customer.OutstandingDebt.Should().Be(150_000m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-5000)]
+    public void IncurDebt_WithNonPositiveAmount_ThrowsDomainException(decimal amount)
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+
+        Action act = () => customer.IncurDebt(amount, Guid.NewGuid(), "INV-1", "kasir-01");
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void IncurDebt_WhenInactive_ThrowsDomainException()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+        customer.Deactivate("user-1");
+
+        Action act = () => customer.IncurDebt(50_000m, Guid.NewGuid(), "INV-1", "kasir-01");
+
+        act.Should().Throw<DomainException>();
+    }
+
+    // ── Detailed address fields (Kecamatan / Kelurahan) ────────────────────────
+
+    [Fact]
+    public void AddAddress_CapturesSubdistrictAndDistrict()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+        customer.ClearDomainEvents();
+
+        var id = customer.AddAddress(
+            "Rumah", "Jl. A", "Bandung", "Jawa Barat", "40123", AnyCoords(), "user-1",
+            subdistrict: "  Cibadak  ", district: "  Astanaanyar  ");
+
+        var evt = customer.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<CustomerAddressAdded>().Subject;
+        evt.Subdistrict.Should().Be("Cibadak");      // trimmed
+        evt.District.Should().Be("Astanaanyar");
+
+        var addr = customer.Addresses.Single(a => a.Id == id);
+        addr.Subdistrict.Should().Be("Cibadak");
+        addr.District.Should().Be("Astanaanyar");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData(null)]
+    public void AddAddress_BlankSubdistrictDistrict_StoredAsNull(string? blank)
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+
+        var id = customer.AddAddress(
+            "Rumah", "Jl. A", "Bandung", "Jawa Barat", null, AnyCoords(), "user-1",
+            subdistrict: blank, district: blank);
+
+        var addr = customer.Addresses.Single(a => a.Id == id);
+        addr.Subdistrict.Should().BeNull();
+        addr.District.Should().BeNull();
+    }
+
+    [Fact]
+    public void AddAddress_WithoutCoordinates_StoresNullPin()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+        customer.ClearDomainEvents();
+
+        var id = customer.AddAddress(
+            "Rumah", "Jl. A", "Bandung", "Jawa Barat", "40123",
+            coordinates: null, "user-1");
+
+        var evt = customer.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<CustomerAddressAdded>().Subject;
+        evt.Latitude.Should().BeNull();
+        evt.Longitude.Should().BeNull();
+
+        var addr = customer.Addresses.Single(a => a.Id == id);
+        addr.Coordinates.Should().BeNull();
+    }
+
+    [Fact]
+    public void AddAddress_WithCoordinates_StoresPin()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+
+        var id = customer.AddAddress(
+            "Rumah", "Jl. A", "Bandung", "Jawa Barat", null, AnyCoords(), "user-1");
+
+        var addr = customer.Addresses.Single(a => a.Id == id);
+        addr.Coordinates.Should().NotBeNull();
+        addr.Coordinates!.Latitude.Should().Be(1.234567m);
+    }
+
+    [Fact]
+    public void UpdateAddress_ChangesSubdistrictAndDistrict()
+    {
+        var customer = Customer.Create("Budi", "08123456789", null, "user-1");
+        var id = customer.AddAddress(
+            "Rumah", "Jl. A", "Bandung", "Jawa Barat", null, AnyCoords(), "user-1",
+            subdistrict: "Cibadak", district: "Astanaanyar");
+        customer.ClearDomainEvents();
+
+        customer.UpdateAddress(
+            id, "Rumah", "Jl. B", "Bandung", "Jawa Barat", null, AnyCoords(), "user-1",
+            subdistrict: "Karasak", district: "Astanaanyar");
+
+        var addr = customer.Addresses.Single(a => a.Id == id);
+        addr.Subdistrict.Should().Be("Karasak");
+        addr.District.Should().Be("Astanaanyar");
+    }
+
+    [Fact]
+    public void Reconstitute_ReplaysSubdistrictAndDistrict()
+    {
+        var original = Customer.Create("Budi", "08123456789", null, "user-1");
+        original.AddAddress(
+            "Rumah", "Jl. A", "Bandung", "Jawa Barat", "40123", AnyCoords(), "user-1",
+            subdistrict: "Cibadak", district: "Astanaanyar");
+
+        var replayed = Customer.Reconstitute(original.DomainEvents);
+
+        var addr = replayed.Addresses.Single();
+        addr.Subdistrict.Should().Be("Cibadak");
+        addr.District.Should().Be("Astanaanyar");
+    }
+
+    [Fact]
+    public void Reconstitute_ReplaysOutstandingDebt()
+    {
+        var original = Customer.Create("Budi", "08123456789", null, "user-1");
+        original.IncurDebt(100_000m, Guid.NewGuid(), "INV-1", "kasir-01");
+        original.IncurDebt(25_000m,  Guid.NewGuid(), "INV-2", "kasir-01");
+
+        var replayed = Customer.Reconstitute(original.DomainEvents);
+
+        replayed.OutstandingDebt.Should().Be(125_000m);
+        replayed.DomainEvents.Should().BeEmpty();
+    }
 }
 

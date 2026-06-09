@@ -19,34 +19,100 @@
     <div class="alert alert-danger">@_error</div>
 }
 
-<div class="card" style="max-width:560px">
+<div class="card" style="max-width:720px">
     <div class="card-body">
         <EditForm Model="_form" OnValidSubmit="HandleCreate">
             <DataAnnotationsValidator />
 
-            <div class="mb-3">
-                <label class="form-label">Nama <span class="text-danger">*</span></label>
-                <InputText class="form-control" @bind-Value="_form.Name"
-                           placeholder="cth. Budi Santoso" />
-                <ValidationMessage For="() => _form.Name" class="small text-danger" />
+            <h6 class="fw-semibold mb-3">Data Pelanggan</h6>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label">Nama <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="_form.Name"
+                               placeholder="cth. Budi Santoso" />
+                    <ValidationMessage For="() => _form.Name" class="small text-danger" />
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Nomor Telepon <span class="text-danger">*</span></label>
+                    <InputText class="form-control" @bind-Value="_form.Phone"
+                               placeholder="cth. 08123456789" />
+                    <ValidationMessage For="() => _form.Phone" class="small text-danger" />
+                </div>
+                <div class="col-12">
+                    <label class="form-label">Email</label>
+                    <InputText class="form-control" @bind-Value="_form.Email"
+                               placeholder="cth. budi@email.com" />
+                    <ValidationMessage For="() => _form.Email" class="small text-danger" />
+                </div>
             </div>
 
-            <div class="mb-3">
-                <label class="form-label">Nomor Telepon <span class="text-danger">*</span></label>
-                <InputText class="form-control" @bind-Value="_form.Phone"
-                           placeholder="cth. 08123456789" />
-                <ValidationMessage For="() => _form.Phone" class="small text-danger" />
-            </div>
+            <hr class="my-4" />
 
-            <div class="mb-4">
-                <label class="form-label">Email</label>
-                <InputText class="form-control" @bind-Value="_form.Email"
-                           placeholder="cth. budi@email.com" />
-                <ValidationMessage For="() => _form.Email" class="small text-danger" />
+            <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="addAddr" @bind="_addAddress" />
+                <label class="form-check-label fw-semibold" for="addAddr">
+                    Tambahkan alamat utama
+                </label>
             </div>
+            <p class="text-muted small">
+                Alamat pertama otomatis menjadi <strong>alamat utama</strong> yang dipakai pada form penjualan.
+            </p>
 
-            <div class="d-flex gap-2">
+            @if (_addAddress)
+            {
+                <div class="row g-2">
+                    <div class="col-md-6">
+                        <label class="form-label small">Label <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_addr.Label"
+                               placeholder="cth. Rumah, Toko, Proyek A" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Kode Pos</label>
+                        <input class="form-control form-control-sm" @bind="_addr.PostalCode"
+                               placeholder="cth. 40123" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Jalan <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_addr.Street"
+                               placeholder="Jl. Merdeka No. 1, RT 01/RW 02" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Kelurahan / Desa</label>
+                        <input class="form-control form-control-sm" @bind="_addr.Subdistrict"
+                               placeholder="cth. Cibadak" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Kecamatan</label>
+                        <input class="form-control form-control-sm" @bind="_addr.District"
+                               placeholder="cth. Astanaanyar" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Kota / Kabupaten <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_addr.City"
+                               placeholder="Bandung" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Provinsi <span class="text-danger">*</span></label>
+                        <input class="form-control form-control-sm" @bind="_addr.Province"
+                               placeholder="Jawa Barat" />
+                    </div>
+                    <div class="col-12 mt-2">
+                        <label class="form-label small">
+                            Titik Lokasi <span class="text-muted">(untuk pengiriman)</span>
+                        </label>
+                        <AddressMapPicker @bind-Latitude="_addr.Latitude"
+                                          @bind-Longitude="_addr.Longitude" />
+                    </div>
+                </div>
+            }
+
+            <div class="d-flex gap-2 mt-4">
                 <button type="submit" class="btn btn-primary" disabled="@_saving">
+                    @if (_saving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1"></span>
+                    }
                     <i class="bi bi-check-lg me-1"></i> Buat Pelanggan
                 </button>
                 <a href="/customers" class="btn btn-outline-secondary">Batal</a>
@@ -57,19 +123,55 @@
 
 @code {
     private readonly CustomerForm _form = new();
+    private readonly AddressInput _addr = new();
+    private bool    _addAddress;
     private string? _error;
     private bool    _saving;
 
     private async Task HandleCreate()
     {
+        _error = null;
+
+        if (_addAddress && !AddressComplete())
+        {
+            _error = "Lengkapi Label, Jalan, Kota/Kabupaten, dan Provinsi — atau matikan opsi tambah alamat.";
+            return;
+        }
+
         _saving = true;
-        _error  = null;
+
         var (id, error) = await Api.CreateCustomerAsync(
             _form.Name, _form.Phone, string.IsNullOrWhiteSpace(_form.Email) ? null : _form.Email);
-        _saving = false;
-        if (error is not null) { _error = error; return; }
+
+        if (error is not null) { _saving = false; _error = error; return; }
+
+        if (_addAddress && id is not null)
+        {
+            var (_, addrErr) = await Api.AddAddressAsync(
+                id.Value, _addr.Label.Trim(), _addr.Street.Trim(), _addr.City.Trim(),
+                _addr.Province.Trim(), Nullable(_addr.PostalCode),
+                _addr.Latitude, _addr.Longitude,
+                Nullable(_addr.Subdistrict), Nullable(_addr.District));
+
+            // Customer is already created; if the address failed, send the user to the
+            // detail page to fix it rather than losing the customer.
+            if (addrErr is not null)
+            {
+                Navigation.NavigateTo($"/customers/{id}?created=1&addrError=1", forceLoad: true);
+                return;
+            }
+        }
+
         Navigation.NavigateTo($"/customers/{id}?created=1", forceLoad: true);
     }
+
+    private bool AddressComplete() =>
+        !string.IsNullOrWhiteSpace(_addr.Label) &&
+        !string.IsNullOrWhiteSpace(_addr.Street) &&
+        !string.IsNullOrWhiteSpace(_addr.City) &&
+        !string.IsNullOrWhiteSpace(_addr.Province);
+
+    private static string? Nullable(string? s) => string.IsNullOrWhiteSpace(s) ? null : s.Trim();
 
     private sealed class CustomerForm
     {
@@ -84,5 +186,18 @@
         [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Format email tidak valid.")]
         [System.ComponentModel.DataAnnotations.MaxLength(200)]
         public string? Email { get; set; }
+    }
+
+    private sealed class AddressInput
+    {
+        public string  Label       { get; set; } = string.Empty;
+        public string  Street      { get; set; } = string.Empty;
+        public string? Subdistrict { get; set; }
+        public string? District    { get; set; }
+        public string  City        { get; set; } = string.Empty;
+        public string  Province    { get; set; } = string.Empty;
+        public string?  PostalCode  { get; set; }
+        public decimal? Latitude    { get; set; }
+        public decimal? Longitude   { get; set; }
     }
 }

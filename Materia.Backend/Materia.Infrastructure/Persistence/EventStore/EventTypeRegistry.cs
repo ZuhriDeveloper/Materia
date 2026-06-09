@@ -55,6 +55,7 @@ public static class EventTypeRegistry
         [nameof(CustomerAddressUpdated)]        = typeof(CustomerAddressUpdated),
         [nameof(CustomerAddressRemoved)]        = typeof(CustomerAddressRemoved),
         [nameof(CustomerDefaultAddressChanged)] = typeof(CustomerDefaultAddressChanged),
+        [nameof(CustomerDebtIncurred)]          = typeof(CustomerDebtIncurred),
 
         // Supplier events
         [nameof(SupplierRegistered)]       = typeof(SupplierRegistered),
@@ -78,6 +79,7 @@ public static class EventTypeRegistry
         [nameof(SaleItemRemoved)]        = typeof(SaleItemRemoved),
         [nameof(SaleConfirmed)]          = typeof(SaleConfirmed),
         [nameof(SalePaid)]               = typeof(SalePaid),
+        [nameof(SaleSettled)]            = typeof(SaleSettled),
         [nameof(SaleCancelled)]          = typeof(SaleCancelled),
         [nameof(SaleFinalized)]          = typeof(SaleFinalized),
         [nameof(DeliveryRequested)]      = typeof(DeliveryRequested),

@@ -1,7 +1,9 @@
 namespace Materia.WebUi.Services;
 
 public enum SaleType      { Pickup, Delivery }
-public enum SaleStatus    { Draft, Confirmed, Paid, Cancelled }
+
+// Mirrors Materia.Domain.Sales enums. Sent over the API by ordinal — keep in sync, append only.
+public enum SaleStatus    { Draft, Confirmed, Paid, Cancelled, PartiallyPaid }
 public enum PaymentMethod { Cash, BankTransfer, QRIS, Debit, Credit }
 
 public record SaleItemDto(
@@ -19,6 +21,7 @@ public record SaleItemDto(
 public record SalePaymentDto(
     decimal       PaidAmount,
     decimal       Change,
+    decimal       Outstanding,
     PaymentMethod Method,
     DateTime      PaidAt);
 
@@ -33,7 +36,11 @@ public record SaleDto(
     SaleStatus      Status,
     bool            IsDeliveryRequired,
     decimal         Subtotal,
+    decimal         Discount,
+    decimal         Tax,
     decimal         GrandTotal,
+    decimal         AmountPaid,
+    decimal         OutstandingAmount,
     string          CreatedBy,
     string?         ServedBy,
     DateTime        CreatedAt,
@@ -58,4 +65,11 @@ public record FinalizeSaleItemInput(
     Guid?   VariantId = null,
     string? ColorName = null);
 
-public record FinalizeSaleResult(Guid SaleId, string ReferenceNo);
+public record FinalizeSaleResult(
+    Guid    SaleId,
+    string  ReferenceNo,
+    decimal GrandTotal,
+    decimal AmountPaid,
+    decimal Change,
+    decimal OutstandingAmount,
+    bool    IsCredit);

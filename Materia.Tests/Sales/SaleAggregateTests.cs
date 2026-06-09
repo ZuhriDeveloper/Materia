@@ -197,4 +197,166 @@ public class SaleAggregateTests
         replayed.GrandTotal.Amount.Should().Be(195_000m);
         replayed.DomainEvents.Should().BeEmpty();
     }
+
+    // ── Discount & tax on finalize ─────────────────────────────────────────────
+
+    [Fact]
+    public void Finalize_WithDiscount_ReducesGrandTotal()
+    {
+        var sale = SaleWithOneItem();   // subtotal 195,000
+
+        sale.Finalize(Staff, discount: 15_000m);
+
+        sale.Discount.Amount.Should().Be(15_000m);
+        sale.GrandTotal.Amount.Should().Be(180_000m);
+    }
+
+    [Fact]
+    public void Finalize_WithTaxEnabled_AddsElevenPercentPpn()
+    {
+        var sale = SaleWithOneItem();   // subtotal 195,000
+
+        sale.Finalize(Staff, taxEnabled: true);
+
+        sale.Tax.Amount.Should().Be(21_450m);            // 195,000 × 11%
+        sale.GrandTotal.Amount.Should().Be(216_450m);
+    }
+
+    [Fact]
+    public void Finalize_AppliesPpnOnTheDiscountedAmount()
+    {
+        var sale = SaleWithOneItem();   // subtotal 195,000
+
+        sale.Finalize(Staff, discount: 95_000m, taxEnabled: true);
+
+        sale.Tax.Amount.Should().Be(11_000m);            // (195,000 − 95,000) × 11%
+        sale.GrandTotal.Amount.Should().Be(111_000m);    // 100,000 + 11,000
+    }
+
+    [Fact]
+    public void Finalize_DiscountExceedingSubtotal_IsClampedToSubtotal()
+    {
+        var sale = SaleWithOneItem();
+
+        sale.Finalize(Staff, discount: 500_000m);
+
+        sale.Discount.Amount.Should().Be(195_000m);
+        sale.GrandTotal.Amount.Should().Be(0m);
+    }
+
+    // ── Settlement (full payment / down payment / credit) ──────────────────────
+
+    private static Sale FinalizedSaleForCustomer(Guid customerId)
+    {
+        var sale = Sale.Create("INV-0500", Staff);
+        sale.SetCustomer(customerId, "Budi", Staff);
+        sale.AddItem(Guid.NewGuid(), "Semen 50kg", "sak", 3m, 3m, 65_000m, Staff);
+        sale.Finalize(Staff);     // grand total 195,000
+        return sale;
+    }
+
+    [Fact]
+    public void RecordSettlement_FullPayment_MarksPaidWithNoOutstanding()
+    {
+        var sale = FinalizedSaleForCustomer(Guid.NewGuid());
+
+        sale.RecordSettlement(195_000m, PaymentMethod.Cash, Staff);
+
+        sale.Status.Should().Be(SaleStatus.Paid);
+        sale.AmountPaid.Amount.Should().Be(195_000m);
+        sale.OutstandingAmount.Amount.Should().Be(0m);
+        sale.Payment!.Change.Amount.Should().Be(0m);
+    }
+
+    [Fact]
+    public void RecordSettlement_Overpayment_YieldsChangeAndIsPaid()
+    {
+        var sale = FinalizedSaleForCustomer(Guid.NewGuid());
+
+        sale.RecordSettlement(200_000m, PaymentMethod.Cash, Staff);
+
+        sale.Status.Should().Be(SaleStatus.Paid);
+        sale.OutstandingAmount.Amount.Should().Be(0m);
+        sale.Payment!.Change.Amount.Should().Be(5_000m);
+    }
+
+    [Fact]
+    public void RecordSettlement_PartialPayment_ForRegisteredCustomer_LeavesOutstandingDebt()
+    {
+        var sale = FinalizedSaleForCustomer(Guid.NewGuid());
+
+        sale.RecordSettlement(50_000m, PaymentMethod.Cash, Staff);
+
+        sale.Status.Should().Be(SaleStatus.PartiallyPaid);
+        sale.AmountPaid.Amount.Should().Be(50_000m);
+        sale.OutstandingAmount.Amount.Should().Be(145_000m);
+
+        var evt = sale.DomainEvents.OfType<SaleSettled>().Single();
+        evt.IsCredit.Should().BeTrue();
+        evt.OutstandingAmount.Should().Be(145_000m);
+    }
+
+    [Fact]
+    public void RecordSettlement_ZeroDownPayment_ForRegisteredCustomer_IsFullCredit()
+    {
+        var sale = FinalizedSaleForCustomer(Guid.NewGuid());
+
+        sale.RecordSettlement(0m, PaymentMethod.Cash, Staff);
+
+        sale.Status.Should().Be(SaleStatus.PartiallyPaid);
+        sale.OutstandingAmount.Amount.Should().Be(195_000m);
+    }
+
+    [Fact]
+    public void RecordSettlement_PartialPayment_ForWalkIn_ThrowsDomainException()
+    {
+        var sale = Sale.Create("INV-0501", Staff);
+        sale.SetCustomer(null, "Umum", Staff);   // anonymous walk-in
+        sale.AddItem(Guid.NewGuid(), "Semen 50kg", "sak", 3m, 3m, 65_000m, Staff);
+        sale.Finalize(Staff);
+
+        Action act = () => sale.RecordSettlement(50_000m, PaymentMethod.Cash, Staff);
+
+        act.Should().Throw<DomainException>().WithMessage("*pelanggan terdaftar*");
+    }
+
+    [Fact]
+    public void RecordSettlement_BeforeFinalize_ThrowsDomainException()
+    {
+        var sale = Sale.Create("INV-0502", Staff);
+        sale.SetCustomer(Guid.NewGuid(), "Budi", Staff);
+        sale.AddItem(Guid.NewGuid(), "Semen", "sak", 1m, 1m, 65_000m, Staff);
+
+        Action act = () => sale.RecordSettlement(10_000m, PaymentMethod.Cash, Staff);
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void RecordSettlement_IsIdempotentOnceSettled()
+    {
+        var sale = FinalizedSaleForCustomer(Guid.NewGuid());
+        sale.RecordSettlement(195_000m, PaymentMethod.Cash, Staff);
+        sale.ClearDomainEvents();
+
+        sale.RecordSettlement(50_000m, PaymentMethod.Cash, Staff);   // ignored
+
+        sale.DomainEvents.Should().BeEmpty();
+        sale.Status.Should().Be(SaleStatus.Paid);
+    }
+
+    [Fact]
+    public void Reconstitute_ReplaysCreditSettlement()
+    {
+        var original = FinalizedSaleForCustomer(Guid.NewGuid());
+        original.RecordSettlement(75_000m, PaymentMethod.BankTransfer, Staff);
+
+        var replayed = Sale.Reconstitute(original.DomainEvents);
+
+        replayed.Status.Should().Be(SaleStatus.PartiallyPaid);
+        replayed.AmountPaid.Amount.Should().Be(75_000m);
+        replayed.OutstandingAmount.Amount.Should().Be(120_000m);
+        replayed.Payment!.Method.Should().Be(PaymentMethod.BankTransfer);
+        replayed.DomainEvents.Should().BeEmpty();
+    }
 }
