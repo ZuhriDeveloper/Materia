@@ -13,8 +13,10 @@ public class RecordPettyCashExpenseValidatorTests
         string recipient = "Budi",
         PettyCashCategory category = PettyCashCategory.Bensin,
         string? reasonDetail = null,
-        string? notes = null) =>
-        new(amount, recipient, category, reasonDetail, notes, "admin");
+        string? notes = null,
+        Guid? idempotencyKey = null) =>
+        new(amount, recipient, category, reasonDetail, notes, "admin",
+            idempotencyKey ?? Guid.NewGuid());
 
     [Fact]
     public void Valid_PredefinedCategory_Passes()
@@ -76,5 +78,28 @@ public class RecordPettyCashExpenseValidatorTests
         var result = _validator.Validate(Valid(category: (PettyCashCategory)99));
         result.IsValid.Should().BeFalse();
         result.Errors.Should().Contain(e => e.PropertyName == nameof(RecordPettyCashExpenseCommand.Category));
+    }
+
+    [Fact]
+    public void AmountAboveSanityCap_Fails()
+    {
+        var result = _validator.Validate(Valid(amount: 1_000_000_001m));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RecordPettyCashExpenseCommand.Amount));
+    }
+
+    [Fact]
+    public void AmountAtSanityCap_Passes()
+    {
+        var result = _validator.Validate(Valid(amount: 1_000_000_000m));
+        result.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void EmptyIdempotencyKey_Fails()
+    {
+        var result = _validator.Validate(Valid(idempotencyKey: Guid.Empty));
+        result.IsValid.Should().BeFalse();
+        result.Errors.Should().Contain(e => e.PropertyName == nameof(RecordPettyCashExpenseCommand.IdempotencyKey));
     }
 }

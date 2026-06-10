@@ -41,6 +41,8 @@ using Materia.Application.Queries.Purchasing;
 using Materia.Application.Commands.Customers.RecordReceivablePayment;
 using Materia.Application.Commands.Sales.FinalizeSale;
 using Materia.Application.Commands.Financials.RecordPettyCashExpense;
+using Materia.Application.Commands.Financials.RecordChangeFundDeposit;
+using Materia.Application.Commands.Financials.RecordChangeFundWithdrawal;
 using Materia.Application.Financials.Queries;
 using Materia.Application.Commands.Stores.RegisterStore;
 using Materia.Application.Commands.Stores.RenameStore;
@@ -138,6 +140,10 @@ public static class DependencyInjection
         services.AddScoped<GetCashFlowQueryHandler>();
         services.AddScoped<RecordPettyCashExpenseCommandHandler>();
         services.AddScoped<GetPettyCashExpensesQueryHandler>();
+        services.AddScoped<RecordChangeFundDepositCommandHandler>();
+        services.AddScoped<RecordChangeFundWithdrawalCommandHandler>();
+        services.AddScoped<GetChangeFundQueryHandler>();
+        services.AddScoped<GetChangeFundWithdrawalsQueryHandler>();
 
         // Stores (platform / multi-tenant)
         services.AddScoped<RegisterStoreCommandHandler>();

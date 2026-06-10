@@ -5,11 +5,12 @@
 @using Microsoft.AspNetCore.Components.Authorization
 @using Materia.WebUi.Services
 @using MudBlazor
-@inject SaleApiClient      SaleApi
-@inject InventoryApiClient InventoryApi
-@inject CustomerApiClient  CustomerApi
-@inject NavigationManager  Navigation
-@inject IJSRuntime         JS
+@inject SaleApiClient           SaleApi
+@inject InventoryApiClient      InventoryApi
+@inject CustomerApiClient       CustomerApi
+@inject StoreSettingsApiClient  StoreApi
+@inject NavigationManager       Navigation
+@inject IJSRuntime              JS
 @implements IAsyncDisposable
 
 <PageTitle>Kasir — Materia</PageTitle>
@@ -442,6 +443,41 @@ else
                             </MudText>
                         </div>
                     }
+                    else if (_paymentMethod == PaymentMethod.Cash)
+                    {
+                        <div class="d-flex align-center justify-space-between mb-2">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Jumlah Bayar (Rp)</MudText>
+                            <MudNumericField T="decimal?"
+                                             Value="_amountTendered"
+                                             ValueChanged="OnAmountTenderedChanged"
+                                             Min="0m" Step="1000m" Format="N0"
+                                             Placeholder="@GrandTotal.ToString("N0")"
+                                             Variant="Variant.Outlined" Margin="Margin.Dense"
+                                             HideSpinButtons="true" Style="width:140px" />
+                        </div>
+                        @if (_amountTendered.HasValue && _amountTendered.Value > 0 && _amountTendered.Value < GrandTotal)
+                        {
+                            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2 py-1">
+                                Uang bayar kurang
+                            </MudAlert>
+                        }
+                        else if (_amountTendered.HasValue && _amountTendered.Value >= GrandTotal)
+                        {
+                            <div class="d-flex justify-space-between align-center mb-3">
+                                <MudText Typo="Typo.body2" Style="font-weight:700;color:var(--mud-palette-success)">
+                                    Kembalian
+                                </MudText>
+                                <MudText Typo="Typo.h6"
+                                         Style="font-weight:800;color:var(--mud-palette-success)">
+                                    Rp @((_amountTendered.Value - GrandTotal).ToString("N0"))
+                                </MudText>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="mb-3"></div>
+                        }
+                    }
                     else
                     {
                         <div class="mb-3"></div>
@@ -453,7 +489,7 @@ else
                                Size="Size.Large"
                                StartIcon="@(_isCredit ? Icons.Material.Filled.ReceiptLong : Icons.Material.Filled.CheckCircle)"
                                OnClick="FinalizeAsync"
-                               Disabled="@(_lines.Count == 0 || _processing)"
+                               Disabled="@(_lines.Count == 0 || _processing || IsCashInsufficient)"
                                Style="font-size:.95rem;font-weight:700;height:48px">
                         @if (_processing)
                         {
@@ -497,9 +533,19 @@ else
             @* ─── Store header ─────────────────────────── *@
             <div style="text-align:center;border-bottom:2px solid #000;
                         padding-bottom:3mm;margin-bottom:4mm">
-                <div style="font-size:16pt;font-weight:700;letter-spacing:1px">MATERIA</div>
-                <div style="font-size:10pt;font-weight:600">BUILDING MATERIALS</div>
-                <div style="font-size:9pt;margin-top:1mm">Jl. Raya Bahan Bangunan No. 1</div>
+                @if (!string.IsNullOrEmpty(_storeLogo))
+                {
+                    <img src="@_storeLogo" style="height:16mm;margin-bottom:2mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
+                }
+                <div style="font-size:16pt;font-weight:700;letter-spacing:1px">@(_storeProfile?.Name ?? "MATERIA")</div>
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Address))
+                {
+                    <div style="font-size:9pt;margin-top:1mm">@_storeProfile.Address</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Phone))
+                {
+                    <div style="font-size:9pt">Telp. @_storeProfile.Phone</div>
+                }
             </div>
 
             @* ─── Document title ───────────────────────── *@
@@ -683,9 +729,19 @@ else
 
             @* ─── Store header ─────────────────────────── *@
             <div style="text-align:center;margin-bottom:3mm">
-                <div style="font-size:13pt;font-weight:700;letter-spacing:.5px">MATERIA</div>
-                <div style="font-size:8.5pt;font-weight:600">BUILDING MATERIALS</div>
-                <div style="font-size:7.5pt;margin-top:1mm">Jl. Raya Bahan Bangunan No. 1</div>
+                @if (!string.IsNullOrEmpty(_storeLogo))
+                {
+                    <img src="@_storeLogo" style="height:12mm;margin-bottom:1mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
+                }
+                <div style="font-size:13pt;font-weight:700;letter-spacing:.5px">@(_storeProfile?.Name ?? "MATERIA")</div>
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Address))
+                {
+                    <div style="font-size:7.5pt;margin-top:1mm">@_storeProfile.Address</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Phone))
+                {
+                    <div style="font-size:7.5pt">Telp. @_storeProfile.Phone</div>
+                }
             </div>
 
             <div style="border-top:2px solid #000;border-bottom:1px dashed #000;
@@ -824,6 +880,10 @@ else
 @code {
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
 
+    // ── Store profile (for print header) ─────────────────────────────────────
+    private StoreProfileDto? _storeProfile;
+    private string?          _storeLogo;
+
     // ── Data ─────────────────────────────────────────────────────────────────
     private List<CustomerDto>?  _customers;
     private ProductSearchDto?   _selectedProduct;
@@ -863,12 +923,27 @@ else
     // ── Payment / credit (Bon) ───────────────────────────────────────────────
     private bool          _isCredit;
     private decimal       _downPayment;
+    private decimal?      _amountTendered;       // cash-in from cashier input (null = exact)
     private PaymentMethod _paymentMethod = PaymentMethod.Cash;
 
-    /// Amount tendered now: full grand total for a normal sale, the DP for a credit sale.
-    private decimal AmountPaid  => _isCredit ? Math.Clamp(_downPayment, 0m, GrandTotal) : GrandTotal;
+    /// Amount tendered now: for credit = DP; for cash = tendered if entered else GrandTotal;
+    /// for non-cash non-credit = exact GrandTotal.
+    private decimal AmountPaid =>
+        _isCredit
+            ? Math.Clamp(_downPayment, 0m, GrandTotal)
+            : _paymentMethod == PaymentMethod.Cash && _amountTendered is > 0
+                ? _amountTendered.Value
+                : GrandTotal;
+
     /// Remaining customer debt (piutang) for a credit sale.
     private decimal Outstanding => Math.Max(0m, GrandTotal - AmountPaid);
+
+    /// True when cashier has typed a cash amount that is below the grand total.
+    private bool IsCashInsufficient =>
+        !_isCredit
+        && _paymentMethod == PaymentMethod.Cash
+        && _amountTendered is > 0
+        && _amountTendered.Value < GrandTotal;
 
     // ── Lifecycle ────────────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
@@ -879,6 +954,15 @@ else
             _servedBy = state.User.Identity?.Name ?? "";
         }
         _customers = (await CustomerApi.GetCustomersAsync(isActive: true))?.Items ?? [];
+
+        // Load store profile and logo for print headers (tolerate missing logo).
+        try
+        {
+            _storeProfile = await StoreApi.GetProfileAsync();
+            if (_storeProfile?.HasLogo == true)
+                _storeLogo = await StoreApi.GetLogoDataUrlAsync();
+        }
+        catch { /* store data is optional for print; degrade gracefully */ }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1056,6 +1140,9 @@ else
         if (!value) _downPayment = 0m;
     }
 
+    private void OnAmountTenderedChanged(decimal? value)
+        => _amountTendered = value is > 0 ? value : null;
+
     private void OnDownPaymentChanged(decimal value)
         => _downPayment = Math.Clamp(value, 0m, GrandTotal);
 
@@ -1135,6 +1222,7 @@ else
         _taxEnabled         = false;
         _isCredit           = false;
         _downPayment        = 0m;
+        _amountTendered     = null;
         _paymentMethod      = PaymentMethod.Cash;
         _scanMessage        = null;
         _error              = null;
@@ -1148,12 +1236,13 @@ else
     private async Task ClearAll()
     {
         _lines.Clear();
-        _discount    = 0;
-        _taxEnabled  = false;
-        _isCredit    = false;
-        _downPayment = 0m;
-        _scanMessage = null;
-        _error       = null;
+        _discount       = 0;
+        _taxEnabled     = false;
+        _isCredit       = false;
+        _downPayment    = 0m;
+        _amountTendered = null;
+        _scanMessage    = null;
+        _error          = null;
         await FocusScanAsync();
     }
 

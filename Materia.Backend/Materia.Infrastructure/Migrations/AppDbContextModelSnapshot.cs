@@ -172,6 +172,46 @@ namespace Materia.Infrastructure.Migrations
                     b.ToTable("CategoryReadModels");
                 });
 
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.ChangeFundDepositReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<DateTime>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("RecordedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("SourceReferenceNo")
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RecordedAt");
+
+                    b.HasIndex("StoreId");
+
+                    b.ToTable("ChangeFundDepositReadModels");
+                });
+
             modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.CustomerAddressReadModel", b =>
                 {
                     b.Property<Guid>("Id")

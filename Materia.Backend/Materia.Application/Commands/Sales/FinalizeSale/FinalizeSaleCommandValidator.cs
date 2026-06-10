@@ -15,6 +15,10 @@ public sealed class FinalizeSaleCommandValidator : AbstractValidator<FinalizeSal
         RuleFor(x => x.AmountPaid).GreaterThanOrEqualTo(0)
             .When(x => x.AmountPaid.HasValue)
             .WithMessage("Jumlah pembayaran tidak boleh negatif.");
+        // Sanity cap — a tender beyond Rp 1 miliar is a typo, not a payment.
+        RuleFor(x => x.AmountPaid).LessThanOrEqualTo(1_000_000_000m)
+            .When(x => x.AmountPaid.HasValue)
+            .WithMessage("Jumlah pembayaran melebihi batas wajar (maks. Rp 1.000.000.000).");
 
         // A credit sale (outstanding balance) is only allowed for a registered customer.
         // The domain enforces this too; validating here returns a clean 400 to the client.

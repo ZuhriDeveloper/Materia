@@ -191,6 +191,31 @@
                     </tr>
                 </table>
 
+                @* ── Jumlah Bayar ── *@
+                <div class="mb-2">
+                    <label class="form-label small mb-1">Jumlah Bayar (Rp)</label>
+                    <input type="number" class="form-control form-control-sm"
+                           @bind="_amountPaid" @bind:event="oninput"
+                           min="0" step="1000" placeholder="@Total.ToString("N0")" />
+                </div>
+                @if (_amountPaid > 0 && _amountPaid < Total)
+                {
+                    <div class="alert alert-warning py-2 small mb-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Uang bayar kurang
+                    </div>
+                }
+                else if (_amountPaid >= Total && Total > 0)
+                {
+                    <div class="d-flex justify-content-between fw-semibold text-success mb-3">
+                        <span>Kembalian</span>
+                        <span>Rp @((_amountPaid - Total).ToString("N0"))</span>
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3"></div>
+                }
+
                 <p class="small text-muted">
                     Menyelesaikan penjualan akan mengurangi stok tiap produk (boleh menjadi negatif)
                     dan mencatat Anda sebagai staf yang melayani.
@@ -198,7 +223,7 @@
 
                 <button class="btn btn-success w-100"
                         @onclick="HandleFinalize"
-                        disabled="@(_items.Count == 0 || _processing)">
+                        disabled="@(_items.Count == 0 || _processing || (_amountPaid > 0 && _amountPaid < Total))">
                     @if (_processing)
                     {
                         <span class="spinner-border spinner-border-sm me-1"></span>
@@ -230,6 +255,7 @@
     private decimal _itemQty;
     private decimal _itemPrice;
     private bool    _isDeliveryRequired;
+    private decimal _amountPaid;
 
     private readonly List<LineItem> _items = [];
 
@@ -293,11 +319,15 @@
             .Select(i => new FinalizeSaleItemInput(i.ProductId, i.ProductName, i.UnitName, i.Quantity, i.UnitPrice))
             .ToList();
 
+        // Pass amountPaid when entered; 0 or not-entered means exact (null → server treats as GrandTotal).
+        decimal? tendered = _amountPaid > 0 ? _amountPaid : null;
+
         var (result, error) = await SaleApi.FinalizeAsync(
             _selectedCustomer?.Id,
             _selectedCustomer?.Name,
             inputs,
-            _isDeliveryRequired);
+            _isDeliveryRequired,
+            amountPaid: tendered);
 
         _processing = false;
         if (error is not null) { _error = error; return; }

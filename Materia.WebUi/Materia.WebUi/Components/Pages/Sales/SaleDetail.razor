@@ -2,9 +2,10 @@
 @attribute [Authorize(Roles = "Admin,Cashier")]
 @rendermode InteractiveServer
 @using Materia.WebUi.Services
-@inject SaleApiClient     Api
-@inject NavigationManager Navigation
-@inject IJSRuntime        JS
+@inject SaleApiClient          Api
+@inject StoreSettingsApiClient StoreApi
+@inject NavigationManager      Navigation
+@inject IJSRuntime             JS
 
 <PageTitle>@(_sale?.ReferenceNo ?? "Penjualan") — Materia</PageTitle>
 
@@ -212,9 +213,19 @@ else
             @* ─── Store header ─────────────────────────── *@
             <div style="text-align:center;border-bottom:2px solid #000;
                         padding-bottom:3mm;margin-bottom:4mm">
-                <div style="font-size:16pt;font-weight:700;letter-spacing:1px">MATERIA</div>
-                <div style="font-size:10pt;font-weight:600">BUILDING MATERIALS</div>
-                <div style="font-size:9pt;margin-top:1mm">Jl. Raya Bahan Bangunan No. 1</div>
+                @if (!string.IsNullOrEmpty(_storeLogo))
+                {
+                    <img src="@_storeLogo" style="height:16mm;margin-bottom:2mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
+                }
+                <div style="font-size:16pt;font-weight:700;letter-spacing:1px">@(_storeProfile?.Name ?? "MATERIA")</div>
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Address))
+                {
+                    <div style="font-size:9pt;margin-top:1mm">@_storeProfile.Address</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Phone))
+                {
+                    <div style="font-size:9pt">Telp. @_storeProfile.Phone</div>
+                }
             </div>
 
             @* ─── Document title ───────────────────────── *@
@@ -377,9 +388,19 @@ else
 
             @* ─── Store header ─────────────────────────── *@
             <div style="text-align:center;margin-bottom:3mm">
-                <div style="font-size:13pt;font-weight:700;letter-spacing:.5px">MATERIA</div>
-                <div style="font-size:8.5pt;font-weight:600">BUILDING MATERIALS</div>
-                <div style="font-size:7.5pt;margin-top:1mm">Jl. Raya Bahan Bangunan No. 1</div>
+                @if (!string.IsNullOrEmpty(_storeLogo))
+                {
+                    <img src="@_storeLogo" style="height:12mm;margin-bottom:1mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
+                }
+                <div style="font-size:13pt;font-weight:700;letter-spacing:.5px">@(_storeProfile?.Name ?? "MATERIA")</div>
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Address))
+                {
+                    <div style="font-size:7.5pt;margin-top:1mm">@_storeProfile.Address</div>
+                }
+                @if (!string.IsNullOrWhiteSpace(_storeProfile?.Phone))
+                {
+                    <div style="font-size:7.5pt">Telp. @_storeProfile.Phone</div>
+                }
             </div>
 
             @* ─── Meta ─────────────────────────────────── *@
@@ -519,12 +540,14 @@ else
     [Parameter] public Guid Id { get; set; }
     [SupplyParameterFromQuery(Name = "finalized")] public string? Finalized { get; set; }
 
-    private SaleDto? _sale;
-    private bool     _justFinalized;
-    private bool     _showCancel;
-    private string   _cancelReason = "";
-    private string?  _error;
-    private bool     _saving;
+    private SaleDto?         _sale;
+    private bool             _justFinalized;
+    private bool             _showCancel;
+    private string           _cancelReason = "";
+    private string?          _error;
+    private bool             _saving;
+    private StoreProfileDto? _storeProfile;
+    private string?          _storeLogo;
 
     private bool CanCancel => _sale is not null
         && _sale.Status is not SaleStatus.Paid and not SaleStatus.Cancelled;
@@ -533,6 +556,14 @@ else
     {
         _justFinalized = Finalized == "1";
         await LoadAsync();
+
+        try
+        {
+            _storeProfile = await StoreApi.GetProfileAsync();
+            if (_storeProfile?.HasLogo == true)
+                _storeLogo = await StoreApi.GetLogoDataUrlAsync();
+        }
+        catch { /* print header degrades gracefully */ }
     }
 
     private async Task LoadAsync()

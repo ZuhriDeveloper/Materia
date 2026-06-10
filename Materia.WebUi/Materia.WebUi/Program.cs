@@ -84,6 +84,10 @@ builder.Services.AddHttpClient<PettyCashApiClient>(client =>
     client.BaseAddress = new Uri(apiBaseUrl))
     .AddHttpMessageHandler<BearerTokenHandler>();
 
+builder.Services.AddHttpClient<ChangeFundApiClient>(client =>
+    client.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<BearerTokenHandler>();
+
 builder.Services.AddHttpClient<ReceivableApiClient>(client =>
     client.BaseAddress = new Uri(apiBaseUrl))
     .AddHttpMessageHandler<BearerTokenHandler>();

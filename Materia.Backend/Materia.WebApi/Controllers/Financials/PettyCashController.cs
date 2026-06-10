@@ -54,9 +54,17 @@ public sealed class PettyCashController(
     public async Task<IActionResult> Record(
         [FromBody] RecordPettyCashRequest request, CancellationToken ct)
     {
+        // Idempotency key: prefer the body field; fall back to the Idempotency-Key header.
+        // A double-clicked or retried request must reuse the same key to be de-duplicated.
+        var idempotencyKey = request.IdempotencyKey is { } bodyKey && bodyKey != Guid.Empty
+            ? bodyKey
+            : Guid.TryParse(Request.Headers["Idempotency-Key"], out var headerKey)
+                ? headerKey
+                : Guid.Empty;
+
         var command = new RecordPettyCashExpenseCommand(
             request.Amount, request.Recipient, request.Category,
-            request.ReasonDetail, request.Notes, CurrentUser);
+            request.ReasonDetail, request.Notes, CurrentUser, idempotencyKey);
 
         var validation = await recordValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
@@ -72,4 +80,9 @@ public record RecordPettyCashRequest(
     string            Recipient,
     PettyCashCategory Category,
     string?           ReasonDetail,
-    string?           Notes);
+    string?           Notes,
+    /// <summary>
+    /// Client-generated de-duplication token (one per submit attempt). Optional in the body
+    /// if supplied via the <c>Idempotency-Key</c> header instead; one of the two is required.
+    /// </summary>
+    Guid?             IdempotencyKey = null);
