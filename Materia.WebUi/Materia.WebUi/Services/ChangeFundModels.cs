@@ -16,3 +16,17 @@ public record ChangeFundResultDto(
     int     PageSize,
     int     TotalPages,
     decimal TotalBalance);
+
+public record ChangeFundWithdrawalDto(
+    Guid     Id,
+    decimal  Amount,
+    string   Reason,
+    string   RecordedBy,
+    DateTime RecordedAt);
+
+public record ChangeFundWithdrawalResultDto(
+    List<ChangeFundWithdrawalDto> Items,
+    int TotalCount,
+    int Page,
+    int PageSize,
+    int TotalPages);

@@ -98,6 +98,11 @@
     private string? _error;
     private bool    _saving;
 
+    // Idempotency key: generated ONCE per form instance, reused on every retry so a
+    // timed-out-and-retried submit can't record the expense (and its change-fund
+    // deposit) twice. This form navigates away on success, so it is never reused.
+    private Guid _idempotencyKey = Guid.NewGuid();
+
     private void OnCategoryChanged()
     {
         // Drop any stray "Sebutkan" text when leaving the Lainnya template.
@@ -123,7 +128,8 @@
             _form.Recipient.Trim(),
             _form.Category,
             string.IsNullOrWhiteSpace(_form.ReasonDetail) ? null : _form.ReasonDetail!.Trim(),
-            string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes!.Trim());
+            string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes!.Trim(),
+            _idempotencyKey);
 
         if (error is not null) { _saving = false; _error = error; return; }
 

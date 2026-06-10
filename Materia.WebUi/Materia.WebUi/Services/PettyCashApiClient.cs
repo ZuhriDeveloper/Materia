@@ -22,10 +22,10 @@ public class PettyCashApiClient(HttpClient http)
 
     public async Task<(Guid? Id, string? Error)> RecordExpenseAsync(
         decimal amount, string recipient, PettyCashCategory category,
-        string? reasonDetail, string? notes, CancellationToken ct = default)
+        string? reasonDetail, string? notes, Guid idempotencyKey, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/pettycash",
-            new { amount, recipient, category, reasonDetail, notes }, ct);
+            new { amount, recipient, category, reasonDetail, notes, idempotencyKey }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
         var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);

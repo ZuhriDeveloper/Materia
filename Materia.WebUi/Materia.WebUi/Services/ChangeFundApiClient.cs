@@ -10,11 +10,28 @@ public class ChangeFundApiClient(HttpClient http)
         => http.GetFromJsonAsync<ChangeFundResultDto>(
             $"api/change-fund?page={page}&pageSize={pageSize}", ct);
 
+    public Task<ChangeFundWithdrawalResultDto?> GetWithdrawalsAsync(
+        int page = 1, int pageSize = 20,
+        CancellationToken ct = default)
+        => http.GetFromJsonAsync<ChangeFundWithdrawalResultDto>(
+            $"api/change-fund/withdrawals?page={page}&pageSize={pageSize}", ct);
+
     public async Task<(Guid? Id, List<string>? Errors)> RecordDepositAsync(
-        decimal amount, string? notes, CancellationToken ct = default)
+        decimal amount, string? notes, Guid idempotencyKey, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/change-fund",
-            new { amount, notes }, ct);
+            new { amount, notes, idempotencyKey }, ct);
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorsAsync(response));
+        var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);
+        return (result?.Id, null);
+    }
+
+    public async Task<(Guid? Id, List<string>? Errors)> RecordWithdrawalAsync(
+        decimal amount, string reason, Guid idempotencyKey, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("api/change-fund/withdrawals",
+            new { amount, reason, idempotencyKey }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorsAsync(response));
         var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);

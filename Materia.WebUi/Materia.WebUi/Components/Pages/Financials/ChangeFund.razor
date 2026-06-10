@@ -81,6 +81,56 @@
                 </EditForm>
             </div>
         </div>
+
+        @* ── Withdrawal / correction form (Admin only) ── *@
+        <div class="card mb-4" style="max-width:560px">
+            <div class="card-header fw-semibold">
+                <i class="bi bi-dash-circle me-1"></i> Koreksi / Penarikan
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">
+                    Catat penarikan uang kembalian untuk mengoreksi deposit yang salah.
+                    Saldo tidak boleh menjadi negatif.
+                </p>
+                @if (_withdrawErrors is { Count: > 0 })
+                {
+                    <div class="alert alert-danger py-2">
+                        <ul class="mb-0 ps-3">
+                            @foreach (var e in _withdrawErrors)
+                            {
+                                <li>@e</li>
+                            }
+                        </ul>
+                    </div>
+                }
+                <EditForm Model="_withdrawForm" OnValidSubmit="HandleWithdrawSubmit">
+                    <DataAnnotationsValidator />
+                    <div class="row g-3">
+                        <div class="col-sm-6">
+                            <label class="form-label">Jumlah (Rp) <span class="text-danger">*</span></label>
+                            <InputNumber class="form-control" @bind-Value="_withdrawForm.Amount"
+                                         placeholder="cth. 50000" />
+                            <ValidationMessage For="() => _withdrawForm.Amount" class="small text-danger" />
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">Alasan <span class="text-danger">*</span></label>
+                            <InputText class="form-control" @bind-Value="_withdrawForm.Reason"
+                                       placeholder="cth. Koreksi deposit ganda" />
+                            <ValidationMessage For="() => _withdrawForm.Reason" class="small text-danger" />
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" disabled="@_withdrawing">
+                            @if (_withdrawing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-dash-lg me-1"></i> Catat Penarikan
+                        </button>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
     </Authorized>
 </AuthorizeView>
 
@@ -162,20 +212,66 @@ else
     }
 }
 
+@* ── Withdrawal list ── *@
+@if (_withdrawals is { Items.Count: > 0 })
+{
+    <h6 class="fw-bold mt-4 mb-2 text-danger">
+        <i class="bi bi-dash-circle me-1"></i> Penarikan / Koreksi
+    </h6>
+    <div class="card">
+        <div class="card-body p-0">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Tanggal</th>
+                        <th>Alasan</th>
+                        <th>Dicatat Oleh</th>
+                        <th class="text-end">Jumlah</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var w in _withdrawals.Items)
+                    {
+                        <tr>
+                            <td class="small text-muted">
+                                @w.RecordedAt.ToLocalTime().ToString("dd/MM/yy HH:mm")
+                            </td>
+                            <td class="small">@w.Reason</td>
+                            <td class="small">@w.RecordedBy</td>
+                            <td class="text-end fw-semibold text-danger">− Rp @w.Amount.ToString("N0")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </div>
+}
+
 @code {
-    private ChangeFundResultDto? _data;
-    private int                  _page     = 1;
-    private const int            _pageSize = 20;
+    private ChangeFundResultDto?           _data;
+    private ChangeFundWithdrawalResultDto? _withdrawals;
+    private int                            _page     = 1;
+    private const int                      _pageSize = 20;
 
     private readonly DepositForm _form = new();
     private List<string>?        _depositErrors;
     private bool                 _saving;
 
+    private readonly WithdrawForm _withdrawForm = new();
+    private List<string>?         _withdrawErrors;
+    private bool                  _withdrawing;
+
+    // Idempotency keys: generated ONCE per pending form, reused on every retry so a
+    // timed-out-and-retried submit can't double-post. Regenerated only after a success.
+    private Guid _depositKey  = Guid.NewGuid();
+    private Guid _withdrawKey = Guid.NewGuid();
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
-        _data = await Api.GetAsync(_page, _pageSize);
+        _data        = await Api.GetAsync(_page, _pageSize);
+        _withdrawals = await Api.GetWithdrawalsAsync(1, _pageSize);
     }
 
     private async Task HandleDepositSubmit()
@@ -185,7 +281,8 @@ else
 
         var (_, errors) = await Api.RecordDepositAsync(
             _form.Amount,
-            string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes.Trim());
+            string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes.Trim(),
+            _depositKey);
 
         _saving = false;
 
@@ -193,7 +290,29 @@ else
 
         _form.Amount = 0;
         _form.Notes  = null;
+        _depositKey  = Guid.NewGuid();   // fresh key for the next deposit
         _page        = 1;
+        await LoadAsync();
+    }
+
+    private async Task HandleWithdrawSubmit()
+    {
+        _withdrawErrors = null;
+        _withdrawing = true;
+
+        var (_, errors) = await Api.RecordWithdrawalAsync(
+            _withdrawForm.Amount,
+            _withdrawForm.Reason.Trim(),
+            _withdrawKey);
+
+        _withdrawing = false;
+
+        if (errors is not null) { _withdrawErrors = errors; return; }
+
+        _withdrawForm.Amount = 0;
+        _withdrawForm.Reason = string.Empty;
+        _withdrawKey         = Guid.NewGuid();   // fresh key for the next withdrawal
+        _page                = 1;
         await LoadAsync();
     }
 
@@ -217,5 +336,15 @@ else
 
         [MaxLength(500)]
         public string? Notes { get; set; }
+    }
+
+    private sealed class WithdrawForm
+    {
+        [Range(0.01, double.MaxValue, ErrorMessage = "Jumlah harus lebih dari nol.")]
+        public decimal Amount { get; set; }
+
+        [Required(ErrorMessage = "Alasan penarikan wajib diisi.")]
+        [MaxLength(300, ErrorMessage = "Alasan maksimal 300 karakter.")]
+        public string Reason { get; set; } = string.Empty;
     }
 }
