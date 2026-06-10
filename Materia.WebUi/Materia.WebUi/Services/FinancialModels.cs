@@ -10,7 +10,11 @@ public record ProfitAndLossResult(
     decimal                    GrossProfit,
     decimal                    GrossProfitMarginPct,
     List<PnlLineItemResult>    RevenueLines,
-    List<PnlLineItemResult>    CogsLines);
+    List<PnlLineItemResult>    CogsLines,
+    // Phase 1 — line pricing fields (default 0 so existing API responses still deserialise)
+    decimal                    GrossSales      = 0m,
+    decimal                    DiscountsGiven  = 0m,
+    decimal                    NetSales        = 0m);
 
 public record PnlLineItemResult(
     string   Description,

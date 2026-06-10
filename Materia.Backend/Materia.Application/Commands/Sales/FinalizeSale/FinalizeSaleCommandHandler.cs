@@ -1,5 +1,6 @@
 using Materia.Application.Contracts.Customers;
 using Materia.Application.Contracts.Inventory;
+using Materia.Application.Contracts.Purchasing;
 using Materia.Application.Contracts.Sales;
 using Materia.Application.DTOs.Inventory;
 using Materia.Domain.Common;
@@ -20,12 +21,13 @@ namespace Materia.Application.Commands.Sales.FinalizeSale;
 /// </para>
 /// </summary>
 public sealed class FinalizeSaleCommandHandler(
-    ISaleRepository           saleRepository,
-    ICustomerRepository       customerRepository,
-    ICustomerQueryRepository  customerQueryRepository,
-    IProductQueryRepository   productQueryRepository,
-    IStockDeductionService    stockDeduction,
-    IReferenceNumberGenerator referenceGenerator)
+    ISaleRepository                  saleRepository,
+    ICustomerRepository              customerRepository,
+    ICustomerQueryRepository         customerQueryRepository,
+    IProductQueryRepository          productQueryRepository,
+    IStockDeductionService           stockDeduction,
+    IReferenceNumberGenerator        referenceGenerator,
+    ILatestPurchasePriceRepository   latestPurchasePrice)
 {
     public async Task<FinalizeSaleResult> HandleAsync(
         FinalizeSaleCommand command, CancellationToken ct = default)
@@ -108,6 +110,11 @@ public sealed class FinalizeSaleCommandHandler(
 
             var quantityInBaseUnit = ResolveBaseQuantity(item.Quantity, item.UnitName, product);
 
+            // Snapshot unit cost from the latest supplier purchase price.
+            // Do NOT trust the client for cost — always resolve server-side.
+            // When no purchase price exists, UnitCost = 0 (margin report shows unknown cost).
+            var unitCost = (await latestPurchasePrice.GetLatestCostAsync(item.ProductId, ct)) ?? 0m;
+
             sale.AddItem(
                 item.ProductId,
                 item.ProductName,
@@ -117,7 +124,10 @@ public sealed class FinalizeSaleCommandHandler(
                 item.UnitPrice,
                 command.ServedBy,
                 item.VariantId,
-                item.ColorName);
+                item.ColorName,
+                listUnitPrice:   item.ListUnitPrice,
+                discountPerUnit: item.DiscountPerUnit,
+                unitCost:        unitCost);
         }
     }
 

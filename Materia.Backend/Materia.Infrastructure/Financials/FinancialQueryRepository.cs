@@ -15,59 +15,76 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
     public async Task<ProfitAndLossDto> GetProfitAndLossAsync(
         DateTime from, DateTime to, CancellationToken ct = default)
     {
-        // Revenue — all completed sales in the period
+        // Revenue + matched COGS — all completed sales in the period.
+        // Phase 1: COGS = sum of snapshotted line costs stored on the sale read model.
+        //
+        // Formula summary (see ProfitAndLossDto XML doc for full definitions):
+        //   GrossSales     = sum(SaleReadModel.GrossSubtotal)              [pre-discount revenue]
+        //   DiscountsGiven = sum(LineDiscountTotal + Discount)              [all discounts]
+        //   NetSales       = sum(GrandTotal - Tax)                         [customer-paid excl. VAT]
+        //   TotalCogs      = sum(TotalCost)                                [matched line cost]
+        //   GrossProfit    = NetSales - TotalCogs
+        //   MarginPct      = GrossProfit / NetSales * 100  (0 when NetSales = 0)
+        //   TotalRevenue   = NetSales                      [back-compat alias]
         var salesRaw = await context.SaleReadModels
             .AsNoTracking()
             .Where(s => s.CreatedAt >= from && s.CreatedAt <= to
                      && s.Status != SaleStatus.Draft
                      && s.Status != SaleStatus.Cancelled)
             .OrderBy(s => s.CreatedAt)
-            .Select(s => new { s.ReferenceNo, s.CustomerName, s.CreatedAt, s.GrandTotal })
+            .Select(s => new
+            {
+                s.ReferenceNo,
+                s.CustomerName,
+                s.CreatedAt,
+                s.GrandTotal,
+                s.Tax,
+                s.Discount,
+                s.GrossSubtotal,
+                s.LineDiscountTotal,
+                s.TotalCost,
+            })
             .ToListAsync(ct);
 
-        // COGS — received purchase orders in the period (supplier cost)
-        var posRaw = await context.PurchaseOrderReadModels
-            .AsNoTracking()
-            .Where(p => p.Status == "Received"
-                     && p.ReceivedAt.HasValue
-                     && p.ReceivedAt.Value >= from
-                     && p.ReceivedAt.Value <= to)
-            .OrderBy(p => p.ReceivedAt)
-            .ToListAsync(ct);
-
+        // Revenue lines: one per sale, Amount = GrandTotal − Tax (net revenue excl. VAT)
         var revenueLines = salesRaw
             .Select(s => new PnlLineItemDto(
                 $"Penjualan — {s.CustomerName}",
                 s.CreatedAt,
                 s.ReferenceNo,
-                s.GrandTotal))
+                s.GrandTotal - s.Tax))   // net of VAT
             .ToList();
 
-        var cogsLines = new List<PnlLineItemDto>();
-        foreach (var po in posRaw)
-        {
-            var lines     = JsonSerializer.Deserialize<List<PoLineJson>>(po.LinesJson, _json) ?? [];
-            var totalCost = lines.Sum(l => l.ReceivedQty * l.UnitCost);
-            if (totalCost <= 0) continue;
+        // COGS lines: one per sale (matched line cost)
+        var cogsLines = salesRaw
+            .Where(s => s.TotalCost > 0)
+            .Select(s => new PnlLineItemDto(
+                $"HPP Penjualan — {s.CustomerName}",
+                s.CreatedAt,
+                s.ReferenceNo,
+                s.TotalCost))
+            .ToList();
 
-            cogsLines.Add(new PnlLineItemDto(
-                $"Pembelian dari {po.SupplierName}",
-                po.ReceivedAt!.Value,
-                po.Id.ToString("N")[..8].ToUpperInvariant(),
-                totalCost));
-        }
-
-        var totalRevenue = revenueLines.Sum(l => l.Amount);
-        var totalCogs    = cogsLines.Sum(l => l.Amount);
-        var grossProfit  = totalRevenue - totalCogs;
-        var marginPct    = totalRevenue > 0
-                           ? Math.Round(grossProfit / totalRevenue * 100, 1)
-                           : 0m;
+        var grossSales     = salesRaw.Sum(s => s.GrossSubtotal);
+        var discountsGiven = salesRaw.Sum(s => s.LineDiscountTotal + s.Discount);
+        var netSales       = salesRaw.Sum(s => s.GrandTotal - s.Tax);
+        var totalCogs      = salesRaw.Sum(s => s.TotalCost);
+        var grossProfit    = netSales - totalCogs;
+        var marginPct      = netSales > 0
+                             ? Math.Round(grossProfit / netSales * 100, 1)
+                             : 0m;
 
         return new ProfitAndLossDto(
             from, to,
-            totalRevenue, totalCogs, grossProfit, marginPct,
-            revenueLines.AsReadOnly(), cogsLines.AsReadOnly());
+            TotalRevenue:         netSales,       // back-compat field = NetSales
+            TotalCogs:            totalCogs,
+            GrossProfit:          grossProfit,
+            GrossProfitMarginPct: marginPct,
+            RevenueLines:         revenueLines.AsReadOnly(),
+            CogsLines:            cogsLines.AsReadOnly(),
+            GrossSales:           grossSales,
+            DiscountsGiven:       discountsGiven,
+            NetSales:             netSales);
     }
 
     // ── Cash Flow ─────────────────────────────────────────────────────────────

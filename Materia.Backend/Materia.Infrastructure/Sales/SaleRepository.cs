@@ -85,10 +85,13 @@ public class SaleRepository(AppDbContext context, ICurrentStore currentStore) : 
         projection.Status             = sale.Status;
         projection.IsDeliveryRequired = sale.IsDeliveryRequired;
         projection.ServedBy           = sale.ServedBy;
+        projection.GrossSubtotal      = sale.GrossSubtotal.Amount;
+        projection.LineDiscountTotal  = sale.LineDiscountTotal.Amount;
         projection.Subtotal           = sale.Subtotal.Amount;
         projection.Discount           = sale.Discount.Amount;
         projection.Tax                = sale.Tax.Amount;
         projection.GrandTotal         = sale.GrandTotal.Amount;
+        projection.TotalCost          = sale.TotalCost.Amount;
         projection.AmountPaid         = sale.AmountPaid.Amount;
         projection.OutstandingAmount  = sale.OutstandingAmount.Amount;
 
@@ -117,8 +120,15 @@ public class SaleRepository(AppDbContext context, ICurrentStore currentStore) : 
             {
                 row.Quantity           = item.Quantity;
                 row.QuantityInBaseUnit = item.QuantityInBaseUnit;
+                row.ListUnitPrice      = item.ListUnitPrice.Amount;
+                row.DiscountPerUnit    = item.DiscountPerUnit.Amount;
+                row.NetUnitPrice       = item.NetUnitPrice.Amount;
                 row.UnitPrice          = item.UnitPrice.Amount;
                 row.Subtotal           = item.Subtotal.Amount;
+                row.GrossSubtotal      = item.GrossSubtotal.Amount;
+                row.LineDiscount       = item.LineDiscount.Amount;
+                row.UnitCost           = item.UnitCost.Amount;
+                row.LineCost           = item.LineCost.Amount;
             }
             else
             {
@@ -134,8 +144,15 @@ public class SaleRepository(AppDbContext context, ICurrentStore currentStore) : 
                     UnitName           = item.UnitName,
                     Quantity           = item.Quantity,
                     QuantityInBaseUnit = item.QuantityInBaseUnit,
+                    ListUnitPrice      = item.ListUnitPrice.Amount,
+                    DiscountPerUnit    = item.DiscountPerUnit.Amount,
+                    NetUnitPrice       = item.NetUnitPrice.Amount,
                     UnitPrice          = item.UnitPrice.Amount,
                     Subtotal           = item.Subtotal.Amount,
+                    GrossSubtotal      = item.GrossSubtotal.Amount,
+                    LineDiscount       = item.LineDiscount.Amount,
+                    UnitCost           = item.UnitCost.Amount,
+                    LineCost           = item.LineCost.Amount,
                 });
             }
         }

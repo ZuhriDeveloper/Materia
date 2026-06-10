@@ -112,6 +112,15 @@ public class SalesController(
     }
 }
 
+/// <summary>
+/// HTTP request body for the single-step consumer sale finalize endpoint.
+/// <para>
+/// Item-level pricing: each item in <see cref="Items"/> may carry
+/// <c>ListUnitPrice</c> and <c>DiscountPerUnit</c> to record gross-price and
+/// line discounts. When omitted, no line discount is applied (back-compat).
+/// UnitCost is always server-side — never accepted from the client.
+/// </para>
+/// </summary>
 public record FinalizeSaleRequest(
     Guid?                                CustomerId,
     string?                              CustomerName,

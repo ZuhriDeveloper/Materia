@@ -116,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Purchasing.IPurchaseOrderRepository, Purchasing.PurchaseOrderRepository>();
         services.AddScoped<Application.Contracts.Purchasing.ISupplierQueryRepository, Purchasing.SupplierQueryRepository>();
         services.AddScoped<Application.Contracts.Purchasing.IPurchaseOrderQueryRepository, Purchasing.PurchaseOrderQueryRepository>();
+        services.AddScoped<Application.Contracts.Purchasing.ILatestPurchasePriceRepository, Purchasing.LatestPurchasePriceRepository>();
 
         // Financials
         services.AddScoped<Application.Contracts.Financials.IFinancialQueryRepository, Financials.FinancialQueryRepository>();

@@ -57,13 +57,15 @@ public record PagedSalesDto(
 // ── Consumer sale (single-step finalize) ────────────────────────────────────
 
 public record FinalizeSaleItemInput(
-    Guid    ProductId,
-    string  ProductName,
-    string  UnitName,
-    decimal Quantity,
-    decimal UnitPrice,
-    Guid?   VariantId = null,
-    string? ColorName = null);
+    Guid     ProductId,
+    string   ProductName,
+    string   UnitName,
+    decimal  Quantity,
+    decimal  UnitPrice,
+    Guid?    VariantId        = null,
+    string?  ColorName        = null,
+    decimal? ListUnitPrice    = null,
+    decimal? DiscountPerUnit  = null);
 
 public record FinalizeSaleResult(
     Guid    SaleId,

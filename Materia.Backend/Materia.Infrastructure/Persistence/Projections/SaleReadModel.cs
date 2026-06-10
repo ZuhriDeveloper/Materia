@@ -14,10 +14,17 @@ public class SaleReadModel
     public SaleType      SaleType          { get; set; }
     public SaleStatus    Status            { get; set; }
     public bool          IsDeliveryRequired { get; set; }
+    /// <summary>Gross line subtotals before line discounts.</summary>
+    public decimal       GrossSubtotal     { get; set; }
+    /// <summary>Total line discounts across all items.</summary>
+    public decimal       LineDiscountTotal { get; set; }
+    /// <summary>Net line subtotals (after line-level discounts).</summary>
     public decimal       Subtotal          { get; set; }
     public decimal       Discount          { get; set; }
     public decimal       Tax               { get; set; }
     public decimal       GrandTotal        { get; set; }
+    /// <summary>Sum of line costs (snapshotted unit costs × base-unit quantities).</summary>
+    public decimal       TotalCost         { get; set; }
     public decimal       AmountPaid        { get; set; }
     public decimal       OutstandingAmount { get; set; }
     public string        CreatedBy         { get; set; } = default!;

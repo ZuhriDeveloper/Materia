@@ -27,8 +27,28 @@ public sealed class Sale : AggregateRoot<SaleId>
 
     public IReadOnlyList<SaleItem> Items => _items.AsReadOnly();
 
-    public Money Subtotal   => new(_items.Sum(i => i.Subtotal.Amount));
-    public Money GrandTotal => new(Math.Max(0m, Subtotal.Amount - Discount.Amount + Tax.Amount));
+    /// <summary>Sum of all gross (pre-discount) line subtotals.</summary>
+    public Money GrossSubtotal      => new(_items.Sum(i => i.GrossSubtotal.Amount));
+
+    /// <summary>Total line discounts across all items.</summary>
+    public Money LineDiscountTotal  => new(_items.Sum(i => i.LineDiscount.Amount));
+
+    /// <summary>
+    /// Net subtotal: sum of each line's net subtotal (after line-level discounts).
+    /// When no discounts are in effect this equals <see cref="GrossSubtotal"/>.
+    /// </summary>
+    public Money Subtotal           => new(_items.Sum(i => i.Subtotal.Amount));
+
+    public Money GrandTotal         => new(Math.Max(0m, Subtotal.Amount - Discount.Amount + Tax.Amount));
+
+    /// <summary>Total snapshotted cost across all lines (in base units).</summary>
+    public Money TotalCost          => new(_items.Sum(i => i.LineCost.Amount));
+
+    /// <summary>
+    /// Aggregate gross margin (decimal — can be negative).
+    /// <c>GrandTotal − TotalCost</c>.
+    /// </summary>
+    public decimal GrossMargin      => GrandTotal.Amount - TotalCost.Amount;
 
     /// <summary>Remaining customer debt (piutang) after the recorded settlement.</summary>
     public Money OutstandingAmount => new(Math.Max(0m, GrandTotal.Amount - AmountPaid.Amount));
@@ -83,6 +103,21 @@ public sealed class Sale : AggregateRoot<SaleId>
             Id, customerAddressId, deliveryAddress.Trim(), updatedBy, DateTime.UtcNow));
     }
 
+    /// <summary>
+    /// Adds a line item to the sale.
+    /// </summary>
+    /// <param name="unitPrice">
+    /// The net (as-charged) price per entered unit. Used as the list price when
+    /// <paramref name="listUnitPrice"/> is not supplied (back-compat default).
+    /// </param>
+    /// <param name="listUnitPrice">
+    /// Gross list price before line discount. When null, defaults to <paramref name="unitPrice"/>.
+    /// Must be >= <paramref name="unitPrice"/> (so the derived discount is non-negative).
+    /// </param>
+    /// <param name="discountPerUnit">
+    /// Per-unit discount off <paramref name="listUnitPrice"/>. Must be 0 ≤ discount ≤ list price.
+    /// </param>
+    /// <param name="unitCost">Snapshotted supplier purchase cost per base unit. Zero by default.</param>
     public SaleItemId AddItem(
         Guid    productId,
         string  productName,
@@ -91,14 +126,28 @@ public sealed class Sale : AggregateRoot<SaleId>
         decimal quantityInBaseUnit,
         decimal unitPrice,
         string  updatedBy,
-        Guid?   variantId = null,
-        string? colorName = null)
+        Guid?   variantId          = null,
+        string? colorName          = null,
+        decimal? listUnitPrice     = null,
+        decimal? discountPerUnit   = null,
+        decimal  unitCost          = 0m,
+        Guid?   appliedPromotionId = null,
+        string? promotionLabel     = null)
     {
         EnsureDraft();
         if (quantity <= 0)
             throw new DomainException("Kuantitas harus lebih dari nol.");
         if (unitPrice < 0)
             throw new DomainException("Harga tidak boleh negatif.");
+
+        var effectiveListPrice = listUnitPrice ?? unitPrice;
+
+        if (discountPerUnit.HasValue && discountPerUnit.Value < 0)
+            throw new DomainException("Diskon tidak boleh negatif.");
+        if (discountPerUnit.HasValue && discountPerUnit.Value > effectiveListPrice)
+            throw new DomainException("Diskon tidak boleh melebihi harga.");
+
+        var effectiveDiscount = discountPerUnit ?? 0m;
 
         var itemId = SaleItemId.New();
         Raise(new SaleItemAdded(
@@ -108,7 +157,12 @@ public sealed class Sale : AggregateRoot<SaleId>
             quantity, quantityInBaseUnit, unitPrice,
             updatedBy, DateTime.UtcNow,
             variantId,
-            string.IsNullOrWhiteSpace(colorName) ? null : colorName.Trim()));
+            string.IsNullOrWhiteSpace(colorName) ? null : colorName.Trim(),
+            ListUnitPrice:      effectiveListPrice,
+            DiscountPerUnit:    effectiveDiscount,
+            UnitCost:           unitCost,
+            AppliedPromotionId: appliedPromotionId,
+            PromotionLabel:     promotionLabel));
 
         return itemId;
     }
@@ -260,10 +314,17 @@ public sealed class Sale : AggregateRoot<SaleId>
                 break;
 
             case SaleItemAdded e:
+                // Back-compat: old events without ListUnitPrice/DiscountPerUnit/UnitCost
+                // default ListUnitPrice to UnitPrice, discount/cost to zero.
+                var listPrice    = new Money(e.ListUnitPrice ?? e.UnitPrice);
+                var discPerUnit  = new Money(e.DiscountPerUnit ?? 0m);
+                var costPerUnit  = new Money(e.UnitCost ?? 0m);
                 _items.Add(new SaleItem(
                     e.ItemId, e.ProductId, e.ProductName,
                     e.UnitName, e.Quantity, e.QuantityInBaseUnit,
-                    new Money(e.UnitPrice), e.VariantId, e.ColorName));
+                    listPrice, discPerUnit, costPerUnit,
+                    e.VariantId, e.ColorName,
+                    e.AppliedPromotionId, e.PromotionLabel));
                 break;
 
             case SaleItemRemoved e:

@@ -287,7 +287,22 @@ else
                                                  ValueChanged="@(v => OnPriceChanged(context, v))"
                                                  Min="0m" Step="500m" Format="N0"
                                                  Variant="Variant.Outlined" Margin="Margin.Dense"
-                                                 HideSpinButtons="true" Style="width:112px" />
+                                                 HideSpinButtons="true"
+                                                 Style="@($"width:112px{(context.HasPromo ? ";border-color:var(--mud-palette-success)" : "")}")" />
+                                @if (context.HasPromo)
+                                {
+                                    <div style="text-align:right;line-height:1.2;margin-top:1px">
+                                        <span style="font-size:.68rem;text-decoration:line-through;
+                                                     color:var(--mud-palette-text-secondary)">
+                                            Rp @context.ListUnitPrice.ToString("N0")
+                                        </span>
+                                        <MudChip T="string" Size="Size.Small"
+                                                 Color="Color.Success" Variant="Variant.Filled"
+                                                 Style="height:14px;font-size:.6rem;padding:0 4px;margin:0">
+                                            Hemat @context.DiscountPerUnit.ToString("N0")
+                                        </MudChip>
+                                    </div>
+                                }
                             </MudTd>
                             <MudTd Style="padding:4px 8px;text-align:right">
                                 <MudText Typo="Typo.body2" Style="font-weight:700">
@@ -362,8 +377,25 @@ else
                     {
                         <MudAlert Severity="Severity.Error" Dense="true" Class="mb-3">@_error</MudAlert>
                     }
+                    @* Gross subtotal row — only shown when there are per-line promos *@
+                    @if (ItemDiscountTotal > 0)
+                    {
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2" Color="Color.Secondary">Subtotal kotor</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Secondary"
+                                     Style="text-decoration:line-through">
+                                Rp @GrossSubtotal.ToString("N0")
+                            </MudText>
+                        </div>
+                        <div class="d-flex justify-space-between mb-1">
+                            <MudText Typo="Typo.body2" Color="Color.Success">Diskon item</MudText>
+                            <MudText Typo="Typo.body2" Color="Color.Success" Style="font-weight:600">
+                                -Rp @ItemDiscountTotal.ToString("N0")
+                            </MudText>
+                        </div>
+                    }
                     <div class="d-flex justify-space-between mb-2">
-                        <MudText Typo="Typo.body2" Color="Color.Secondary">Subtotal</MudText>
+                        <MudText Typo="Typo.body2" Style="@(ItemDiscountTotal > 0 ? "font-weight:600" : "")">Subtotal</MudText>
                         <MudText Typo="Typo.body2" Style="font-weight:600">
                             Rp @Subtotal.ToString("N0")
                         </MudText>
@@ -778,17 +810,44 @@ else
                         <div style="display:flex;justify-content:space-between;
                                     font-size:8pt;padding-left:3mm">
                             <span>
-                                @FormatQty(item.Quantity) @item.UnitName
-                                &times; @item.UnitPrice.ToString("N0")
+                                @if (item.HasPromo)
+                                {
+                                    <span style="text-decoration:line-through;opacity:.6">
+                                        @FormatQty(item.Quantity) @item.UnitName &times; @item.ListUnitPrice.ToString("N0")
+                                    </span>
+                                    <span>&nbsp;</span>
+                                    <span>@FormatQty(item.Quantity) @item.UnitName &times; @item.UnitPrice.ToString("N0")</span>
+                                }
+                                else
+                                {
+                                    <span>@FormatQty(item.Quantity) @item.UnitName &times; @item.UnitPrice.ToString("N0")</span>
+                                }
                             </span>
                             <span style="font-weight:600">@item.Total.ToString("N0")</span>
                         </div>
+                        @if (item.HasPromo)
+                        {
+                            <div style="font-size:7.5pt;padding-left:3mm;color:#2e7d32">
+                                Hemat Rp @item.DiscountPerUnit.ToString("N0") / @item.UnitName
+                            </div>
+                        }
                     </div>
                 }
             </div>
 
             @* ─── Totals ────────────────────────────────── *@
             <div style="font-size:8pt;margin-bottom:1mm">
+                @if (_receipt.ItemDiscount > 0)
+                {
+                    <div style="display:flex;justify-content:space-between;opacity:.7">
+                        <span>Subtotal kotor</span>
+                        <span style="text-decoration:line-through">@_receipt.GrossSubtotal.ToString("N0")</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;color:#2e7d32">
+                        <span>Diskon item</span>
+                        <span>-@_receipt.ItemDiscount.ToString("N0")</span>
+                    </div>
+                }
                 <div style="display:flex;justify-content:space-between">
                     <span>Subtotal</span>
                     <span>@_receipt.Subtotal.ToString("N0")</span>
@@ -816,6 +875,14 @@ else
                 <span>TOTAL</span>
                 <span>Rp @_receipt.GrandTotal.ToString("N0")</span>
             </div>
+
+            @if (_receipt.ItemDiscount + _receipt.Discount > 0)
+            {
+                <div style="font-size:7.5pt;margin-bottom:2mm;text-align:center;
+                            background:#f1f8e9;padding:1mm;color:#2e7d32;font-weight:600">
+                    Total hemat: Rp @((_receipt.ItemDiscount + _receipt.Discount).ToString("N0"))
+                </div>
+            }
 
             @* ─── Payment / debt ────────────────────────── *@
             <div style="font-size:8pt;margin-bottom:2mm">
@@ -911,8 +978,13 @@ else
     private bool _saleFinalized;
 
     // ── Computed totals ──────────────────────────────────────────────────────
-    private decimal Subtotal       => _lines.Sum(l => l.Total);
-    private decimal DiscountAmount => Math.Clamp(_discount, 0m, Subtotal);
+    /// Sum of Qty * ListUnitPrice — gross before per-line promos
+    private decimal GrossSubtotal    => _lines.Sum(l => l.Quantity * l.ListUnitPrice);
+    /// Sum of per-line promo savings
+    private decimal ItemDiscountTotal => _lines.Sum(l => l.LineItemDiscount);
+    /// Net subtotal: Qty * UnitPrice (charged price)
+    private decimal Subtotal          => _lines.Sum(l => l.Total);
+    private decimal DiscountAmount    => Math.Clamp(_discount, 0m, Subtotal);
     // PPN rounding mirrors the server (MidpointRounding.AwayFromZero) so the displayed and
     // printed Grand Total exactly match the persisted amount and the recorded debt.
     private decimal TaxAmount      => _taxEnabled
@@ -1071,16 +1143,17 @@ else
 
         _lines.Add(new CartLine
         {
-            ProductId   = product.Id,
-            VariantId   = variant?.VariantId,
-            ProductName = product.Name,
-            ColorName   = variant?.ColorName,
-            Sku         = product.Sku,
-            UnitName    = baseUnit.UnitName,
-            Quantity    = 1,
-            UnitPrice   = unitPrice,
-            Units       = units,
-            Variants    = variants,
+            ProductId     = product.Id,
+            VariantId     = variant?.VariantId,
+            ProductName   = product.Name,
+            ColorName     = variant?.ColorName,
+            Sku           = product.Sku,
+            UnitName      = baseUnit.UnitName,
+            Quantity      = 1,
+            UnitPrice     = unitPrice,
+            ListUnitPrice = unitPrice,
+            Units         = units,
+            Variants      = variants,
         });
     }
 
@@ -1105,17 +1178,19 @@ else
     {
         var unit = line.Units.FirstOrDefault(u => u.UnitName == unitName);
         if (unit is null) return;
-        line.UnitName  = unit.UnitName;
-        line.UnitPrice = unit.SalePrice;
+        line.UnitName      = unit.UnitName;
+        line.UnitPrice     = unit.SalePrice;
+        line.ListUnitPrice = unit.SalePrice;   // reset catalog price on unit switch
     }
 
     private void OnVariantChanged(CartLine line, Guid? variantId)
     {
         var variant = line.Variants.FirstOrDefault(v => v.VariantId == variantId);
         if (variant is null) return;
-        line.VariantId = variant.VariantId;
-        line.ColorName = variant.ColorName;
-        line.UnitPrice = variant.EffectivePrice;
+        line.VariantId     = variant.VariantId;
+        line.ColorName     = variant.ColorName;
+        line.UnitPrice     = variant.EffectivePrice;
+        line.ListUnitPrice = variant.EffectivePrice;  // reset catalog price on variant switch
     }
 
     private void OnQtyChanged(CartLine line, decimal qty)
@@ -1162,9 +1237,18 @@ else
         _error      = null;
 
         var items = _lines
-            .Select(l => new FinalizeSaleItemInput(
-                l.ProductId, l.ProductName, l.UnitName, l.Quantity, l.UnitPrice,
-                l.VariantId, l.ColorName))
+            .Select(l =>
+            {
+                // Compute the consistent triple: UnitPrice == ListUnitPrice - DiscountPerUnit.
+                // effectiveList moves UP if the cashier typed a price above catalog (no negative discount).
+                var charged       = Math.Round(l.UnitPrice,     2, MidpointRounding.AwayFromZero);
+                var effectiveList = Math.Round(Math.Max(l.ListUnitPrice, l.UnitPrice), 2, MidpointRounding.AwayFromZero);
+                var discount      = Math.Round(effectiveList - charged, 2, MidpointRounding.AwayFromZero);
+                return new FinalizeSaleItemInput(
+                    l.ProductId, l.ProductName, l.UnitName, l.Quantity, charged,
+                    l.VariantId, l.ColorName,
+                    ListUnitPrice: effectiveList, DiscountPerUnit: discount);
+            })
             .ToList();
 
         var (result, error) = await SaleApi.FinalizeAsync(
@@ -1199,7 +1283,9 @@ else
             IsDeliveryRequired  : _isDeliveryRequired,
             Lines               : _lines.Select(l => new ReceiptLine(
                                       l.ProductName, l.ColorName, l.UnitName, l.Quantity,
-                                      l.UnitPrice, l.Total)).ToList(),
+                                      l.UnitPrice, l.ListUnitPrice, l.Total)).ToList(),
+            GrossSubtotal       : GrossSubtotal,
+            ItemDiscount        : ItemDiscountTotal,
             Subtotal            : Subtotal,
             Discount            : DiscountAmount,
             Tax                 : TaxAmount,
@@ -1261,17 +1347,22 @@ else
     // ── Inner types ──────────────────────────────────────────────────────────
     private sealed class CartLine
     {
-        public Guid    ProductId   { get; init; }
-        public Guid?   VariantId   { get; set; }
-        public string  ProductName { get; init; } = "";
-        public string? ColorName   { get; set; }
-        public string  Sku         { get; init; } = "";
-        public string  UnitName    { get; set; }  = "";
-        public decimal Quantity    { get; set; }
-        public decimal UnitPrice   { get; set; }
+        public Guid    ProductId     { get; init; }
+        public Guid?   VariantId     { get; set; }
+        public string  ProductName   { get; init; } = "";
+        public string? ColorName     { get; set; }
+        public string  Sku           { get; init; } = "";
+        public string  UnitName      { get; set; }  = "";
+        public decimal Quantity      { get; set; }
+        public decimal UnitPrice     { get; set; }
+        /// <summary>Catalog / list price at the time of adding/unit-switching. Never overwritten by cashier edits.</summary>
+        public decimal ListUnitPrice { get; set; }
         public IReadOnlyList<ProductUnitPriceDto> Units { get; init; } = [];
         public IReadOnlyList<ProductVariantSearchDto> Variants { get; init; } = [];
-        public decimal Total => Quantity * UnitPrice;
+        public decimal Total            => Quantity * UnitPrice;
+        public bool    HasPromo         => UnitPrice < ListUnitPrice;
+        public decimal DiscountPerUnit  => HasPromo ? ListUnitPrice - UnitPrice : 0m;
+        public decimal LineItemDiscount => Quantity * DiscountPerUnit;
     }
 
     private sealed record ReceiptSnapshot(
@@ -1285,6 +1376,8 @@ else
         bool     IsRegisteredCustomer,
         bool     IsDeliveryRequired,
         List<ReceiptLine> Lines,
+        decimal  GrossSubtotal,
+        decimal  ItemDiscount,
         decimal  Subtotal,
         decimal  Discount,
         decimal  Tax,
@@ -1316,5 +1409,10 @@ else
         string  UnitName,
         decimal Quantity,
         decimal UnitPrice,
-        decimal Total);
+        decimal ListUnitPrice,
+        decimal Total)
+    {
+        public bool    HasPromo        => UnitPrice < ListUnitPrice;
+        public decimal DiscountPerUnit => HasPromo ? ListUnitPrice - UnitPrice : 0m;
+    }
 }
