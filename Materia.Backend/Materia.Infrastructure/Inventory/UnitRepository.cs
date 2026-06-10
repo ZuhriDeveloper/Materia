@@ -1,4 +1,5 @@
 using Materia.Application.Contracts.Inventory;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Inventory;
 using Materia.Domain.Inventory.Events;
 using Materia.Infrastructure.Persistence;
@@ -8,14 +9,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Inventory;
 
-public class UnitRepository(AppDbContext context) : IUnitRepository
+public class UnitRepository(AppDbContext context, ICurrentStore currentStore) : IUnitRepository
 {
     private const string AggregateType = "Unit";
 
     public async Task<Unit?> GetByIdAsync(UnitId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -34,12 +36,14 @@ public class UnitRepository(AppDbContext context) : IUnitRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = unit.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId = storeId,
                 AggregateType = AggregateType,
                 AggregateId = unit.Id.Value,
                 Version = baseVersion + i + 1,
@@ -67,6 +71,7 @@ public class UnitRepository(AppDbContext context) : IUnitRepository
             projection = new UnitReadModel
             {
                 Id = unit.Id.Value,
+                StoreId = currentStore.StoreId,
                 CreatedBy = created.CreatedBy,
                 CreatedAt = created.OccurredAt,
                 IsActive = true,

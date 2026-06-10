@@ -5,6 +5,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class SaleReadModel
 {
     public Guid          Id                { get; set; }
+    public Guid          StoreId           { get; set; }
     public string        ReferenceNo       { get; set; } = default!;
     public Guid?         CustomerId        { get; set; }
     public string        CustomerName      { get; set; } = "Umum";

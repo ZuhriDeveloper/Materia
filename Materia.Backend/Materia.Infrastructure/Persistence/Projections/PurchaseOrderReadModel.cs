@@ -3,6 +3,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class PurchaseOrderReadModel
 {
     public Guid Id { get; set; }
+    public Guid StoreId { get; set; }
     public Guid SupplierId { get; set; }
     public string SupplierName { get; set; } = default!;
     public string Status { get; set; } = default!;

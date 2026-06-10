@@ -3,6 +3,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class CustomerReadModel
 {
     public Guid      Id        { get; set; }
+    public Guid      StoreId   { get; set; }
     public string    Name      { get; set; } = default!;
     public string    Phone     { get; set; } = default!;
     public string?   Email     { get; set; }

@@ -3,6 +3,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class CustomerAddressReadModel
 {
     public Guid    Id         { get; set; }
+    public Guid    StoreId    { get; set; }
     public Guid    CustomerId { get; set; }
     public string  Label       { get; set; } = default!;
     public string  Street      { get; set; } = default!;

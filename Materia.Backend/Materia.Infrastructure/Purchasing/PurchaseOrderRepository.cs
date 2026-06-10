@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Materia.Application.Contracts.Purchasing;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Purchasing;
 using Materia.Domain.Purchasing.Events;
 using Materia.Infrastructure.Persistence;
@@ -9,14 +10,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Purchasing;
 
-public class PurchaseOrderRepository(AppDbContext context) : IPurchaseOrderRepository
+public class PurchaseOrderRepository(AppDbContext context, ICurrentStore currentStore) : IPurchaseOrderRepository
 {
     private const string AggregateType = "PurchaseOrder";
 
     public async Task<PurchaseOrder?> GetByIdAsync(PurchaseOrderId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -32,12 +34,14 @@ public class PurchaseOrderRepository(AppDbContext context) : IPurchaseOrderRepos
         if (newEvents.Count == 0) return;
 
         var baseVersion = po.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId = storeId,
                 AggregateType = AggregateType,
                 AggregateId = po.Id.Value,
                 Version = baseVersion + i + 1,
@@ -69,6 +73,7 @@ public class PurchaseOrderRepository(AppDbContext context) : IPurchaseOrderRepos
             projection = new PurchaseOrderReadModel
             {
                 Id = po.Id.Value,
+                StoreId = currentStore.StoreId,
                 SupplierId = po.SupplierId.Value,
                 SupplierName = supplierName,
                 CreatedBy = newEvents.OfType<PurchaseOrderCreated>().FirstOrDefault()?.CreatedBy ?? string.Empty,

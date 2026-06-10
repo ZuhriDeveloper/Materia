@@ -5,6 +5,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class PettyCashExpenseReadModel
 {
     public Guid              Id           { get; set; }
+    public Guid              StoreId      { get; set; }
     public decimal           Amount       { get; set; }
     public string            Recipient    { get; set; } = default!;
     public PettyCashCategory Category     { get; set; }

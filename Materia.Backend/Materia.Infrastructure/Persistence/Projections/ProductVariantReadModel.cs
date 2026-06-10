@@ -8,6 +8,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class ProductVariantReadModel
 {
     public Guid Id { get; set; }              // VariantId
+    public Guid StoreId { get; set; }
     public Guid ProductId { get; set; }
     public string ColorName { get; set; } = default!;
     public string? ColorCode { get; set; }

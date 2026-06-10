@@ -70,6 +70,9 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
 
@@ -113,14 +116,17 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<long>("Version")
                         .HasColumnType("bigint");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("AggregateId", "AggregateType");
+                    b.HasIndex("StoreId", "AggregateId", "AggregateType");
 
-                    b.HasIndex("AggregateType", "AggregateId", "Version")
+                    b.HasIndex("StoreId", "AggregateType", "AggregateId", "Version")
                         .IsUnique();
 
                     b.ToTable("StoredEvents");
@@ -149,6 +155,9 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -157,7 +166,7 @@ namespace Materia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("StoreId", "Name")
                         .IsUnique();
 
                     b.ToTable("CategoryReadModels");
@@ -198,6 +207,9 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<string>("Province")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("Street")
                         .IsRequired()
@@ -245,6 +257,9 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -257,7 +272,7 @@ namespace Materia.Infrastructure.Migrations
 
                     b.HasIndex("Name");
 
-                    b.HasIndex("Phone")
+                    b.HasIndex("StoreId", "Phone")
                         .IsUnique();
 
                     b.ToTable("CustomerReadModels");
@@ -309,13 +324,16 @@ namespace Materia.Infrastructure.Migrations
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Category");
 
                     b.HasIndex("RecordedAt");
 
-                    b.HasIndex("ReferenceNo")
+                    b.HasIndex("StoreId", "ReferenceNo")
                         .IsUnique();
 
                     b.ToTable("PettyCashExpenseReadModels");
@@ -359,6 +377,9 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<decimal>("SalePrice")
                         .HasColumnType("numeric");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("UnitConversionsJson")
                         .IsRequired()
                         .HasColumnType("text");
@@ -371,12 +392,12 @@ namespace Materia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Barcode")
-                        .IsUnique();
-
                     b.HasIndex("IsActive");
 
                     b.HasIndex("Name");
+
+                    b.HasIndex("StoreId", "Barcode")
+                        .IsUnique();
 
                     b.ToTable("ProductReadModels");
                 });
@@ -409,12 +430,15 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<Guid>("ProductId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Barcode")
-                        .IsUnique();
-
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("StoreId", "Barcode")
+                        .IsUnique();
 
                     b.ToTable("ProductVariantReadModels");
                 });
@@ -440,6 +464,9 @@ namespace Materia.Infrastructure.Migrations
                         .HasColumnType("character varying(260)");
 
                     b.Property<Guid>("PurchaseOrderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
                         .HasColumnType("uuid");
 
                     b.Property<DateTime>("UploadedAt")
@@ -481,6 +508,9 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(30)
                         .HasColumnType("character varying(30)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
 
                     b.Property<Guid>("SupplierId")
                         .HasColumnType("uuid");
@@ -537,11 +567,14 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<DateTime>("RecordedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.HasKey("Id");
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("IdempotencyKey")
+                    b.HasIndex("StoreId", "IdempotencyKey")
                         .IsUnique();
 
                     b.ToTable("ReceivablePaymentReadModels");
@@ -570,6 +603,9 @@ namespace Materia.Infrastructure.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<Guid>("SaleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("StoreId")
                         .HasColumnType("uuid");
 
                     b.Property<decimal>("Subtotal")
@@ -665,6 +701,9 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("numeric");
 
@@ -677,10 +716,10 @@ namespace Materia.Infrastructure.Migrations
 
                     b.HasIndex("CustomerId");
 
-                    b.HasIndex("ReferenceNo")
-                        .IsUnique();
-
                     b.HasIndex("Status");
+
+                    b.HasIndex("StoreId", "ReferenceNo")
+                        .IsUnique();
 
                     b.ToTable("SaleReadModels", (string)null);
                 });
@@ -703,6 +742,9 @@ namespace Materia.Infrastructure.Migrations
                     b.Property<decimal>("Quantity")
                         .HasColumnType("numeric");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Unit")
                         .IsRequired()
                         .HasColumnType("text");
@@ -712,10 +754,45 @@ namespace Materia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProductId", "VariantId")
+                    b.HasIndex("StoreId", "ProductId", "VariantId")
                         .IsUnique();
 
                     b.ToTable("StockReadModels");
+                });
+
+            modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.StoreReadModel", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Code")
+                        .IsUnique();
+
+                    b.ToTable("StoreReadModels");
                 });
 
             modelBuilder.Entity("Materia.Infrastructure.Persistence.Projections.SupplierReadModel", b =>
@@ -746,6 +823,9 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -782,6 +862,9 @@ namespace Materia.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid>("StoreId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Symbol")
                         .HasColumnType("text");
 
@@ -793,7 +876,7 @@ namespace Materia.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("StoreId", "Name")
                         .IsUnique();
 
                     b.ToTable("UnitReadModels");

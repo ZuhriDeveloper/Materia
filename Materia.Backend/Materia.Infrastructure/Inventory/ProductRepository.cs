@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Materia.Application.Contracts.Inventory;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Inventory;
 using Materia.Domain.Inventory.Events;
 using Materia.Infrastructure.Persistence;
@@ -9,14 +10,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Inventory;
 
-public class ProductRepository(AppDbContext context, IProductSearchCache searchCache) : IProductRepository
+public class ProductRepository(AppDbContext context, IProductSearchCache searchCache, ICurrentStore currentStore) : IProductRepository
 {
     private const string AggregateType = "Product";
 
     public async Task<Product?> GetByIdAsync(ProductId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -32,12 +34,14 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
         if (newEvents.Count == 0) return;
 
         var baseVersion = product.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId = storeId,
                 AggregateType = AggregateType,
                 AggregateId = product.Id.Value,
                 Version = baseVersion + i + 1,
@@ -68,6 +72,7 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
             projection = new ProductReadModel
             {
                 Id = product.Id.Value,
+                StoreId = currentStore.StoreId,
                 BaseUnit = product.BaseUnit.Value,
                 CreatedBy = created?.CreatedBy ?? string.Empty,
                 CreatedAt = created?.OccurredAt ?? DateTime.UtcNow,
@@ -133,7 +138,7 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
         {
             if (!existingById.TryGetValue(variant.Id.Value, out var row))
             {
-                row = new ProductVariantReadModel { Id = variant.Id.Value, ProductId = product.Id.Value };
+                row = new ProductVariantReadModel { Id = variant.Id.Value, StoreId = currentStore.StoreId, ProductId = product.Id.Value };
                 context.ProductVariantReadModels.Add(row);
             }
 

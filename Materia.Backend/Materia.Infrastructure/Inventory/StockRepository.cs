@@ -1,4 +1,5 @@
 using Materia.Application.Contracts.Inventory;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Inventory;
 using Materia.Domain.Inventory.Events;
 using Materia.Domain.Purchasing;
@@ -9,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Inventory;
 
-public class StockRepository(AppDbContext context) : IStockRepository
+public class StockRepository(AppDbContext context, ICurrentStore currentStore) : IStockRepository
 {
     private const string AggregateType = "Stock";
 
@@ -26,8 +27,9 @@ public class StockRepository(AppDbContext context) : IStockRepository
 
         if (stockId == Guid.Empty) return null;
 
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == stockId && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == stockId && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -43,12 +45,14 @@ public class StockRepository(AppDbContext context) : IStockRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = stock.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId = storeId,
                 AggregateType = AggregateType,
                 AggregateId = stock.Id.Value,
                 Version = baseVersion + i + 1,
@@ -77,6 +81,7 @@ public class StockRepository(AppDbContext context) : IStockRepository
             projection = new StockReadModel
             {
                 Id = stock.Id.Value,
+                StoreId = currentStore.StoreId,
                 ProductId = stock.ProductId.Value,
                 VariantId = variantId,
                 Unit = stock.Unit,

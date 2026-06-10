@@ -80,8 +80,15 @@ public static class DependencyInjection
 
         services.AddScoped<IUserAuthRepository, UserAuthRepository>();
         services.AddScoped<ITokenService, JwtTokenService>();
+        services.AddScoped<IUserProvisioningService, UserProvisioningService>();
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<CatalogSeeder>();
+
+        // ── Multi-tenant (store scoping) ────────────────────────────────────────
+        services.AddHttpContextAccessor();
+        services.AddScoped<Application.Contracts.Stores.ICurrentStore, Stores.CurrentStore>();
+        services.AddScoped<Application.Contracts.Stores.IStoreRepository, Stores.StoreRepository>();
+        services.AddScoped<Application.Contracts.Stores.IStoreQueryRepository, Stores.StoreQueryRepository>();
 
         // Inventory repositories
         services.AddScoped<Application.Contracts.Inventory.IProductRepository, Inventory.ProductRepository>();

@@ -1,3 +1,4 @@
+using Materia.Application.Contracts.Stores;
 using Materia.Infrastructure.Identity;
 using Materia.Infrastructure.Persistence.EventStore;
 using Materia.Infrastructure.Persistence.Projections;
@@ -6,10 +7,19 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Persistence;
 
-public class AppDbContext(DbContextOptions<AppDbContext> options)
+public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore currentStore)
     : IdentityDbContext<ApplicationUser>(options)
 {
+    /// <summary>
+    /// The store the current operation is scoped to, used by the per-store global query
+    /// filters. <c>null</c> for a platform SuperAdmin or unscoped context, in which case
+    /// the filters are no-ops (all rows visible). Referenced directly in the filter
+    /// lambdas so EF Core re-evaluates it per query rather than caching a value.
+    /// </summary>
+    public Guid? CurrentStoreId => currentStore.StoreIdOrNull;
+
     public DbSet<StoredEvent> StoredEvents => Set<StoredEvent>();
+    public DbSet<StoreReadModel> StoreReadModels => Set<StoreReadModel>();
     public DbSet<ProductReadModel> ProductReadModels => Set<ProductReadModel>();
     public DbSet<ProductVariantReadModel> ProductVariantReadModels => Set<ProductVariantReadModel>();
     public DbSet<CategoryReadModel> CategoryReadModels => Set<CategoryReadModel>();
@@ -29,11 +39,24 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
     {
         base.OnModelCreating(builder);
 
+        // ── Event store ─────────────────────────────────────────────────────────
+        // NOT store-filtered: the event store is queried directly, and repositories add
+        // an explicit StoreId predicate on load as defense-in-depth.
         builder.Entity<StoredEvent>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => new { x.AggregateType, x.AggregateId, x.Version }).IsUnique();
-            e.HasIndex(x => new { x.AggregateId, x.AggregateType });
+            e.HasIndex(x => new { x.StoreId, x.AggregateType, x.AggregateId, x.Version }).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.AggregateId, x.AggregateType });
+        });
+
+        // ── Store registry (platform-level — intentionally NOT store-filtered) ───
+        builder.Entity<StoreReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Code).HasMaxLength(30).IsRequired();
+            e.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.Code).IsUnique();
         });
 
         builder.Entity<ProductReadModel>(e =>
@@ -42,9 +65,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.HasIndex(x => x.Name);
             e.HasIndex(x => x.IsActive);
             e.Property(x => x.Barcode).HasMaxLength(100);
-            // Unique per barcode; PostgreSQL treats NULLs as distinct, so products
-            // without a barcode are unaffected.
-            e.HasIndex(x => x.Barcode).IsUnique();
+            // Unique per barcode WITHIN a store; PostgreSQL treats NULLs as distinct, so
+            // products without a barcode are unaffected.
+            e.HasIndex(x => new { x.StoreId, x.Barcode }).IsUnique();
         });
 
         builder.Entity<ProductVariantReadModel>(e =>
@@ -54,34 +77,33 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.ColorName).HasMaxLength(100).IsRequired();
             e.Property(x => x.ColorCode).HasMaxLength(50);
             e.Property(x => x.Barcode).HasMaxLength(100);
-            // Unique per barcode across all variants; PostgreSQL treats NULLs as distinct,
-            // so variants without a barcode are unaffected.
-            e.HasIndex(x => x.Barcode).IsUnique();
+            // Unique per barcode WITHIN a store; PostgreSQL treats NULLs as distinct.
+            e.HasIndex(x => new { x.StoreId, x.Barcode }).IsUnique();
         });
 
         builder.Entity<CategoryReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.Name).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.Name }).IsUnique();
         });
 
         builder.Entity<UnitReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.Name).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.Name }).IsUnique();
         });
 
         builder.Entity<StockReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            // One stock row per (product, variant). Product-level stock has a null VariantId.
-            e.HasIndex(x => new { x.ProductId, x.VariantId }).IsUnique();
+            // One stock row per (product, variant) WITHIN a store. Product-level stock has a null VariantId.
+            e.HasIndex(x => new { x.StoreId, x.ProductId, x.VariantId }).IsUnique();
         });
 
         builder.Entity<CustomerReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            e.HasIndex(x => x.Phone).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.Phone }).IsUnique();
             e.HasIndex(x => x.Name);
             e.HasIndex(x => x.IsActive);
             e.HasMany(x => x.Addresses)
@@ -102,9 +124,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
         builder.Entity<ReceivablePaymentReadModel>(e =>
         {
             e.HasKey(x => x.Id);
-            // Idempotency: at most one payment per client key. PostgreSQL enforces this even
-            // under a concurrent race, so a duplicate submission can never over-collect.
-            e.HasIndex(x => x.IdempotencyKey).IsUnique();
+            // Idempotency: at most one payment per client key WITHIN a store. PostgreSQL
+            // enforces this even under a concurrent race, so a duplicate submission can
+            // never over-collect.
+            e.HasIndex(x => new { x.StoreId, x.IdempotencyKey }).IsUnique();
             e.HasIndex(x => x.CustomerId);
             e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
             e.Property(x => x.NewBalance).HasColumnType("decimal(18,2)");
@@ -158,7 +181,27 @@ public class AppDbContext(DbContextOptions<AppDbContext> options)
             e.Property(x => x.RecordedBy).HasMaxLength(100).IsRequired();
             e.HasIndex(x => x.RecordedAt);
             e.HasIndex(x => x.Category);
-            e.HasIndex(x => x.ReferenceNo).IsUnique();
+            e.HasIndex(x => new { x.StoreId, x.ReferenceNo }).IsUnique();
         });
+
+        // ── Per-store global query filters (tenant isolation) ────────────────────
+        // Null-tolerant: a null CurrentStoreId (SuperAdmin / seed) is a no-op so all rows
+        // are visible; otherwise rows are scoped to the current store. Applied to every
+        // read model — including child tables, so Include() and direct queries stay
+        // consistent. The Stores registry, event store and Identity tables are excluded.
+        builder.Entity<ProductReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<ProductVariantReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<CategoryReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<UnitReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<StockReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<CustomerReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<CustomerAddressReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<ReceivablePaymentReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<SaleReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<SaleItemReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<SupplierReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<PurchaseOrderReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<PurchaseInvoiceImage>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<PettyCashExpenseReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
     }
 }

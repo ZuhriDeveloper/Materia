@@ -6,6 +6,7 @@ using Materia.Domain.Financials;
 using Materia.Domain.Inventory;
 using Materia.Domain.Purchasing;
 using Materia.Domain.Sales;
+using Materia.Domain.Stores;
 
 namespace Materia.Infrastructure.Persistence.EventStore;
 
@@ -27,6 +28,7 @@ public static class EventSerializer
             new SupplierIdConverter(),
             new PurchaseOrderIdConverter(),
             new PettyCashExpenseIdConverter(),
+            new StoreIdConverter(),
         },
     };
 
@@ -126,6 +128,14 @@ public static class EventSerializer
         public override PettyCashExpenseId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
             => PettyCashExpenseId.From(reader.GetGuid());
         public override void Write(Utf8JsonWriter writer, PettyCashExpenseId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class StoreIdConverter : JsonConverter<StoreId>
+    {
+        public override StoreId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => StoreId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, StoreId value, JsonSerializerOptions o)
             => writer.WriteStringValue(value.Value);
     }
 }

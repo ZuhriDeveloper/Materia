@@ -1,11 +1,12 @@
 using Materia.Application.Contracts.Purchasing;
+using Materia.Application.Contracts.Stores;
 using Materia.Infrastructure.Persistence;
 using Materia.Infrastructure.Persistence.Projections;
 using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Purchasing;
 
-public class PurchaseInvoiceImageRepository(AppDbContext context) : IPurchaseInvoiceImageRepository
+public class PurchaseInvoiceImageRepository(AppDbContext context, ICurrentStore currentStore) : IPurchaseInvoiceImageRepository
 {
     public async Task SaveAsync(
         Guid purchaseOrderId, byte[] content, string contentType, string fileName,
@@ -21,6 +22,7 @@ public class PurchaseInvoiceImageRepository(AppDbContext context) : IPurchaseInv
         context.PurchaseInvoiceImages.Add(new PurchaseInvoiceImage
         {
             Id              = Guid.NewGuid(),
+            StoreId         = currentStore.StoreId,
             PurchaseOrderId = purchaseOrderId,
             FileName        = fileName,
             ContentType     = contentType,
