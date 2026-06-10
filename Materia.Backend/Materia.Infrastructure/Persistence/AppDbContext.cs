@@ -35,6 +35,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
     public DbSet<PurchaseInvoiceImage> PurchaseInvoiceImages => Set<PurchaseInvoiceImage>();
     public DbSet<StoreLogo> StoreLogos => Set<StoreLogo>();
     public DbSet<PettyCashExpenseReadModel> PettyCashExpenseReadModels => Set<PettyCashExpenseReadModel>();
+    public DbSet<ChangeFundDepositReadModel> ChangeFundDepositReadModels => Set<ChangeFundDepositReadModel>();
+    public DbSet<ChangeFundWithdrawalReadModel> ChangeFundWithdrawalReadModels => Set<ChangeFundWithdrawalReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -199,6 +201,35 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
             e.HasIndex(x => x.RecordedAt);
             e.HasIndex(x => x.Category);
             e.HasIndex(x => new { x.StoreId, x.ReferenceNo }).IsUnique();
+            // Idempotency: at most one expense per client key WITHIN a store. PostgreSQL
+            // enforces this even under a concurrent race, so a duplicate submission can
+            // never record the expense (or its TukarUangKembalian deposit) twice.
+            e.HasIndex(x => new { x.StoreId, x.IdempotencyKey }).IsUnique();
+        });
+
+        builder.Entity<ChangeFundDepositReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            e.Property(x => x.SourceReferenceNo).HasMaxLength(30);
+            e.Property(x => x.Notes).HasMaxLength(500);
+            e.Property(x => x.RecordedBy).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.RecordedAt);
+            e.HasIndex(x => x.StoreId);
+            // Idempotency: at most one deposit per client key WITHIN a store — the ledger
+            // is append-only, so a duplicate would permanently inflate the balance.
+            e.HasIndex(x => new { x.StoreId, x.IdempotencyKey }).IsUnique();
+        });
+
+        builder.Entity<ChangeFundWithdrawalReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Amount).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Reason).HasMaxLength(300).IsRequired();
+            e.Property(x => x.RecordedBy).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => x.RecordedAt);
+            e.HasIndex(x => x.StoreId);
+            e.HasIndex(x => new { x.StoreId, x.IdempotencyKey }).IsUnique();
         });
 
         // ── Per-store global query filters (tenant isolation) ────────────────────
@@ -220,5 +251,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
         builder.Entity<PurchaseOrderReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<PurchaseInvoiceImage>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<PettyCashExpenseReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<ChangeFundDepositReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<ChangeFundWithdrawalReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
     }
 }

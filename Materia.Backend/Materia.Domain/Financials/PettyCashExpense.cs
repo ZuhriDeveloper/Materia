@@ -18,6 +18,9 @@ public sealed class PettyCashExpense : AggregateRoot<PettyCashExpenseId>
     public string            RecordedBy   { get; private set; } = default!;
     public DateTime          RecordedAt   { get; private set; }
 
+    /// <summary>Client-supplied de-duplication token (see <see cref="PettyCashExpenseRecorded.IdempotencyKey"/>).</summary>
+    public Guid              IdempotencyKey { get; private set; }
+
     /// <summary>Resolved display reason: the free-text detail for Lainnya, else the category label.</summary>
     public string Reason =>
         Category == PettyCashCategory.Lainnya
@@ -28,6 +31,12 @@ public sealed class PettyCashExpense : AggregateRoot<PettyCashExpenseId>
 
     // ── Factories ─────────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// <paramref name="idempotencyKey"/> is the client's double-submit guard, baked into the
+    /// event so the projection's unique index can reject duplicates. The domain does not
+    /// enforce idempotency itself; when omitted, a fresh key is generated so internal
+    /// callers still produce a unique, non-empty value.
+    /// </summary>
     public static PettyCashExpense Record(
         decimal           amount,
         string            recipient,
@@ -35,7 +44,8 @@ public sealed class PettyCashExpense : AggregateRoot<PettyCashExpenseId>
         string?           reasonDetail,
         string?           notes,
         string            referenceNo,
-        string            recordedBy)
+        string            recordedBy,
+        Guid?             idempotencyKey = null)
     {
         if (amount <= 0)
             throw new DomainException("Jumlah pengeluaran harus lebih dari nol.");
@@ -69,7 +79,8 @@ public sealed class PettyCashExpense : AggregateRoot<PettyCashExpenseId>
             string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
             referenceNo.Trim(),
             recordedBy,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            idempotencyKey is { } k && k != Guid.Empty ? k : Guid.NewGuid()));
         return expense;
     }
 
@@ -87,15 +98,16 @@ public sealed class PettyCashExpense : AggregateRoot<PettyCashExpenseId>
         switch (domainEvent)
         {
             case PettyCashExpenseRecorded e:
-                Id           = e.Id;
-                Amount       = e.Amount;
-                Recipient    = e.Recipient;
-                Category     = e.Category;
-                ReasonDetail = e.ReasonDetail;
-                Notes        = e.Notes;
-                ReferenceNo  = e.ReferenceNo;
-                RecordedBy   = e.RecordedBy;
-                RecordedAt   = e.OccurredAt;
+                Id             = e.Id;
+                Amount         = e.Amount;
+                Recipient      = e.Recipient;
+                Category       = e.Category;
+                ReasonDetail   = e.ReasonDetail;
+                Notes          = e.Notes;
+                ReferenceNo    = e.ReferenceNo;
+                RecordedBy     = e.RecordedBy;
+                RecordedAt     = e.OccurredAt;
+                IdempotencyKey = e.IdempotencyKey;
                 break;
         }
     }

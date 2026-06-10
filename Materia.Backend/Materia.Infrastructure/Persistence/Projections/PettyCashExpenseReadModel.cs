@@ -21,4 +21,11 @@ public class PettyCashExpenseReadModel
 
     /// <summary>Reserved for a future void/cancel capability; always false in this increment.</summary>
     public bool              IsVoided     { get; set; }
+
+    /// <summary>
+    /// Client-supplied de-duplication token; unique per store so a retried submission can
+    /// never record the expense twice. Rows from before the key existed were backfilled
+    /// with random values by the migration.
+    /// </summary>
+    public Guid              IdempotencyKey { get; set; }
 }

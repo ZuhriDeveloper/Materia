@@ -21,4 +21,7 @@ public enum PettyCashCategory
 
     /// <summary>Lainnya (other) — requires a free-text "Sebutkan" detail.</summary>
     Lainnya = 3,
+
+    /// <summary>Tukar Uang Kembalian — exchange cash to prepare change fund.</summary>
+    TukarUangKembalian = 4,
 }

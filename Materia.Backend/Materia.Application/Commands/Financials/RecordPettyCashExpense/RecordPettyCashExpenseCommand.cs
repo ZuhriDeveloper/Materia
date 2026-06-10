@@ -8,4 +8,5 @@ public record RecordPettyCashExpenseCommand(
     PettyCashCategory Category,
     string?           ReasonDetail,
     string?           Notes,
-    string            RecordedBy);
+    string            RecordedBy,
+    Guid              IdempotencyKey);

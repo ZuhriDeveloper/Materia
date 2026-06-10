@@ -28,6 +28,8 @@ public static class EventSerializer
             new SupplierIdConverter(),
             new PurchaseOrderIdConverter(),
             new PettyCashExpenseIdConverter(),
+            new ChangeFundDepositIdConverter(),
+            new ChangeFundWithdrawalIdConverter(),
             new StoreIdConverter(),
         },
     };
@@ -128,6 +130,22 @@ public static class EventSerializer
         public override PettyCashExpenseId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
             => PettyCashExpenseId.From(reader.GetGuid());
         public override void Write(Utf8JsonWriter writer, PettyCashExpenseId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class ChangeFundDepositIdConverter : JsonConverter<ChangeFundDepositId>
+    {
+        public override ChangeFundDepositId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => ChangeFundDepositId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, ChangeFundDepositId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class ChangeFundWithdrawalIdConverter : JsonConverter<ChangeFundWithdrawalId>
+    {
+        public override ChangeFundWithdrawalId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => ChangeFundWithdrawalId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, ChangeFundWithdrawalId value, JsonSerializerOptions o)
             => writer.WriteStringValue(value.Value);
     }
 

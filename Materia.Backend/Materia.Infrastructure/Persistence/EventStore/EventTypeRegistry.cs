@@ -89,6 +89,8 @@ public static class EventTypeRegistry
 
         // Petty cash (financials) events
         [nameof(PettyCashExpenseRecorded)] = typeof(PettyCashExpenseRecorded),
+        [nameof(ChangeFundDeposited)]      = typeof(ChangeFundDeposited),
+        [nameof(ChangeFundWithdrawn)]      = typeof(ChangeFundWithdrawn),
 
         // Store (platform / multi-tenant) events
         [nameof(StoreRegistered)]         = typeof(StoreRegistered),

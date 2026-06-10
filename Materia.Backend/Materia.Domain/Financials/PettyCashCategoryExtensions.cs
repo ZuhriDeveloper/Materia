@@ -9,6 +9,7 @@ public static class PettyCashCategoryExtensions
         PettyCashCategory.SparepartKendaraan => "Sparepart Kendaraan",
         PettyCashCategory.BelanjaLainnya     => "Belanja lainnya",
         PettyCashCategory.Lainnya            => "Lainnya",
+        PettyCashCategory.TukarUangKembalian => "Tukar Uang Kembalian",
         _                                    => category.ToString(),
     };
 }

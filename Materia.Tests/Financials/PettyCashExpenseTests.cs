@@ -118,6 +118,30 @@ public class PettyCashExpenseTests
         expense.Notes.Should().BeNull();
     }
 
+    // ── Idempotency key ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void Record_WithIdempotencyKey_BakesKeyIntoEvent()
+    {
+        var key = Guid.NewGuid();
+
+        var expense = PettyCashExpense.Record(
+            50_000m, "Budi", PettyCashCategory.Bensin, null, null, Ref, User, key);
+
+        expense.DomainEvents.OfType<PettyCashExpenseRecorded>().Single()
+            .IdempotencyKey.Should().Be(key);
+        expense.IdempotencyKey.Should().Be(key);
+    }
+
+    [Fact]
+    public void Record_WithoutIdempotencyKey_GeneratesNonEmptyKey()
+    {
+        var expense = PettyCashExpense.Record(
+            50_000m, "Budi", PettyCashCategory.Bensin, null, null, Ref, User);
+
+        expense.IdempotencyKey.Should().NotBeEmpty();
+    }
+
     [Fact]
     public void Reconstitute_FromEvents_RestoresStateAndClearsPendingEvents()
     {
@@ -134,6 +158,7 @@ public class PettyCashExpenseTests
         reconstituted.Reason.Should().Be("Servis AC");
         reconstituted.Notes.Should().Be("urgent");
         reconstituted.ReferenceNo.Should().Be(Ref);
+        reconstituted.IdempotencyKey.Should().Be(original.IdempotencyKey);
         reconstituted.DomainEvents.Should().BeEmpty();
     }
 }

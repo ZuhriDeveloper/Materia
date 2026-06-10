@@ -6,6 +6,7 @@ using Materia.Infrastructure.Persistence;
 using Materia.Infrastructure.Persistence.EventStore;
 using Materia.Infrastructure.Persistence.Projections;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace Materia.Infrastructure.Financials;
 
@@ -52,27 +53,53 @@ public class PettyCashRepository(AppDbContext context, ICurrentStore currentStor
         }
 
         UpdateProjection(expense);
-        await context.SaveChangesAsync(ct);
+
+        // Translate a duplicate-idempotency-key collision (a concurrent expense with the
+        // same client key committed first) into an application-level signal the handler
+        // can replay, without leaking the persistence technology into Application.
+        try
+        {
+            await context.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateException ex) when (IsIdempotencyKeyViolation(ex))
+        {
+            throw new DuplicatePettyCashExpenseException(expense.IdempotencyKey);
+        }
+
         expense.ClearDomainEvents();
     }
+
+    public async Task<Guid?> FindExpenseIdByKeyAsync(
+        Guid idempotencyKey, CancellationToken ct = default)
+    {
+        var row = await context.PettyCashExpenseReadModels
+            .AsNoTracking()
+            .FirstOrDefaultAsync(e => e.IdempotencyKey == idempotencyKey, ct);
+        return row?.Id;
+    }
+
+    private static bool IsIdempotencyKeyViolation(DbUpdateException ex) =>
+        ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } pg &&
+        (pg.ConstraintName?.Contains("IdempotencyKey", StringComparison.OrdinalIgnoreCase) ?? false);
 
     private void UpdateProjection(PettyCashExpense expense)
     {
         // Record-only in this increment: a new aggregate maps to a single new read row.
         context.PettyCashExpenseReadModels.Add(new PettyCashExpenseReadModel
         {
-            Id           = expense.Id.Value,
-            StoreId      = currentStore.StoreId,
-            Amount       = expense.Amount,
-            Recipient    = expense.Recipient,
-            Category     = expense.Category,
-            ReasonDetail = expense.ReasonDetail,
-            ReasonText   = expense.Reason,
-            Notes        = expense.Notes,
-            ReferenceNo  = expense.ReferenceNo,
-            RecordedBy   = expense.RecordedBy,
-            RecordedAt   = expense.RecordedAt,
-            IsVoided     = false,
+            Id             = expense.Id.Value,
+            StoreId        = currentStore.StoreId,
+            Amount         = expense.Amount,
+            Recipient      = expense.Recipient,
+            Category       = expense.Category,
+            ReasonDetail   = expense.ReasonDetail,
+            ReasonText     = expense.Reason,
+            Notes          = expense.Notes,
+            ReferenceNo    = expense.ReferenceNo,
+            RecordedBy     = expense.RecordedBy,
+            RecordedAt     = expense.RecordedAt,
+            IsVoided       = false,
+            IdempotencyKey = expense.IdempotencyKey,
         });
     }
 }

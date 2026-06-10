@@ -84,6 +84,8 @@ public static class DependencyInjection
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<CatalogSeeder>();
 
+        services.AddScoped<Application.Contracts.Common.IUnitOfWork, Persistence.EfUnitOfWork>();
+
         // ── Multi-tenant (store scoping) ────────────────────────────────────────
         services.AddHttpContextAccessor();
         services.AddScoped<Application.Contracts.Stores.ICurrentStore, Stores.CurrentStore>();
@@ -120,6 +122,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Financials.IPettyCashRepository, Financials.PettyCashRepository>();
         services.AddScoped<Application.Contracts.Financials.IPettyCashQueryRepository, Financials.PettyCashQueryRepository>();
         services.AddScoped<Application.Contracts.Financials.IPettyCashReferenceGenerator, Financials.PettyCashReferenceNumberGenerator>();
+        services.AddScoped<Application.Contracts.Financials.IChangeFundRepository, Financials.ChangeFundRepository>();
+        services.AddScoped<Application.Contracts.Financials.IChangeFundQueryRepository, Financials.ChangeFundQueryRepository>();
 
         // Sales
         services.AddScoped<Application.Contracts.Sales.ISaleRepository, Sales.SaleRepository>();

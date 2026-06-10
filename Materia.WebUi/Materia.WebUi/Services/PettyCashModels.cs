@@ -6,10 +6,11 @@ namespace Materia.WebUi.Services;
 /// </summary>
 public enum PettyCashCategory
 {
-    Bensin             = 0,
-    SparepartKendaraan = 1,
-    BelanjaLainnya     = 2,
-    Lainnya            = 3,
+    Bensin               = 0,
+    SparepartKendaraan   = 1,
+    BelanjaLainnya       = 2,
+    Lainnya              = 3,
+    TukarUangKembalian   = 4,
 }
 
 public static class PettyCashCategoryLabels
@@ -20,12 +21,14 @@ public static class PettyCashCategoryLabels
         PettyCashCategory.SparepartKendaraan => "Sparepart Kendaraan",
         PettyCashCategory.BelanjaLainnya     => "Belanja lainnya",
         PettyCashCategory.Lainnya            => "Lainnya",
+        PettyCashCategory.TukarUangKembalian => "Tukar Uang Kembalian",
         _                                    => category.ToString(),
     };
 
     public static IReadOnlyList<PettyCashCategory> All { get; } =
         [PettyCashCategory.Bensin, PettyCashCategory.SparepartKendaraan,
-         PettyCashCategory.BelanjaLainnya, PettyCashCategory.Lainnya];
+         PettyCashCategory.BelanjaLainnya, PettyCashCategory.Lainnya,
+         PettyCashCategory.TukarUangKembalian];
 }
 
 public record PettyCashExpenseResult(

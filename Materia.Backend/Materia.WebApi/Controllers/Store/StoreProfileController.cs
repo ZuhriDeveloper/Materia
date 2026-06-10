@@ -12,8 +12,11 @@ namespace Materia.WebApi.Controllers.Store;
 /// Store profile management — editable by the store's own Admin.
 /// All endpoints are scoped to the current store via the <c>storeId</c> JWT claim.
 /// </summary>
+// NOTE: stacked [Authorize] attributes combine with AND semantics — the class level
+// stays role-less and every action declares its own roles, otherwise a class-level
+// "Admin" would override the Cashier access on the GET endpoints.
 [ApiController]
-[Authorize(Roles = "Admin")]
+[Authorize]
 [Route("api/store/profile")]
 public class StoreProfileController(
     GetMyStoreQueryHandler queryHandler,
@@ -29,6 +32,7 @@ public class StoreProfileController(
     // ── GET api/store/profile ─────────────────────────────────────────────────
 
     [HttpGet]
+    [Authorize(Roles = "Admin,Cashier")]
     public async Task<IActionResult> GetProfile(CancellationToken ct)
     {
         var profile = await queryHandler.HandleAsync(new GetMyStoreQuery(), ct);
@@ -38,6 +42,7 @@ public class StoreProfileController(
     // ── PUT api/store/profile ─────────────────────────────────────────────────
 
     [HttpPut]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateProfile(
         [FromBody] UpdateStoreProfileRequest request,
         CancellationToken ct)
@@ -59,6 +64,7 @@ public class StoreProfileController(
     // ── POST api/store/profile/logo ───────────────────────────────────────────
 
     [HttpPost("logo")]
+    [Authorize(Roles = "Admin")]
     [RequestSizeLimit(2 * 1024 * 1024)]
     public async Task<IActionResult> UploadLogo(IFormFile file, CancellationToken ct)
     {
@@ -117,6 +123,7 @@ public class StoreProfileController(
     // ── GET api/store/profile/logo ────────────────────────────────────────────
 
     [HttpGet("logo")]
+    [Authorize(Roles = "Admin,Cashier")]
     public async Task<IActionResult> GetLogo(CancellationToken ct)
     {
         var storeIdClaim = User.FindFirstValue("storeId");
