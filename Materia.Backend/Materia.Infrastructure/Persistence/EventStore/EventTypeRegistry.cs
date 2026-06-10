@@ -91,10 +91,11 @@ public static class EventTypeRegistry
         [nameof(PettyCashExpenseRecorded)] = typeof(PettyCashExpenseRecorded),
 
         // Store (platform / multi-tenant) events
-        [nameof(StoreRegistered)]   = typeof(StoreRegistered),
-        [nameof(StoreRenamed)]      = typeof(StoreRenamed),
-        [nameof(StoreActivated)]    = typeof(StoreActivated),
-        [nameof(StoreDeactivated)]  = typeof(StoreDeactivated),
+        [nameof(StoreRegistered)]         = typeof(StoreRegistered),
+        [nameof(StoreRenamed)]            = typeof(StoreRenamed),
+        [nameof(StoreActivated)]          = typeof(StoreActivated),
+        [nameof(StoreDeactivated)]        = typeof(StoreDeactivated),
+        [nameof(StoreParametersUpdated)]  = typeof(StoreParametersUpdated),
     };
 
     public static Type Resolve(string eventType) =>

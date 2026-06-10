@@ -33,6 +33,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
     public DbSet<SupplierReadModel> SupplierReadModels => Set<SupplierReadModel>();
     public DbSet<PurchaseOrderReadModel> PurchaseOrderReadModels => Set<PurchaseOrderReadModel>();
     public DbSet<PurchaseInvoiceImage> PurchaseInvoiceImages => Set<PurchaseInvoiceImage>();
+    public DbSet<StoreLogo> StoreLogos => Set<StoreLogo>();
     public DbSet<PettyCashExpenseReadModel> PettyCashExpenseReadModels => Set<PettyCashExpenseReadModel>();
 
     protected override void OnModelCreating(ModelBuilder builder)
@@ -57,6 +58,22 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
             e.Property(x => x.Code).HasMaxLength(30).IsRequired();
             e.Property(x => x.CreatedBy).HasMaxLength(100).IsRequired();
             e.HasIndex(x => x.Code).IsUnique();
+            // Optional store parameters
+            e.Property(x => x.Address).HasMaxLength(500);
+            e.Property(x => x.Phone).HasMaxLength(50);
+            e.Property(x => x.MaxDeliveryDistanceKm).HasColumnType("decimal(10,3)");
+        });
+
+        // ── Store logos (plain attachment table — NOT event-sourced) ────────────
+        builder.Entity<StoreLogo>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.FileName).HasMaxLength(260).IsRequired();
+            e.Property(x => x.ContentType).HasMaxLength(100).IsRequired();
+            e.Property(x => x.Content).HasColumnType("bytea").IsRequired();
+            e.Property(x => x.UploadedBy).HasMaxLength(100).IsRequired();
+            // Unique: one logo per store (enforced by DB, not just the replace-on-upload logic)
+            e.HasIndex(x => x.StoreId).IsUnique();
         });
 
         builder.Entity<ProductReadModel>(e =>

@@ -89,6 +89,7 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Stores.ICurrentStore, Stores.CurrentStore>();
         services.AddScoped<Application.Contracts.Stores.IStoreRepository, Stores.StoreRepository>();
         services.AddScoped<Application.Contracts.Stores.IStoreQueryRepository, Stores.StoreQueryRepository>();
+        services.AddScoped<Application.Contracts.Stores.IStoreLogoRepository, Stores.StoreLogoRepository>();
 
         // Inventory repositories
         services.AddScoped<Application.Contracts.Inventory.IProductRepository, Inventory.ProductRepository>();

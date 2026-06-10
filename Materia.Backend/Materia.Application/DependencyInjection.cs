@@ -45,6 +45,7 @@ using Materia.Application.Financials.Queries;
 using Materia.Application.Commands.Stores.RegisterStore;
 using Materia.Application.Commands.Stores.RenameStore;
 using Materia.Application.Commands.Stores.SetStoreStatus;
+using Materia.Application.Commands.Stores.UpdateStoreParameters;
 using Materia.Application.Queries.Stores;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -142,7 +143,9 @@ public static class DependencyInjection
         services.AddScoped<RegisterStoreCommandHandler>();
         services.AddScoped<RenameStoreCommandHandler>();
         services.AddScoped<SetStoreStatusCommandHandler>();
+        services.AddScoped<UpdateStoreParametersCommandHandler>();
         services.AddScoped<GetStoresQueryHandler>();
+        services.AddScoped<GetMyStoreQueryHandler>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();

@@ -1,0 +1,223 @@
+@page "/platform/users"
+@attribute [Authorize(Roles = "SuperAdmin")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject PlatformApiClient Api
+
+<PageTitle>Pengguna — Materia Platform</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Daftarkan Pengguna</h4>
+</div>
+
+@if (_errors.Count > 0)
+{
+    <div class="alert alert-danger alert-dismissible">
+        <strong>Pendaftaran gagal:</strong>
+        <ul class="mb-0 mt-1 ps-3">
+            @foreach (var e in _errors)
+            {
+                <li>@e</li>
+            }
+        </ul>
+        <button type="button" class="btn-close" @onclick="() => _errors.Clear()"></button>
+    </div>
+}
+@if (!string.IsNullOrEmpty(_notice))
+{
+    <div class="alert alert-success alert-dismissible">
+        @_notice
+        <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+    </div>
+}
+
+<div class="card" style="max-width:680px">
+    <div class="card-header fw-semibold">
+        <i class="bi bi-person-plus me-1"></i> Pengguna Baru
+    </div>
+    <div class="card-body">
+        @if (_stores is null)
+        {
+            <div class="text-muted">
+                <span class="spinner-border spinner-border-sm me-1"></span> Memuat daftar toko…
+            </div>
+        }
+        else
+        {
+            <EditForm Model="_form" OnValidSubmit="HandleCreate">
+                <DataAnnotationsValidator />
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Email <span class="text-danger">*</span></label>
+                        <InputText class="form-control" @bind-Value="_form.Email"
+                                   placeholder="pengguna@contoh.com"
+                                   type="email" autocomplete="off" />
+                        <ValidationMessage For="() => _form.Email" class="small text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Nama Lengkap <span class="text-danger">*</span></label>
+                        <InputText class="form-control" @bind-Value="_form.FullName"
+                                   placeholder="cth. Budi Santoso" />
+                        <ValidationMessage For="() => _form.FullName" class="small text-danger" />
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">
+                            Kata Sandi <span class="text-danger">*</span>
+                        </label>
+                        <InputText class="form-control" @bind-Value="_form.Password"
+                                   type="password" autocomplete="new-password"
+                                   placeholder="Min. 8 karakter, 1 angka, 1 huruf kapital" />
+                        <ValidationMessage For="() => _form.Password" class="small text-danger" />
+                        <div class="form-text">Min. 8 karakter, setidaknya 1 angka dan 1 huruf kapital.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Role <span class="text-danger">*</span></label>
+                        <InputSelect class="form-select" @bind-Value="_form.Role">
+                            <option value="">— pilih role —</option>
+                            <option value="Admin">Admin</option>
+                            <option value="Cashier">Kasir</option>
+                            <option value="Helper">Helper</option>
+                        </InputSelect>
+                        <ValidationMessage For="() => _form.Role" class="small text-danger" />
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">Toko <span class="text-danger">*</span></label>
+                        @if (_stores.Count == 0)
+                        {
+                            <div class="alert alert-warning py-2 small mb-0">
+                                Belum ada toko terdaftar.
+                                <a href="/platform/stores">Daftarkan toko</a> terlebih dahulu.
+                            </div>
+                        }
+                        else
+                        {
+                            <InputSelect class="form-select" @bind-Value="_form.StoreId">
+                                <option value="@Guid.Empty">— pilih toko —</option>
+                                @foreach (var s in _stores)
+                                {
+                                    <option value="@s.Id">@s.Name (@s.Code)</option>
+                                }
+                            </InputSelect>
+                            <ValidationMessage For="() => _form.StoreId" class="small text-danger" />
+                        }
+                    </div>
+                </div>
+
+                <div class="mt-4 d-flex gap-2">
+                    <button type="submit"
+                            class="btn btn-primary"
+                            disabled="@(_saving || _stores.Count == 0)">
+                        @if (_saving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-check-lg me-1"></i>
+                        }
+                        Daftarkan Pengguna
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary"
+                            @onclick="ResetForm" disabled="@_saving">
+                        Reset
+                    </button>
+                </div>
+            </EditForm>
+        }
+    </div>
+</div>
+
+@code {
+    private List<StoreDto>? _stores;
+    private string?         _notice;
+    private bool            _saving;
+
+    private readonly List<string> _errors = [];
+    private UserCreateForm _form = new();
+
+    protected override async Task OnInitializedAsync()
+        => _stores = (await Api.GetStoresAsync() ?? [])
+            .Where(s => s.IsActive)
+            .OrderBy(s => s.Name)
+            .ToList();
+
+    private async Task HandleCreate()
+    {
+        _errors.Clear();
+
+        // Extra client-side password policy check (mirrors server rule)
+        var pwdErrors = ValidatePassword(_form.Password);
+        if (pwdErrors.Count > 0)
+        {
+            _errors.AddRange(pwdErrors);
+            return;
+        }
+
+        if (_form.StoreId == Guid.Empty)
+        {
+            _errors.Add("Toko wajib dipilih.");
+            return;
+        }
+
+        _saving = true;
+
+        var (userId, errors) = await Api.RegisterUserAsync(
+            _form.Email.Trim(),
+            _form.FullName.Trim(),
+            _form.Password,
+            _form.Role,
+            _form.StoreId);
+
+        _saving = false;
+
+        if (errors is not null) { _errors.AddRange(errors); return; }
+
+        _notice = $"Pengguna '{_form.FullName}' berhasil didaftarkan (ID: {userId}).";
+        _form   = new();
+    }
+
+    private void ResetForm()
+    {
+        _form   = new();
+        _errors.Clear();
+        _notice = null;
+    }
+
+    private static List<string> ValidatePassword(string? pwd)
+    {
+        var errs = new List<string>();
+        if (string.IsNullOrEmpty(pwd) || pwd.Length < 8)
+            errs.Add("Kata sandi minimal 8 karakter.");
+        if (pwd is not null && !pwd.Any(char.IsDigit))
+            errs.Add("Kata sandi harus mengandung setidaknya 1 angka.");
+        if (pwd is not null && !pwd.Any(char.IsUpper))
+            errs.Add("Kata sandi harus mengandung setidaknya 1 huruf kapital.");
+        return errs;
+    }
+
+    // ── Form model ─────────────────────────────────────────────────────────────
+
+    private sealed class UserCreateForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Email wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.EmailAddress(ErrorMessage = "Format email tidak valid.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(256)]
+        public string Email { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nama lengkap wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(200)]
+        public string FullName { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Kata sandi wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MinLength(8, ErrorMessage = "Kata sandi minimal 8 karakter.")]
+        public string Password { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Role wajib dipilih.")]
+        public string Role { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Toko wajib dipilih.")]
+        // Guid.Empty fails this custom validation
+        public Guid StoreId { get; set; } = Guid.Empty;
+    }
+}

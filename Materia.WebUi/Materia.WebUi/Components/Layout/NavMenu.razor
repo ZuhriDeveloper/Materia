@@ -7,6 +7,31 @@
         Beranda
     </MudNavLink>
 
+    @* ── Platform (SuperAdmin only) ── *@
+    <AuthorizeView Roles="SuperAdmin">
+
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Platform
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="platform/stores" Icon="@Icons.Material.Filled.StoreMallDirectory">
+            Toko
+        </MudNavLink>
+        <MudNavLink Href="platform/users" Icon="@Icons.Material.Filled.ManageAccounts">
+            Pengguna
+        </MudNavLink>
+
+    </AuthorizeView>
+
     <AuthorizeView Roles="Admin,Cashier">
 
         @* Section: Penjualan *@
@@ -126,6 +151,24 @@
         <MudNavLink Href="suppliers"       Icon="@Icons.Material.Filled.LocalShipping">Pemasok</MudNavLink>
         <MudNavLink Href="purchase-orders" Icon="@Icons.Material.Filled.Assignment">Order Pembelian</MudNavLink>
         <MudNavLink Href="import-pembelian" Icon="@Icons.Material.Filled.DocumentScanner">Import Pembelian</MudNavLink>
+
+        @* Section: Pengaturan *@
+        @if (_drawerOpen)
+        {
+            <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
+                     Style="font-size:.6rem;letter-spacing:.1em;
+                            color:var(--mud-palette-drawer-text);opacity:.5">
+                Pengaturan
+            </MudText>
+        }
+        else
+        {
+            <MudDivider Class="my-2 mx-2" />
+        }
+
+        <MudNavLink Href="store/settings" Icon="@Icons.Material.Filled.Settings">
+            Pengaturan Toko
+        </MudNavLink>
 
     </AuthorizeView>
 

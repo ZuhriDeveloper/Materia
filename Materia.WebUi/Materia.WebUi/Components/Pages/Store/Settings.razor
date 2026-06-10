@@ -1,0 +1,415 @@
+@page "/store/settings"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject StoreSettingsApiClient Api
+
+<PageTitle>Pengaturan Toko — Materia</PageTitle>
+
+<div class="mb-4">
+    <h4 class="mb-0 fw-bold">Pengaturan Toko</h4>
+</div>
+
+@if (_loadError is not null)
+{
+    <div class="alert alert-danger">@_loadError</div>
+}
+
+@if (_profile is null && _loadError is null)
+{
+    <div class="text-muted">
+        <span class="spinner-border spinner-border-sm me-1"></span> Memuat…
+    </div>
+}
+
+@if (_profile is not null)
+{
+    <div class="row g-4">
+
+        @* ── Column 1: Info + Params ── *@
+        <div class="col-lg-7">
+
+            @* ── Store info (read-only) ── *@
+            <div class="card mb-4">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-shop me-1"></i> Informasi Toko
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-sm-8">
+                            <label class="form-label text-muted small">Nama Toko</label>
+                            <div class="fw-semibold">@_profile.Name</div>
+                        </div>
+                        <div class="col-sm-4">
+                            <label class="form-label text-muted small">Kode Toko</label>
+                            <div>
+                                <span class="badge text-bg-secondary font-monospace">@_profile.Code</span>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label text-muted small">Status</label>
+                            <div>
+                                @if (_profile.IsActive)
+                                {
+                                    <span class="badge bg-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Tidak Aktif</span>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── Parameters form ── *@
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-gear me-1"></i> Parameter Toko
+                </div>
+                <div class="card-body">
+
+                    @if (_paramErrors.Count > 0)
+                    {
+                        <div class="alert alert-danger alert-dismissible py-2">
+                            <ul class="mb-0 ps-3">
+                                @foreach (var e in _paramErrors)
+                                {
+                                    <li class="small">@e</li>
+                                }
+                            </ul>
+                            <button type="button" class="btn-close btn-sm"
+                                    @onclick="() => _paramErrors.Clear()"></button>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_paramNotice))
+                    {
+                        <div class="alert alert-success alert-dismissible py-2 small">
+                            @_paramNotice
+                            <button type="button" class="btn-close btn-sm"
+                                    @onclick="() => _paramNotice = null"></button>
+                        </div>
+                    }
+
+                    <EditForm Model="_paramForm" OnValidSubmit="HandleSaveParams">
+                        <DataAnnotationsValidator />
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label">
+                                    Alamat <span class="text-danger">*</span>
+                                </label>
+                                <InputTextArea class="form-control" @bind-Value="_paramForm.Address"
+                                               rows="3"
+                                               placeholder="Jl. Raya No. 1, Kota Bandung, Jawa Barat" />
+                                <ValidationMessage For="() => _paramForm.Address"
+                                                   class="small text-danger" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    Nomor Telepon <span class="text-danger">*</span>
+                                </label>
+                                <InputText class="form-control" @bind-Value="_paramForm.Phone"
+                                           placeholder="cth. 022-1234567" />
+                                <ValidationMessage For="() => _paramForm.Phone"
+                                                   class="small text-danger" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    Jarak Pengiriman Maks. (km) <span class="text-danger">*</span>
+                                </label>
+                                <InputNumber class="form-control"
+                                             @bind-Value="_paramForm.MaxDeliveryDistanceKm"
+                                             min="0.1" step="0.5" />
+                                <div class="form-text">Harus lebih dari 0.</div>
+                                <ValidationMessage For="() => _paramForm.MaxDeliveryDistanceKm"
+                                                   class="small text-danger" />
+                            </div>
+                        </div>
+                        <div class="mt-4">
+                            <button type="submit" class="btn btn-primary" disabled="@_savingParams">
+                                @if (_savingParams)
+                                {
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-check-lg me-1"></i>
+                                }
+                                Simpan Parameter
+                            </button>
+                        </div>
+                    </EditForm>
+                </div>
+            </div>
+
+        </div>
+
+        @* ── Column 2: Logo ── *@
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header fw-semibold">
+                    <i class="bi bi-image me-1"></i> Logo Toko
+                </div>
+                <div class="card-body">
+
+                    @* Preview *@
+                    <div class="mb-3 text-center">
+                        @if (_logoDataUrl is not null)
+                        {
+                            <img src="@_logoDataUrl"
+                                 alt="Logo toko"
+                                 class="img-thumbnail"
+                                 style="max-height:180px;max-width:100%;object-fit:contain" />
+                        }
+                        else if (_loadingLogo)
+                        {
+                            <div class="text-muted small py-4">
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                                Memuat logo…
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="border rounded d-flex align-items-center justify-content-center
+                                        text-muted"
+                                 style="height:140px;background:var(--bs-light)">
+                                <span class="small">Belum ada logo</span>
+                            </div>
+                        }
+                    </div>
+
+                    @if (_logoErrors.Count > 0)
+                    {
+                        <div class="alert alert-danger alert-dismissible py-2 small">
+                            <ul class="mb-0 ps-3">
+                                @foreach (var e in _logoErrors)
+                                {
+                                    <li>@e</li>
+                                }
+                            </ul>
+                            <button type="button" class="btn-close btn-sm"
+                                    @onclick="() => _logoErrors.Clear()"></button>
+                        </div>
+                    }
+                    @if (!string.IsNullOrEmpty(_logoNotice))
+                    {
+                        <div class="alert alert-success alert-dismissible py-2 small">
+                            @_logoNotice
+                            <button type="button" class="btn-close btn-sm"
+                                    @onclick="() => _logoNotice = null"></button>
+                        </div>
+                    }
+
+                    <InputFile OnChange="OnLogoSelected"
+                               accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
+                               class="form-control mb-2" />
+
+                    @if (_logoFile is not null)
+                    {
+                        <div class="small text-muted mb-2">
+                            <i class="bi bi-file-earmark-image me-1"></i>
+                            @_logoFile.Name —
+                            @(_logoFile.Size / 1024) KB
+                        </div>
+                    }
+
+                    <div class="form-text mb-3">
+                        JPEG, PNG, atau WebP. Maks. 2 MB.
+                    </div>
+
+                    <button class="btn btn-primary w-100"
+                            @onclick="HandleUploadLogo"
+                            disabled="@(_logoFile is null || _uploadingLogo)">
+                        @if (_uploadingLogo)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            <span>Mengunggah…</span>
+                        }
+                        else
+                        {
+                            <i class="bi bi-cloud-upload me-1"></i>
+                            <span>Unggah Logo</span>
+                        }
+                    </button>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+}
+
+@code {
+    private StoreProfileDto? _profile;
+    private string?          _loadError;
+
+    // ── Params form ────────────────────────────────────────────────────────────
+    private readonly List<string> _paramErrors = [];
+    private string?               _paramNotice;
+    private bool                  _savingParams;
+    private ParamsForm            _paramForm = new();
+
+    // ── Logo ───────────────────────────────────────────────────────────────────
+    private string?       _logoDataUrl;
+    private bool          _loadingLogo;
+    private IBrowserFile? _logoFile;
+    private bool          _uploadingLogo;
+    private readonly List<string> _logoErrors = [];
+    private string?               _logoNotice;
+
+    private const long MaxLogoBytes   = 2 * 1024 * 1024;  // 2 MB
+    private static readonly string[] AllowedMimeTypes =
+        ["image/jpeg", "image/png", "image/webp"];
+
+    // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _profile = await Api.GetProfileAsync();
+            PopulateParamForm();
+        }
+        catch
+        {
+            _loadError = "Gagal memuat profil toko. Muat ulang halaman.";
+            return;
+        }
+
+        if (_profile?.HasLogo == true)
+            await LoadLogoAsync();
+    }
+
+    private void PopulateParamForm()
+    {
+        if (_profile is null) return;
+        _paramForm.Address               = _profile.Address ?? string.Empty;
+        _paramForm.Phone                 = _profile.Phone ?? string.Empty;
+        _paramForm.MaxDeliveryDistanceKm = _profile.MaxDeliveryDistanceKm ?? 0;
+    }
+
+    // ── Params save ────────────────────────────────────────────────────────────
+
+    private async Task HandleSaveParams()
+    {
+        _paramErrors.Clear();
+        _paramNotice = null;
+        _savingParams = true;
+
+        var errors = await Api.UpdateProfileAsync(
+            _paramForm.Address.Trim(),
+            _paramForm.Phone.Trim(),
+            _paramForm.MaxDeliveryDistanceKm);
+
+        _savingParams = false;
+
+        if (errors is not null) { _paramErrors.AddRange(errors); return; }
+
+        _paramNotice = "Parameter toko berhasil disimpan.";
+
+        // Refresh profile so the read-only section stays current
+        _profile = await Api.GetProfileAsync();
+        PopulateParamForm();
+    }
+
+    // ── Logo ───────────────────────────────────────────────────────────────────
+
+    private void OnLogoSelected(InputFileChangeEventArgs e)
+    {
+        _logoErrors.Clear();
+        _logoNotice = null;
+
+        var file = e.File;
+
+        if (!AllowedMimeTypes.Contains(file.ContentType))
+        {
+            _logoErrors.Add("Hanya file JPEG, PNG, atau WebP yang diizinkan.");
+            _logoFile = null;
+            return;
+        }
+
+        if (file.Size > MaxLogoBytes)
+        {
+            _logoErrors.Add($"Ukuran file ({file.Size / 1024} KB) melebihi batas 2 MB.");
+            _logoFile = null;
+            return;
+        }
+
+        _logoFile = file;
+    }
+
+    private async Task HandleUploadLogo()
+    {
+        if (_logoFile is null) return;
+
+        _logoErrors.Clear();
+        _logoNotice = null;
+        _uploadingLogo = true;
+
+        try
+        {
+            await using var stream = _logoFile.OpenReadStream(MaxLogoBytes);
+            var (fileName, errors) = await Api.UploadLogoAsync(
+                stream, _logoFile.Name, _logoFile.ContentType);
+
+            if (errors is not null)
+            {
+                _logoErrors.AddRange(errors);
+                return;
+            }
+
+            _logoNotice = $"Logo berhasil diunggah ({fileName}).";
+            _logoFile   = null;
+
+            // Reload preview with fresh bytes
+            await LoadLogoAsync();
+            if (_profile is not null)
+                _profile = _profile with { HasLogo = true };
+        }
+        catch
+        {
+            _logoErrors.Add("Gagal mengunggah logo. Coba lagi.");
+        }
+        finally
+        {
+            _uploadingLogo = false;
+        }
+    }
+
+    private async Task LoadLogoAsync()
+    {
+        _loadingLogo = true;
+        try
+        {
+            _logoDataUrl = await Api.GetLogoDataUrlAsync();
+        }
+        catch
+        {
+            // Logo preview failure is non-critical
+            _logoDataUrl = null;
+        }
+        finally
+        {
+            _loadingLogo = false;
+        }
+    }
+
+    // ── Form model ─────────────────────────────────────────────────────────────
+
+    private sealed class ParamsForm
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Alamat wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(500, ErrorMessage = "Alamat maksimal 500 karakter.")]
+        public string Address { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Nomor telepon wajib diisi.")]
+        [System.ComponentModel.DataAnnotations.MaxLength(50, ErrorMessage = "Nomor telepon maksimal 50 karakter.")]
+        public string Phone { get; set; } = string.Empty;
+
+        [System.ComponentModel.DataAnnotations.Range(
+            0.01, double.MaxValue,
+            ErrorMessage = "Jarak pengiriman harus lebih dari 0.")]
+        public double MaxDeliveryDistanceKm { get; set; }
+    }
+}

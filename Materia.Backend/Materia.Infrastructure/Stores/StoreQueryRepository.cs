@@ -28,4 +28,18 @@ public class StoreQueryRepository(AppDbContext context) : IStoreQueryRepository
 
     public Task<bool> CodeExistsAsync(string code, CancellationToken ct = default)
         => context.StoreReadModels.AnyAsync(s => s.Code == code, ct);
+
+    public async Task<StoreParametersDto?> GetProfileByIdAsync(Guid id, CancellationToken ct = default)
+        => await context.StoreReadModels
+            .AsNoTracking()
+            .Where(s => s.Id == id)
+            .Select(s => new StoreParametersDto(
+                s.Id,
+                s.Name,
+                s.Code,
+                s.IsActive,
+                s.Address,
+                s.Phone,
+                s.MaxDeliveryDistanceKm))
+            .FirstOrDefaultAsync(ct);
 }

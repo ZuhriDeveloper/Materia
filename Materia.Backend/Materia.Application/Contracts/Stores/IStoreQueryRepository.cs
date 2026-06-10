@@ -11,4 +11,7 @@ public interface IStoreQueryRepository
     Task<StoreDto?> GetByIdAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<StoreDto>> GetAllAsync(CancellationToken ct = default);
     Task<bool> CodeExistsAsync(string code, CancellationToken ct = default);
+
+    /// <summary>Returns the full profile including store parameters (address/phone/distance).</summary>
+    Task<StoreParametersDto?> GetProfileByIdAsync(Guid id, CancellationToken ct = default);
 }

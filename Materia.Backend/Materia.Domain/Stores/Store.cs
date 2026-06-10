@@ -14,6 +14,11 @@ public class Store : AggregateRoot<StoreId>
     public string Code { get; private set; } = default!;
     public bool IsActive { get; private set; }
 
+    // ── Store parameters (optional, set after registration) ──────────────────
+    public string? Address { get; private set; }
+    public string? Phone { get; private set; }
+    public decimal? MaxDeliveryDistanceKm { get; private set; }
+
     private Store() { }
 
     // ── Factory ───────────────────────────────────────────────────────────────
@@ -69,6 +74,24 @@ public class Store : AggregateRoot<StoreId>
         Raise(new StoreActivated(Id, activatedBy, DateTime.UtcNow));
     }
 
+    public void UpdateParameters(string address, string phone, decimal maxDeliveryDistanceKm, string updatedBy)
+    {
+        if (string.IsNullOrWhiteSpace(address))
+            throw new DomainException("Store address cannot be empty.");
+        if (string.IsNullOrWhiteSpace(phone))
+            throw new DomainException("Store phone cannot be empty.");
+        if (maxDeliveryDistanceKm <= 0)
+            throw new DomainException("Store maximum delivery distance must be greater than zero.");
+
+        Raise(new StoreParametersUpdated(
+            Id,
+            address.Trim(),
+            phone.Trim(),
+            maxDeliveryDistanceKm,
+            updatedBy,
+            DateTime.UtcNow));
+    }
+
     // ── Event Application ─────────────────────────────────────────────────────
 
     protected override void Apply(IDomainEvent domainEvent)
@@ -92,6 +115,12 @@ public class Store : AggregateRoot<StoreId>
 
             case StoreActivated:
                 IsActive = true;
+                break;
+
+            case StoreParametersUpdated e:
+                Address = e.Address;
+                Phone = e.Phone;
+                MaxDeliveryDistanceKm = e.MaxDeliveryDistanceKm;
                 break;
         }
     }

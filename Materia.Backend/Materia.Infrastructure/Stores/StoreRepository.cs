@@ -76,8 +76,11 @@ public class StoreRepository(AppDbContext context) : IStoreRepository
             context.StoreReadModels.Add(projection);
         }
 
-        projection.Name     = store.Name;
-        projection.Code     = store.Code;
-        projection.IsActive = store.IsActive;
+        projection.Name                 = store.Name;
+        projection.Code                 = store.Code;
+        projection.IsActive             = store.IsActive;
+        projection.Address              = store.Address;
+        projection.Phone                = store.Phone;
+        projection.MaxDeliveryDistanceKm = store.MaxDeliveryDistanceKm;
     }
 }
