@@ -1,4 +1,5 @@
 using Materia.Application.Contracts.Inventory;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Inventory;
 using Materia.Infrastructure.Persistence;
 using Materia.Infrastructure.Persistence.EventStore;
@@ -7,14 +8,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Inventory;
 
-public class CategoryRepository(AppDbContext context) : ICategoryRepository
+public class CategoryRepository(AppDbContext context, ICurrentStore currentStore) : ICategoryRepository
 {
     private const string AggregateType = "Category";
 
     public async Task<Category?> GetByIdAsync(CategoryId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -33,12 +35,14 @@ public class CategoryRepository(AppDbContext context) : ICategoryRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = category.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId = storeId,
                 AggregateType = AggregateType,
                 AggregateId = category.Id.Value,
                 Version = baseVersion + i + 1,
@@ -66,6 +70,7 @@ public class CategoryRepository(AppDbContext context) : ICategoryRepository
             projection = new CategoryReadModel
             {
                 Id = category.Id.Value,
+                StoreId = currentStore.StoreId,
                 CreatedBy = created.CreatedBy,
                 CreatedAt = created.OccurredAt,
                 IsActive = true,

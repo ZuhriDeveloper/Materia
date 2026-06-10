@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Materia.Application.Contracts.Purchasing;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Purchasing;
 using Materia.Domain.Purchasing.Events;
 using Materia.Infrastructure.Persistence;
@@ -9,14 +10,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Purchasing;
 
-public class SupplierRepository(AppDbContext context) : ISupplierRepository
+public class SupplierRepository(AppDbContext context, ICurrentStore currentStore) : ISupplierRepository
 {
     private const string AggregateType = "Supplier";
 
     public async Task<Supplier?> GetByIdAsync(SupplierId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -32,12 +34,14 @@ public class SupplierRepository(AppDbContext context) : ISupplierRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = supplier.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId = storeId,
                 AggregateType = AggregateType,
                 AggregateId = supplier.Id.Value,
                 Version = baseVersion + i + 1,
@@ -65,6 +69,7 @@ public class SupplierRepository(AppDbContext context) : ISupplierRepository
             projection = new SupplierReadModel
             {
                 Id = supplier.Id.Value,
+                StoreId = currentStore.StoreId,
                 CreatedBy = created?.CreatedBy ?? string.Empty,
                 CreatedAt = created?.OccurredAt ?? DateTime.UtcNow,
             };

@@ -7,6 +7,7 @@ namespace Materia.Infrastructure.Persistence.Projections;
 public class PurchaseInvoiceImage
 {
     public Guid Id { get; set; }
+    public Guid StoreId { get; set; }
     public Guid PurchaseOrderId { get; set; }
     public string FileName { get; set; } = default!;
     public string ContentType { get; set; } = default!;

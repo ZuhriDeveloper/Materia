@@ -1,4 +1,5 @@
 using Materia.Infrastructure.Identity;
+using Materia.Infrastructure.Stores;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -23,8 +24,14 @@ public class DatabaseInitializer(
     {
         await MigrateAsync(cancellationToken);
         await SeedRolesAsync();
+        await SeedPlatformAdminAsync();
         await SeedUsersAsync();
-        await catalogSeeder.SeedAsync(cancellationToken);
+
+        // The catalog (units / categories / products) belongs to the default store. The
+        // seeder runs in a background scope with no HTTP request, so the current store is
+        // supplied via an ambient StoreScope rather than the storeId JWT claim.
+        using (StoreScope.Begin(StoreConstants.DefaultStoreId))
+            await catalogSeeder.SeedAsync(cancellationToken);
     }
 
     private async Task MigrateAsync(CancellationToken cancellationToken)
@@ -43,18 +50,50 @@ public class DatabaseInitializer(
 
     private async Task SeedRolesAsync()
     {
-        foreach (var seed in SeedUsers)
+        var roles = SeedUsers.Select(u => u.Role).Append(StoreConstants.SuperAdminRole).Distinct();
+        foreach (var role in roles)
         {
-            if (await roleManager.RoleExistsAsync(seed.Role))
+            if (await roleManager.RoleExistsAsync(role))
                 continue;
 
-            var result = await roleManager.CreateAsync(new IdentityRole(seed.Role));
+            var result = await roleManager.CreateAsync(new IdentityRole(role));
             if (result.Succeeded)
-                logger.LogInformation("Role '{Role}' created.", seed.Role);
+                logger.LogInformation("Role '{Role}' created.", role);
             else
-                logger.LogWarning("Failed to create role '{Role}': {Errors}", seed.Role,
+                logger.LogWarning("Failed to create role '{Role}': {Errors}", role,
                     string.Join(", ", result.Errors.Select(e => e.Description)));
         }
+    }
+
+    /// <summary>
+    /// Seeds the platform <c>SuperAdmin</c> — a user with NO store (StoreId = null) that
+    /// manages stores and provisions store-scoped users.
+    /// </summary>
+    private async Task SeedPlatformAdminAsync()
+    {
+        const string email = "superadmin@materia.local";
+        if (await userManager.FindByEmailAsync(email) is not null)
+            return;
+
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            FullName = "Super Admin",
+            EmailConfirmed = true,
+            StoreId = null,
+        };
+
+        var result = await userManager.CreateAsync(user, "SuperAdmin@1234");
+        if (!result.Succeeded)
+        {
+            logger.LogWarning("Failed to create platform admin: {Errors}",
+                string.Join(", ", result.Errors.Select(e => e.Description)));
+            return;
+        }
+
+        await userManager.AddToRoleAsync(user, StoreConstants.SuperAdminRole);
+        logger.LogInformation("Platform admin '{Email}' created.", email);
     }
 
     private async Task SeedUsersAsync()
@@ -70,6 +109,8 @@ public class DatabaseInitializer(
                 Email = seed.Email,
                 FullName = seed.FullName,
                 EmailConfirmed = true,
+                // The default store's own staff. SuperAdmin (seeded separately) has no store.
+                StoreId = StoreConstants.DefaultStoreId,
             };
 
             var result = await userManager.CreateAsync(user, seed.Password);

@@ -1,4 +1,5 @@
 using Materia.Application.Contracts.Sales;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Sales;
 using Materia.Domain.Sales.Events;
 using Materia.Infrastructure.Persistence;
@@ -8,14 +9,15 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Sales;
 
-public class SaleRepository(AppDbContext context) : ISaleRepository
+public class SaleRepository(AppDbContext context, ICurrentStore currentStore) : ISaleRepository
 {
     private const string AggregateType = "Sale";
 
     public async Task<Sale?> GetByIdAsync(SaleId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -31,11 +33,13 @@ public class SaleRepository(AppDbContext context) : ISaleRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = sale.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId       = storeId,
                 AggregateType = AggregateType,
                 AggregateId   = sale.Id.Value,
                 Version       = baseVersion + i + 1,
@@ -65,6 +69,7 @@ public class SaleRepository(AppDbContext context) : ISaleRepository
             projection = new SaleReadModel
             {
                 Id          = sale.Id.Value,
+                StoreId     = currentStore.StoreId,
                 ReferenceNo = created.ReferenceNo,
                 CreatedBy   = created.CreatedBy,
                 CreatedAt   = created.OccurredAt,
@@ -120,6 +125,7 @@ public class SaleRepository(AppDbContext context) : ISaleRepository
                 context.SaleItemReadModels.Add(new SaleItemReadModel
                 {
                     Id                 = item.Id.Value,
+                    StoreId            = currentStore.StoreId,
                     SaleId             = sale.Id.Value,
                     ProductId          = item.ProductId,
                     VariantId          = item.VariantId,

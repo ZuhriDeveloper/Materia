@@ -42,6 +42,11 @@ using Materia.Application.Commands.Customers.RecordReceivablePayment;
 using Materia.Application.Commands.Sales.FinalizeSale;
 using Materia.Application.Commands.Financials.RecordPettyCashExpense;
 using Materia.Application.Financials.Queries;
+using Materia.Application.Commands.Stores.RegisterStore;
+using Materia.Application.Commands.Stores.RenameStore;
+using Materia.Application.Commands.Stores.SetStoreStatus;
+using Materia.Application.Commands.Stores.UpdateStoreParameters;
+using Materia.Application.Queries.Stores;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Materia.Application;
@@ -133,6 +138,14 @@ public static class DependencyInjection
         services.AddScoped<GetCashFlowQueryHandler>();
         services.AddScoped<RecordPettyCashExpenseCommandHandler>();
         services.AddScoped<GetPettyCashExpensesQueryHandler>();
+
+        // Stores (platform / multi-tenant)
+        services.AddScoped<RegisterStoreCommandHandler>();
+        services.AddScoped<RenameStoreCommandHandler>();
+        services.AddScoped<SetStoreStatusCommandHandler>();
+        services.AddScoped<UpdateStoreParametersCommandHandler>();
+        services.AddScoped<GetStoresQueryHandler>();
+        services.AddScoped<GetMyStoreQueryHandler>();
 
         // Validators (all assemblies scanned from this project)
         services.AddValidatorsFromAssemblyContaining<LoginCommandHandler>();

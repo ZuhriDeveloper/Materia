@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Materia.Application.Contracts.Customers;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Customers;
 using Materia.Domain.Customers.Events;
 using Materia.Infrastructure.Persistence;
@@ -10,14 +11,15 @@ using Npgsql;
 
 namespace Materia.Infrastructure.Customers;
 
-public class CustomerRepository(AppDbContext context) : ICustomerRepository
+public class CustomerRepository(AppDbContext context, ICurrentStore currentStore) : ICustomerRepository
 {
     private const string AggregateType = "Customer";
 
     public async Task<Customer?> GetByIdAsync(CustomerId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -33,11 +35,13 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = customer.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId       = storeId,
                 AggregateType = AggregateType,
                 AggregateId   = customer.Id.Value,
                 Version       = baseVersion + i + 1,
@@ -103,6 +107,7 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
             projection = new CustomerReadModel
             {
                 Id        = customer.Id.Value,
+                StoreId   = currentStore.StoreId,
                 CreatedBy = created.CreatedBy,
                 CreatedAt = created.OccurredAt,
             };
@@ -145,6 +150,7 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
             context.ReceivablePaymentReadModels.Add(new ReceivablePaymentReadModel
             {
                 Id              = pay.PaymentId,
+                StoreId         = currentStore.StoreId,
                 IdempotencyKey  = pay.IdempotencyKey,
                 CustomerId      = customer.Id.Value,
                 Amount          = pay.Amount,
@@ -190,6 +196,7 @@ public class CustomerRepository(AppDbContext context) : ICustomerRepository
                 context.CustomerAddressReadModels.Add(new CustomerAddressReadModel
                 {
                     Id          = addr.Id.Value,
+                    StoreId     = currentStore.StoreId,
                     CustomerId  = customer.Id.Value,
                     Label       = addr.Label,
                     Street      = addr.Street,

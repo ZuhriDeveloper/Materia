@@ -13,6 +13,8 @@ public class ReceivablePaymentReadModel
     /// <summary>Server-issued payment id (the event's PaymentId).</summary>
     public Guid          Id              { get; set; }
 
+    public Guid          StoreId         { get; set; }
+
     /// <summary>Client-supplied de-duplication token. Unique.</summary>
     public Guid          IdempotencyKey  { get; set; }
 

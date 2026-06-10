@@ -10,4 +10,4 @@ public interface IUserAuthRepository
     Task<IReadOnlyList<string>> GetRolesAsync(string userId, CancellationToken cancellationToken = default);
 }
 
-public record UserAuthInfo(string Id, string Email, string? FullName);
+public record UserAuthInfo(string Id, string Email, string? FullName, Guid? StoreId);

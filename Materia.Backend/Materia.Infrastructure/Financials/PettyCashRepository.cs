@@ -1,4 +1,5 @@
 using Materia.Application.Contracts.Financials;
+using Materia.Application.Contracts.Stores;
 using Materia.Domain.Financials;
 using Materia.Domain.Financials.Events;
 using Materia.Infrastructure.Persistence;
@@ -8,15 +9,16 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Financials;
 
-public class PettyCashRepository(AppDbContext context) : IPettyCashRepository
+public class PettyCashRepository(AppDbContext context, ICurrentStore currentStore) : IPettyCashRepository
 {
     private const string AggregateType = "PettyCashExpense";
 
     public async Task<PettyCashExpense?> GetByIdAsync(
         PettyCashExpenseId id, CancellationToken ct = default)
     {
+        var storeId = currentStore.StoreId;
         var stored = await context.StoredEvents
-            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType)
+            .Where(e => e.AggregateId == id.Value && e.AggregateType == AggregateType && e.StoreId == storeId)
             .OrderBy(e => e.Version)
             .ToListAsync(ct);
 
@@ -32,12 +34,14 @@ public class PettyCashRepository(AppDbContext context) : IPettyCashRepository
         if (newEvents.Count == 0) return;
 
         var baseVersion = expense.Version - newEvents.Count;
+        var storeId = currentStore.StoreId;
 
         for (var i = 0; i < newEvents.Count; i++)
         {
             var evt = newEvents[i];
             context.StoredEvents.Add(new StoredEvent
             {
+                StoreId       = storeId,
                 AggregateType = AggregateType,
                 AggregateId   = expense.Id.Value,
                 Version       = baseVersion + i + 1,
@@ -58,6 +62,7 @@ public class PettyCashRepository(AppDbContext context) : IPettyCashRepository
         context.PettyCashExpenseReadModels.Add(new PettyCashExpenseReadModel
         {
             Id           = expense.Id.Value,
+            StoreId      = currentStore.StoreId,
             Amount       = expense.Amount,
             Recipient    = expense.Recipient,
             Category     = expense.Category,

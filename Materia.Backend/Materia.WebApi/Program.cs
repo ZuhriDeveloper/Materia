@@ -2,11 +2,19 @@ using Materia.Application;
 using Materia.Domain.Common;
 using Materia.Infrastructure;
 using Materia.Infrastructure.Persistence;
+using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Allow up to 2 MB for store logo uploads (Kestrel + form-body limits must both be set)
+builder.WebHost.ConfigureKestrel(o => o.Limits.MaxRequestBodySize = 2 * 1024 * 1024);
+builder.Services.Configure<FormOptions>(o =>
+{
+    o.MultipartBodyLengthLimit = 2 * 1024 * 1024;
+});
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

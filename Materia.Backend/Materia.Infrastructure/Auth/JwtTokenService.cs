@@ -22,6 +22,11 @@ public class JwtTokenService(IConfiguration configuration) : ITokenService
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
             new("fullName", user.FullName ?? string.Empty),
         };
+
+        // Store scope (multi-tenant). Absent for a platform SuperAdmin, who is unscoped.
+        if (user.StoreId is Guid storeId)
+            claims.Add(new Claim("storeId", storeId.ToString()));
+
         claims.AddRange(roles.Select(r => new Claim(ClaimTypes.Role, r)));
 
         var token = new JwtSecurityToken(

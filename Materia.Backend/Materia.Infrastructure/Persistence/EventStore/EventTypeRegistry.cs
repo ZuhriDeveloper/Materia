@@ -4,6 +4,7 @@ using Materia.Domain.Financials.Events;
 using Materia.Domain.Inventory.Events;
 using Materia.Domain.Purchasing.Events;
 using Materia.Domain.Sales.Events;
+using Materia.Domain.Stores.Events;
 
 namespace Materia.Infrastructure.Persistence.EventStore;
 
@@ -88,6 +89,13 @@ public static class EventTypeRegistry
 
         // Petty cash (financials) events
         [nameof(PettyCashExpenseRecorded)] = typeof(PettyCashExpenseRecorded),
+
+        // Store (platform / multi-tenant) events
+        [nameof(StoreRegistered)]         = typeof(StoreRegistered),
+        [nameof(StoreRenamed)]            = typeof(StoreRenamed),
+        [nameof(StoreActivated)]          = typeof(StoreActivated),
+        [nameof(StoreDeactivated)]        = typeof(StoreDeactivated),
+        [nameof(StoreParametersUpdated)]  = typeof(StoreParametersUpdated),
     };
 
     public static Type Resolve(string eventType) =>

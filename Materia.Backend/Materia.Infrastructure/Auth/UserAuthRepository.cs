@@ -9,7 +9,7 @@ public class UserAuthRepository(UserManager<ApplicationUser> userManager) : IUse
     public async Task<UserAuthInfo?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         var user = await userManager.FindByEmailAsync(email);
-        return user is null ? null : new UserAuthInfo(user.Id, user.Email!, user.FullName);
+        return user is null ? null : new UserAuthInfo(user.Id, user.Email!, user.FullName, user.StoreId);
     }
 
     public async Task<bool> CheckPasswordAsync(string userId, string password)

@@ -3,6 +3,7 @@ namespace Materia.Infrastructure.Persistence.EventStore;
 public class StoredEvent
 {
     public Guid Id { get; init; } = Guid.NewGuid();
+    public Guid StoreId { get; init; }
     public string AggregateType { get; init; } = default!;
     public Guid AggregateId { get; init; }
     public long Version { get; init; }

@@ -20,7 +20,7 @@ public sealed class SaleReadModelConfiguration : IEntityTypeConfiguration<SaleRe
         builder.ToTable("SaleReadModels");
         builder.HasKey(x => x.Id);
 
-        builder.HasIndex(x => x.ReferenceNo).IsUnique();
+        builder.HasIndex(x => new { x.StoreId, x.ReferenceNo }).IsUnique();
         builder.HasIndex(x => x.Status);
         builder.HasIndex(x => x.CreatedAt);
         builder.HasIndex(x => x.CustomerId);

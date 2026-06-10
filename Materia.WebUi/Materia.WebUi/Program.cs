@@ -88,6 +88,14 @@ builder.Services.AddHttpClient<ReceivableApiClient>(client =>
     client.BaseAddress = new Uri(apiBaseUrl))
     .AddHttpMessageHandler<BearerTokenHandler>();
 
+builder.Services.AddHttpClient<PlatformApiClient>(client =>
+    client.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<BearerTokenHandler>();
+
+builder.Services.AddHttpClient<StoreSettingsApiClient>(client =>
+    client.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<BearerTokenHandler>();
+
 var app = builder.Build();
 
 // MUST be the first middleware so everything downstream (HSTS, the auth-cookie Secure
