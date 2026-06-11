@@ -404,8 +404,8 @@ else
             </div>
 
             @* ─── Meta ─────────────────────────────────── *@
-            <div style="border-top:2px solid #000;border-bottom:1px dashed #000;
-                        padding:2mm 0;margin-bottom:2mm;font-size:7.5pt">
+            <div style="padding:2mm 0;margin-bottom:2mm;font-size:7.5pt">
+                <div style="line-height:1.2">================================</div>
                 <table style="width:100%;border-collapse:collapse">
                     <tr>
                         <td style="width:28%">No.</td>
@@ -424,10 +424,11 @@ else
                         <td>: @_sale.CustomerName</td>
                     </tr>
                 </table>
+                <div style="line-height:1.2">- - - - - - - - - - - - - - - - -</div>
             </div>
 
             @* ─── Item lines ────────────────────────────── *@
-            <div style="border-bottom:1px dashed #000;padding-bottom:2mm;margin-bottom:2mm">
+            <div style="padding-bottom:0;margin-bottom:0">
                 @foreach (var item in _sale.Items)
                 {
                     <div style="margin-bottom:1.5mm">
@@ -446,6 +447,7 @@ else
                     </div>
                 }
             </div>
+            <div style="font-size:7.5pt;line-height:1.2;margin-bottom:2mm">- - - - - - - - - - - - - - - - -</div>
 
             @* ─── Totals ────────────────────────────────── *@
             <div style="font-size:8pt;margin-bottom:1mm">
@@ -472,13 +474,14 @@ else
                 }
             </div>
 
-            <div style="border-top:2px solid #000;border-bottom:2px solid #000;
-                        padding:1.5mm 0;margin-bottom:3mm;
+            <div style="font-size:7.5pt;line-height:1.2">================================</div>
+            <div style="padding:1.5mm 0;margin-bottom:0;
                         display:flex;justify-content:space-between;
                         font-size:11pt;font-weight:700">
                 <span>TOTAL</span>
                 <span>Rp @_sale.GrandTotal.ToString("N0")</span>
             </div>
+            <div style="font-size:7.5pt;line-height:1.2;margin-bottom:3mm">================================</div>
 
             @* ─── Payment info ──────────────────────────── *@
             @if (_sale.Payment is not null)
@@ -512,14 +515,14 @@ else
             @* ─── Delivery notice ───────────────────────── *@
             @if (_sale.IsDeliveryRequired || _sale.SaleType == SaleType.Delivery)
             {
-                <div style="border:2px solid #000;padding:2mm;margin-bottom:3mm;
-                            text-align:center;font-size:8.5pt;font-weight:700">
+                <div style="margin-bottom:3mm;text-align:center;font-size:8.5pt;font-weight:700">
+                    <div style="line-height:1.2">================================</div>
                     *** DIANTAR ***
                     <div style="font-weight:400;margin-top:2mm;font-size:8pt">
                         Tanda Tangan Penerima:
-                        <div style="border-bottom:1px solid #000;margin-top:5mm;
-                                    width:60%;margin-left:auto;margin-right:auto"></div>
+                        <div style="margin-top:4mm;letter-spacing:1pt">____________________</div>
                     </div>
+                    <div style="line-height:1.2;margin-top:1mm">================================</div>
                 </div>
             }
 

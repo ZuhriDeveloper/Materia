@@ -75,12 +75,6 @@ h1:focus {
     display: none;
 }
 
-/* Target 80mm thermal roll — browsers that support size will honour it */
-@page {
-    margin: 0;
-    size: 80mm auto;
-}
-
 @media print {
     /* --- Suppress everything on the page --- */
     body * {
@@ -105,6 +99,8 @@ h1:focus {
         color: #000;
         background: #fff;
         width: 80mm;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
 
     /* Reset any MudBlazor or Bootstrap box-shadows / colours inside the receipt */
