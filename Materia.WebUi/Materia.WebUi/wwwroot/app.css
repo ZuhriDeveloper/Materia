@@ -90,7 +90,8 @@ h1:focus {
     .receipt-print-only {
         display: block !important;
         position: absolute;
-        inset: 0;
+        top: 0;
+        left: 0;
         margin: 0;
         padding: 4mm 5mm 10mm;
         font-family: 'Courier New', Courier, monospace;
