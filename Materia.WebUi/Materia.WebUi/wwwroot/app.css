@@ -102,9 +102,13 @@ h1:focus {
         font-weight: 500;
         color: #000;
         background: #fff;
-        /* Match the printer's real 72mm printable area (not the 80mm nominal
-           paper) so output prints 1:1 at 100% scale. */
+        /* Designed at the printer's real 72mm printable area (the 576-dot width
+           of an "80mm" head at 203 DPI), then enlarged 1.5x by `zoom` below so
+           it fills the paper at the DEFAULT 100% print scale — this printer
+           otherwise needs a manual 150% scale-up. The page box is widened to
+           108mm (72 x 1.5) in print.js to hold the zoomed content. */
         width: 72mm;
+        zoom: 1.5;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -144,6 +148,9 @@ h1:focus {
         line-height: 1.5 !important;
         padding:     0    !important;
         width:       auto !important;
+        /* The 1.5x receipt zoom is for the 72mm thermal roll only — the A5
+           delivery order must print at its natural size. */
+        zoom:        1    !important;
     }
 }
 

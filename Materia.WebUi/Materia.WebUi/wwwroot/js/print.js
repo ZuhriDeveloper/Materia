@@ -16,15 +16,14 @@ window.printReceipt = function (isSuratJalan) {
 
     var s = document.createElement('style');
     s.id = '_mp_page';
-    // For the thermal receipt we force the page + html/body to the printer's
-    // real printable width (72mm — the standard 576-dot area of an "80mm"
-    // thermal head at 203 DPI). Matching the physical paper exactly makes the
-    // browser print 1:1 at 100% scale instead of shrinking an 80mm layout to
-    // fit, which was forcing a manual 130% scale-up.
+    // The receipt is rendered at its 72mm design width then enlarged 1.5x via
+    // `zoom` in CSS (see .receipt-print-only) so it prints correctly at the
+    // default 100% scale on this printer. The page box must therefore be the
+    // zoomed width — 72mm x 1.5 = 108mm — or the enlarged content gets clipped.
     s.textContent = isSuratJalan
         ? '@page { size: A5 portrait; margin: 12mm 15mm; }'
-        : '@page { size: 72mm auto; margin: 0; }' +
-          '@media print { html, body { width: 72mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; } }';
+        : '@page { size: 108mm auto; margin: 0; }' +
+          '@media print { html, body { width: 108mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; } }';
     document.head.appendChild(s);
 
     window.print();
