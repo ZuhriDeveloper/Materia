@@ -93,10 +93,13 @@ h1:focus {
         top: 0;
         left: 0;
         margin: 0;
-        padding: 4mm 5mm 10mm;
-        font-family: 'Courier New', Courier, monospace;
-        font-size: 8.5pt;
-        line-height: 1.35;
+        padding: 2mm 3mm 6mm;
+        /* Sans-serif prints far crisper on thermal heads than Courier's thin
+           serifed strokes, which render faint and fuzzy at small sizes. */
+        font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
+        font-size: 11pt;
+        line-height: 1.4;
+        font-weight: 500;
         color: #000;
         background: #fff;
         width: 80mm;
@@ -109,6 +112,23 @@ h1:focus {
         background: transparent !important;
         box-shadow: none !important;
         text-shadow: none !important;
+    }
+
+    /* Full-width separator lines — render reliably on graphical thermal
+       drivers and stay crisp regardless of font, unlike '=' character runs. */
+    .receipt-print-only .rcpt-sep,
+    .receipt-print-only .rcpt-sep-strong {
+        border: 0;
+        height: 0;
+        margin: 1.5mm 0;
+    }
+
+    .receipt-print-only .rcpt-sep {
+        border-top: 1px solid #000;
+    }
+
+    .receipt-print-only .rcpt-sep-strong {
+        border-top: 2px solid #000;
     }
 
     /* ── Surat Jalan overrides (A5 professional layout) ──────────────────────

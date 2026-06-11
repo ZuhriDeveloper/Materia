@@ -728,69 +728,67 @@ else
                ══════════════════════════════════════════════ *@
 
             @* ─── Store header ─────────────────────────── *@
-            <div style="text-align:center;margin-bottom:3mm">
+            <div style="text-align:center;margin-bottom:2.5mm">
                 @if (!string.IsNullOrEmpty(_storeLogo))
                 {
-                    <img src="@_storeLogo" style="height:12mm;margin-bottom:1mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
+                    <img src="@_storeLogo" style="height:14mm;margin-bottom:1mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
                 }
-                <div style="font-size:13pt;font-weight:700;letter-spacing:.5px">@(_storeProfile?.Name ?? "MATERIA")</div>
+                <div style="font-size:16pt;font-weight:700;letter-spacing:.5px;line-height:1.1">@(_storeProfile?.Name ?? "MATERIA")</div>
                 @if (!string.IsNullOrWhiteSpace(_storeProfile?.Address))
                 {
-                    <div style="font-size:7.5pt;margin-top:1mm">@_storeProfile.Address</div>
+                    <div style="font-size:9.5pt;margin-top:1mm;line-height:1.25">@_storeProfile.Address</div>
                 }
                 @if (!string.IsNullOrWhiteSpace(_storeProfile?.Phone))
                 {
-                    <div style="font-size:7.5pt">Telp. @_storeProfile.Phone</div>
+                    <div style="font-size:9.5pt">Telp. @_storeProfile.Phone</div>
                 }
             </div>
 
-            <div style="padding:2mm 0;margin-bottom:2mm;font-size:7.5pt">
-                <div style="line-height:1.2">================================</div>
-                <table style="width:100%;border-collapse:collapse">
-                    <tr>
-                        <td style="width:28%">No.</td>
-                        <td>: <b>@_receipt.ReferenceNo</b></td>
-                    </tr>
-                    <tr>
-                        <td>Tgl.</td>
-                        <td>: @_receipt.IssuedAt.ToString("dd/MM/yyyy HH:mm")</td>
-                    </tr>
-                    <tr>
-                        <td>Kasir</td>
-                        <td>: @_receipt.ServedBy</td>
-                    </tr>
-                    <tr>
-                        <td>Plg.</td>
-                        <td>: @_receipt.CustomerName</td>
-                    </tr>
-                </table>
-                <div style="line-height:1.2">- - - - - - - - - - - - - - - - -</div>
-            </div>
+            @* ─── Meta ─────────────────────────────────── *@
+            <div class="rcpt-sep-strong"></div>
+            <table style="width:100%;border-collapse:collapse;font-size:10pt;margin:1.5mm 0">
+                <tr>
+                    <td style="width:24%">No.</td>
+                    <td>: <b>@_receipt.ReferenceNo</b></td>
+                </tr>
+                <tr>
+                    <td>Tgl.</td>
+                    <td>: @_receipt.IssuedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                </tr>
+                <tr>
+                    <td>Kasir</td>
+                    <td>: @_receipt.ServedBy</td>
+                </tr>
+                <tr>
+                    <td>Plg.</td>
+                    <td>: @_receipt.CustomerName</td>
+                </tr>
+            </table>
+            <div class="rcpt-sep"></div>
 
             @* ─── Item lines ────────────────────────────── *@
-            <div style="padding-bottom:0;margin-bottom:0">
+            <div style="margin:1.5mm 0">
                 @foreach (var item in _receipt.Lines)
                 {
-                    <div style="margin-bottom:1.5mm">
-                        <div style="font-weight:600;font-size:8.5pt;
-                                    white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                    <div style="margin-bottom:2mm">
+                        <div style="font-weight:700;font-size:11pt;line-height:1.2">
                             @item.ProductName@(string.IsNullOrEmpty(item.ColorName) ? "" : $" — {item.ColorName}")
                         </div>
                         <div style="display:flex;justify-content:space-between;
-                                    font-size:8pt;padding-left:3mm">
+                                    font-size:10.5pt;padding-left:2mm">
                             <span>
                                 @FormatQty(item.Quantity) @item.UnitName
                                 &times; @item.UnitPrice.ToString("N0")
                             </span>
-                            <span style="font-weight:600">@item.Total.ToString("N0")</span>
+                            <span style="font-weight:700">@item.Total.ToString("N0")</span>
                         </div>
                     </div>
                 }
             </div>
-            <div style="font-size:7.5pt;line-height:1.2;margin-bottom:2mm">- - - - - - - - - - - - - - - - -</div>
+            <div class="rcpt-sep"></div>
 
             @* ─── Totals ────────────────────────────────── *@
-            <div style="font-size:8pt;margin-bottom:1mm">
+            <div style="font-size:10.5pt;margin:1.5mm 0">
                 <div style="display:flex;justify-content:space-between">
                     <span>Subtotal</span>
                     <span>@_receipt.Subtotal.ToString("N0")</span>
@@ -811,17 +809,17 @@ else
                 }
             </div>
 
-            <div style="font-size:7.5pt;line-height:1.2">================================</div>
-            <div style="padding:1.5mm 0;margin-bottom:0;
-                        display:flex;justify-content:space-between;
-                        font-size:11pt;font-weight:700">
+            @* ─── Grand total ──────────────────────────── *@
+            <div class="rcpt-sep-strong"></div>
+            <div style="display:flex;justify-content:space-between;
+                        font-size:14pt;font-weight:700;padding:1mm 0">
                 <span>TOTAL</span>
                 <span>Rp @_receipt.GrandTotal.ToString("N0")</span>
             </div>
-            <div style="font-size:7.5pt;line-height:1.2;margin-bottom:3mm">================================</div>
+            <div class="rcpt-sep-strong"></div>
 
             @* ─── Payment / debt ────────────────────────── *@
-            <div style="font-size:8pt;margin-bottom:2mm">
+            <div style="font-size:10pt;margin:1.5mm 0">
                 <div style="display:flex;justify-content:space-between">
                     <span>Bayar (@_receipt.PaymentMethodLabel)</span>
                     <span>@_receipt.AmountPaid.ToString("N0")</span>
@@ -837,44 +835,42 @@ else
 
             @if (_receipt.IsCredit)
             {
-                <div style="margin-bottom:3mm;text-align:center;font-size:9pt;font-weight:700">
-                    <div style="line-height:1.2">================================</div>
+                <div class="rcpt-sep"></div>
+                <div style="text-align:center;font-size:11pt;font-weight:700;margin:1.5mm 0">
                     *** BELUM LUNAS / PIUTANG ***
                     <div style="display:flex;justify-content:space-between;
-                                font-size:9.5pt;margin-top:2mm">
+                                font-size:11pt;margin-top:2mm">
                         <span>SISA PIUTANG</span>
                         <span>Rp @_receipt.Outstanding.ToString("N0")</span>
                     </div>
-                    <div style="font-weight:400;margin-top:2mm;font-size:8pt">
+                    <div style="font-weight:400;margin-top:2mm;font-size:9.5pt">
                         Tanda Tangan Penerima Bon:
-                        <div style="margin-top:4mm;letter-spacing:1pt">____________________</div>
+                        <div style="margin-top:7mm">(____________________)</div>
                     </div>
-                    <div style="line-height:1.2;margin-top:1mm">================================</div>
                 </div>
+                <div class="rcpt-sep"></div>
             }
 
             @* ─── Delivery notice (simple receipt with delivery) ─ *@
             @if (_receipt.IsDeliveryRequired)
             {
-                <div style="margin-bottom:3mm;text-align:center;font-size:8.5pt;font-weight:700">
-                    <div style="line-height:1.2">================================</div>
+                <div class="rcpt-sep"></div>
+                <div style="text-align:center;font-size:11pt;font-weight:700;margin:1.5mm 0">
                     *** DIANTAR ***
-                    <div style="font-weight:400;margin-top:2mm;font-size:8pt">
+                    <div style="font-weight:400;margin-top:2mm;font-size:9.5pt">
                         Tanda Tangan Penerima:
-                        <div style="margin-top:4mm;letter-spacing:1pt">____________________</div>
+                        <div style="margin-top:7mm">(____________________)</div>
                     </div>
-                    <div style="line-height:1.2;margin-top:1mm">================================</div>
                 </div>
+                <div class="rcpt-sep"></div>
             }
 
             @* ─── Footer ────────────────────────────────── *@
-            <div style="text-align:center;font-size:7.5pt;margin-top:3mm">
-                <div>- - - - - - - - - - - - - - - - -</div>
+            <div style="text-align:center;font-size:9.5pt;margin-top:3mm">
                 <div style="margin:2mm 0">
                     Terima kasih atas kunjungan<br />
                     dan kepercayaan Anda!
                 </div>
-                <div>- - - - - - - - - - - - - - - - -</div>
             </div>
         }
     }
