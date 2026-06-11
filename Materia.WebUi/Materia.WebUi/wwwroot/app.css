@@ -93,7 +93,7 @@ h1:focus {
         top: 0;
         left: 0;
         margin: 0;
-        padding: 2mm 3mm 6mm;
+        padding: 1.5mm 2mm 6mm;
         /* Sans-serif prints far crisper on thermal heads than Courier's thin
            serifed strokes, which render faint and fuzzy at small sizes. */
         font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif;
@@ -102,7 +102,9 @@ h1:focus {
         font-weight: 500;
         color: #000;
         background: #fff;
-        width: 80mm;
+        /* Match the printer's real 72mm printable area (not the 80mm nominal
+           paper) so output prints 1:1 at 100% scale. */
+        width: 72mm;
         -webkit-print-color-adjust: exact;
         print-color-adjust: exact;
     }
@@ -132,9 +134,9 @@ h1:focus {
     }
 
     /* ── Surat Jalan overrides (A5 professional layout) ──────────────────────
-       The base rule locks width to 80mm and uses Courier New for thermal paper.
-       These overrides switch to a proportional font and let the content fill
-       the full A5 content area (paper minus @page margins injected by print.js).
+       The base rule locks width to 72mm for thermal paper. These overrides let
+       the content fill the full A5 content area (paper minus the @page margins
+       injected by print.js) for the delivery-order document instead.
     ──────────────────────────────────────────────────────────────────────────── */
     .receipt-print-only.is-surat-jalan {
         font-family: Arial, Helvetica, sans-serif !important;

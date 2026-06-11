@@ -16,13 +16,15 @@ window.printReceipt = function (isSuratJalan) {
 
     var s = document.createElement('style');
     s.id = '_mp_page';
-    // For the thermal receipt we also force html/body to 80mm so the browser
-    // renders the layout at paper width — otherwise it shrinks the full sidebar
-    // layout (~1200px) down to 80mm and everything prints tiny.
+    // For the thermal receipt we force the page + html/body to the printer's
+    // real printable width (72mm — the standard 576-dot area of an "80mm"
+    // thermal head at 203 DPI). Matching the physical paper exactly makes the
+    // browser print 1:1 at 100% scale instead of shrinking an 80mm layout to
+    // fit, which was forcing a manual 130% scale-up.
     s.textContent = isSuratJalan
         ? '@page { size: A5 portrait; margin: 12mm 15mm; }'
-        : '@page { size: 80mm auto; margin: 0; }' +
-          '@media print { html, body { width: 80mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; } }';
+        : '@page { size: 72mm auto; margin: 0; }' +
+          '@media print { html, body { width: 72mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; } }';
     document.head.appendChild(s);
 
     window.print();
