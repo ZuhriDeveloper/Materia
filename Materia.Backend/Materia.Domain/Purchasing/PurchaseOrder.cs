@@ -11,10 +11,15 @@ public sealed class PurchaseOrderLine
     public ProductId ProductId { get; init; } = default!;
     public decimal OrderedQty { get; init; }
     public decimal ReceivedQty { get; private set; }
+    public decimal ReturnedQty { get; private set; }
     public decimal UnitCost { get; init; }
     public string Unit { get; init; } = default!;
 
+    /// <summary>Received goods still on hand for this PO — the basis for the amount owed.</summary>
+    public decimal NetReceivedQty => ReceivedQty - ReturnedQty;
+
     internal void AddReceipt(decimal qty) => ReceivedQty += qty;
+    internal void AddReturn(decimal qty) => ReturnedQty += qty;
 }
 
 public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
@@ -23,6 +28,9 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
     public PurchaseOrderStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime? ReceivedAt { get; private set; }
+
+    /// <summary>Term of payment (tempo). Null = cash / no tempo.</summary>
+    public PaymentTerm? PaymentTerm { get; private set; }
 
     private readonly List<PurchaseOrderLine> _lines = [];
     public IReadOnlyList<PurchaseOrderLine> Lines => _lines.AsReadOnly();
@@ -34,7 +42,8 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
     public static PurchaseOrder Create(
         SupplierId supplierId,
         IReadOnlyList<(ProductId ProductId, decimal Qty, decimal UnitCost, string Unit)> lines,
-        string createdBy)
+        string createdBy,
+        PaymentTerm? paymentTerm = null)
     {
         if (lines.Count == 0)
             throw new DomainException("Purchase order must have at least one line.");
@@ -49,7 +58,9 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
             supplierId,
             lines.Select(l => new PurchaseOrderLineData(l.ProductId.Value, l.Qty, l.UnitCost, l.Unit)).ToList(),
             createdBy,
-            DateTime.UtcNow));
+            DateTime.UtcNow,
+            paymentTerm?.Value,
+            paymentTerm?.Unit.ToString()));
         return po;
     }
 
@@ -93,6 +104,39 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
             DateTime.UtcNow));
     }
 
+    public void RecordReturn(
+        IReadOnlyList<(ProductId ProductId, decimal Qty)> returns,
+        string reason,
+        string returnedBy)
+    {
+        if (Status is not (PurchaseOrderStatus.PartiallyReceived or PurchaseOrderStatus.Received))
+            throw new DomainException(
+                $"Only received goods can be returned. Current status: {Status}.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("Return reason is required.");
+        if (returns.Count == 0)
+            throw new DomainException("At least one return line is required.");
+
+        foreach (var (productId, qty) in returns)
+        {
+            var line = _lines.FirstOrDefault(l => l.ProductId == productId)
+                ?? throw new DomainException($"Product {productId.Value} not found in this PO.");
+
+            if (qty <= 0)
+                throw new DomainException("Returned quantity must be positive.");
+            if (qty > line.NetReceivedQty)
+                throw new DomainException(
+                    $"Cannot return {qty} — only {line.NetReceivedQty} received and on hand for this product.");
+        }
+
+        Raise(new PurchaseOrderReturned(
+            Id,
+            returns.Select(r => new ReturnLineData(r.ProductId.Value, r.Qty)).ToList(),
+            reason,
+            returnedBy,
+            DateTime.UtcNow));
+    }
+
     public void Cancel(string reason, string cancelledBy)
     {
         if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Cancelled)
@@ -114,6 +158,7 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                 SupplierId = e.SupplierId;
                 Status = PurchaseOrderStatus.Draft;
                 CreatedAt = e.OccurredAt;
+                PaymentTerm = PaymentTerm.FromRaw(e.PaymentTermValue, e.PaymentTermUnit);
                 _lines.AddRange(e.Lines.Select(l => new PurchaseOrderLine
                 {
                     ProductId = ProductId.From(l.ProductId),
@@ -136,6 +181,14 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                 var allFulfilled = _lines.All(l => l.ReceivedQty >= l.OrderedQty);
                 Status = allFulfilled ? PurchaseOrderStatus.Received : PurchaseOrderStatus.PartiallyReceived;
                 ReceivedAt = allFulfilled ? e.OccurredAt : null;
+                break;
+
+            case PurchaseOrderReturned e:
+                foreach (var ret in e.Lines)
+                {
+                    var line = _lines.First(l => l.ProductId.Value == ret.ProductId);
+                    line.AddReturn(ret.ReturnedQty);
+                }
                 break;
 
             case PurchaseOrderCancelled:

@@ -47,7 +47,7 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
         foreach (var po in posRaw)
         {
             var lines     = JsonSerializer.Deserialize<List<PoLineJson>>(po.LinesJson, _json) ?? [];
-            var totalCost = lines.Sum(l => l.ReceivedQty * l.UnitCost);
+            var totalCost = lines.Sum(l => (l.ReceivedQty - l.ReturnedQty) * l.UnitCost);
             if (totalCost <= 0) continue;
 
             cogsLines.Add(new PnlLineItemDto(
@@ -124,7 +124,7 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
         foreach (var po in posRaw)
         {
             var lines     = JsonSerializer.Deserialize<List<PoLineJson>>(po.LinesJson, _json) ?? [];
-            var totalCost = lines.Sum(l => l.ReceivedQty * l.UnitCost);
+            var totalCost = lines.Sum(l => (l.ReceivedQty - l.ReturnedQty) * l.UnitCost);
             if (totalCost <= 0) continue;
 
             outflows.Add(new CashFlowLineDto(
@@ -156,6 +156,7 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
         Guid    ProductId,
         decimal OrderedQty,
         decimal ReceivedQty,
+        decimal ReturnedQty,
         decimal UnitCost,
         string  Unit);
 }

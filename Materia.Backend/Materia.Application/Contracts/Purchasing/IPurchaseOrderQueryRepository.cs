@@ -14,12 +14,16 @@ public record PurchaseOrderDto(
     IReadOnlyList<PurchaseOrderLineDto> Lines,
     string CreatedBy,
     DateTime CreatedAt,
-    DateTime? ReceivedAt);
+    DateTime? ReceivedAt,
+    int? PaymentTermValue,
+    string? PaymentTermUnit,
+    DateTime? DueDate);
 
 public record PurchaseOrderLineDto(
     Guid ProductId,
     string? ProductName,
     decimal OrderedQty,
     decimal ReceivedQty,
+    decimal ReturnedQty,
     decimal UnitCost,
     string Unit);

@@ -11,4 +11,10 @@ public class PurchaseOrderReadModel
     public string CreatedBy { get; set; } = default!;
     public DateTime CreatedAt { get; set; }
     public DateTime? ReceivedAt { get; set; }
+
+    // Payment tenor (tempo). Null term = cash / no tempo.
+    public int? PaymentTermValue { get; set; }
+    public string? PaymentTermUnit { get; set; }
+    // Due date (jatuh tempo), set once the goods are fully received (ReceivedAt + term).
+    public DateTime? PaymentDueDate { get; set; }
 }

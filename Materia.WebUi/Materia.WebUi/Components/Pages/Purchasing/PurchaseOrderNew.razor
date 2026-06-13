@@ -190,6 +190,43 @@
                     Harga beli dikunci dari harga katalog terkini pemasok saat order dibuat.
                 </p>
 
+                @* ── Termin pembayaran (tempo) ── *@
+                <div class="border-top pt-3 mb-3">
+                    <label class="form-label small fw-semibold d-block mb-2">
+                        <i class="bi bi-calendar-check me-1"></i> Termin Pembayaran
+                    </label>
+                    <div class="form-check form-switch mb-2">
+                        <input class="form-check-input" type="checkbox" id="cashSwitch"
+                               checked="@_isCash" @onchange="OnCashToggled" />
+                        <label class="form-check-label small" for="cashSwitch">
+                            Tunai (tanpa tempo)
+                        </label>
+                    </div>
+                    @if (!_isCash)
+                    {
+                        <div class="input-group input-group-sm mb-2">
+                            <input type="number" class="form-control" min="1" step="1"
+                                   @bind="_termValue" placeholder="0" />
+                            <select class="form-select" @bind="_termUnit">
+                                <option value="@PaymentTermUnit.Days">Hari</option>
+                                <option value="@PaymentTermUnit.Weeks">Minggu</option>
+                                <option value="@PaymentTermUnit.Months">Bulan</option>
+                            </select>
+                        </div>
+                        <div class="d-flex flex-wrap gap-1 mb-1">
+                            @foreach (var (label, val, unit) in _presets)
+                            {
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm py-0 px-2"
+                                        @onclick="() => ApplyPreset(val, unit)">@label</button>
+                            }
+                        </div>
+                        <div class="small text-muted">
+                            Jatuh tempo dihitung sejak barang diterima.
+                        </div>
+                    }
+                </div>
+
                 <button class="btn btn-success w-100"
                         @onclick="HandleCreate"
                         disabled="@(_lines.Count == 0 || _processing)">
@@ -221,6 +258,21 @@
     private StockDto? _lineStock;
 
     private readonly List<PoLine> _lines = [];
+
+    // Payment tenor (tempo). Cash = no tempo.
+    private bool            _isCash   = true;
+    private int             _termValue = 30;
+    private PaymentTermUnit _termUnit  = PaymentTermUnit.Days;
+
+    private static readonly (string Label, int Value, PaymentTermUnit Unit)[] _presets =
+    [
+        ("1 minggu", 1, PaymentTermUnit.Weeks),
+        ("2 minggu", 2, PaymentTermUnit.Weeks),
+        ("1 bulan",  1, PaymentTermUnit.Months),
+        ("2 bulan",  2, PaymentTermUnit.Months),
+        ("3 bulan",  3, PaymentTermUnit.Months),
+        ("6 bulan",  6, PaymentTermUnit.Months),
+    ];
 
     private string? _error;
     private bool    _processing;
@@ -269,15 +321,35 @@
         ResetLineForm();
     }
 
+    private void OnCashToggled(ChangeEventArgs e)
+    {
+        _isCash = e.Value is true;
+    }
+
+    private void ApplyPreset(int value, PaymentTermUnit unit)
+    {
+        _termValue = value;
+        _termUnit  = unit;
+    }
+
     private async Task HandleCreate()
     {
         if (_selectedSupplier is null) return;
+
+        if (!_isCash && _termValue <= 0)
+        {
+            _error = "Periode tempo harus lebih dari 0.";
+            return;
+        }
 
         _processing = true;
         _error      = null;
 
         var inputs = _lines.Select(l => new CreatePoLineInput(l.ProductId, l.Qty)).ToList();
-        var (id, error) = await PoApi.CreateAsync(_selectedSupplier.Id, inputs);
+
+        int?            termValue = _isCash ? null : _termValue;
+        PaymentTermUnit? termUnit = _isCash ? null : _termUnit;
+        var (id, error) = await PoApi.CreateAsync(_selectedSupplier.Id, inputs, termValue, termUnit);
 
         _processing = false;
         if (error is not null) { _error = error; return; }

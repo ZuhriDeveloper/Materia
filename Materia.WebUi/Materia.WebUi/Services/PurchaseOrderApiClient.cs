@@ -11,10 +11,12 @@ public class PurchaseOrderApiClient(HttpClient http)
         => http.GetFromJsonAsync<PurchaseOrderDto>($"api/purchase-orders/{id}", ct);
 
     public async Task<(Guid? Id, string? Error)> CreateAsync(
-        Guid supplierId, IReadOnlyList<CreatePoLineInput> lines, CancellationToken ct = default)
+        Guid supplierId, IReadOnlyList<CreatePoLineInput> lines,
+        int? paymentTermValue = null, PaymentTermUnit? paymentTermUnit = null,
+        CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/purchase-orders",
-            new { supplierId, lines }, ct);
+            new { supplierId, lines, paymentTermValue, paymentTermUnit = paymentTermUnit?.ToString() }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
         var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);
@@ -32,6 +34,14 @@ public class PurchaseOrderApiClient(HttpClient http)
     {
         var response = await http.PostAsJsonAsync($"api/purchase-orders/{id}/receive",
             new { lines }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
+    public async Task<string?> ReturnAsync(
+        Guid id, IReadOnlyList<ReturnPoLineInput> lines, string reason, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync($"api/purchase-orders/{id}/return",
+            new { lines, reason }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

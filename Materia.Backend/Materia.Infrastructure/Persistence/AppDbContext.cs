@@ -173,9 +173,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
             e.HasKey(x => x.Id);
             e.Property(x => x.Status).HasMaxLength(30).IsRequired();
             e.Property(x => x.LinesJson).HasColumnType("jsonb");
+            e.Property(x => x.PaymentTermUnit).HasMaxLength(20);
             e.HasIndex(x => x.SupplierId);
             e.HasIndex(x => x.Status);
             e.HasIndex(x => x.CreatedAt);
+            e.HasIndex(x => x.PaymentDueDate);
         });
 
         builder.Entity<PurchaseInvoiceImage>(e =>

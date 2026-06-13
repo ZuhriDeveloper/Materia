@@ -78,18 +78,25 @@ public class PurchaseOrderRepository(AppDbContext context, ICurrentStore current
                 SupplierName = supplierName,
                 CreatedBy = newEvents.OfType<PurchaseOrderCreated>().FirstOrDefault()?.CreatedBy ?? string.Empty,
                 CreatedAt = po.CreatedAt,
+                PaymentTermValue = po.PaymentTerm?.Value,
+                PaymentTermUnit = po.PaymentTerm?.Unit.ToString(),
             };
             context.PurchaseOrderReadModels.Add(projection);
         }
 
         projection.Status = po.Status.ToString();
         projection.ReceivedAt = po.ReceivedAt;
+        // Due date (jatuh tempo) anchors on the goods-received date once fully received.
+        projection.PaymentDueDate = po is { PaymentTerm: { } term, ReceivedAt: { } receivedAt }
+            ? term.DueDateFrom(receivedAt)
+            : null;
         projection.LinesJson = JsonSerializer.Serialize(
             po.Lines.Select(l => new
             {
                 productId = l.ProductId.Value,
                 orderedQty = l.OrderedQty,
                 receivedQty = l.ReceivedQty,
+                returnedQty = l.ReturnedQty,
                 unitCost = l.UnitCost,
                 unit = l.Unit,
             }));
