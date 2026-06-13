@@ -14,7 +14,21 @@ public record ProductDto(
     DateTime? UpdatedAt,
     List<UnitConversionDto> UnitConversions,
     List<CategoryRefDto> Categories,
-    List<ColorVariantDto>? ColorVariants = null);
+    List<ColorVariantDto>? ColorVariants = null,
+    decimal StockQuantity = 0m,
+    decimal? LatestPurchasePrice = null,
+    bool HasSupplier = false)
+{
+    public bool HasStock => StockQuantity > 0m;
+    public bool HasPurchasePrice => LatestPurchasePrice is > 0m;
+    public bool HasSalePrice => SalePrice > 0m;
+
+    /// <summary>
+    /// Mirrors <c>Materia.Application.DTOs.Inventory.ProductDto.NeedsAttention</c>: the
+    /// product is missing a supplier, stock, harga beli, or harga jual.
+    /// </summary>
+    public bool NeedsAttention => !HasSupplier || !HasStock || !HasPurchasePrice || !HasSalePrice;
+}
 
 public record UnitConversionDto(string FromUnit, string ToUnit, decimal Factor, decimal SalePrice);
 

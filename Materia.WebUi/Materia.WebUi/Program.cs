@@ -29,8 +29,7 @@ builder.Services.AddMudServices();
 builder.Services.AddScoped<ThemeState>();
 
 builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents()
-    .AddInteractiveWebAssemblyComponents();
+    .AddInteractiveServerComponents();
 
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddHttpContextAccessor();
@@ -107,11 +106,7 @@ var app = builder.Build();
 // real client scheme/host rather than the internal http://...:8080 hop.
 app.UseForwardedHeaders();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseWebAssemblyDebugging();
-}
-else
+if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
     app.UseHsts();
@@ -130,9 +125,7 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode()
-    .AddInteractiveWebAssemblyRenderMode()
-    .AddAdditionalAssemblies(typeof(Materia.WebUi.Client._Imports).Assembly);
+    .AddInteractiveServerRenderMode();
 
 app.MapPost("/account/logout", async (HttpContext context) =>
 {
