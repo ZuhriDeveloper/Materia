@@ -152,6 +152,37 @@ h1:focus {
            jalan must print at its natural size on the dot-matrix form. */
         zoom:        1    !important;
     }
+
+    /* ── Single-page guard ───────────────────────────────────────────────────
+       The app chrome is only hidden with visibility:hidden, so it still takes
+       up layout height and — on the short 5.5in form — overflows onto a blank
+       second page. Collapse the MudBlazor shell to zero height and make it
+       non-positioning, so the absolutely-positioned receipt is the only box
+       that defines the printed page count. */
+    .mud-layout,
+    .mud-main-content,
+    .mud-container {
+        position:   static  !important;
+        max-height: 0       !important;
+        min-height: 0       !important;
+        overflow:   hidden  !important;
+        padding:    0       !important;
+        margin:     0       !important;
+    }
+
+    .mud-appbar,
+    .mud-drawer,
+    .mud-overlay,
+    #blazor-error-ui {
+        display: none !important;
+    }
+
+    html, body {
+        height:     auto !important;
+        min-height: 0    !important;
+        margin:     0    !important;
+        padding:    0    !important;
+    }
 }
 
 /* ==============================================
