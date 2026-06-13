@@ -22,7 +22,7 @@ window.printReceipt = function (isSuratJalan) {
     // default 100% scale on this printer. The page box must therefore be the
     // zoomed width — 72mm x 1.5 = 108mm — or the enlarged content gets clipped.
     s.textContent = isSuratJalan
-        ? '@page { size: 9.5in 5.5in; margin: 4mm 19mm; }'
+        ? '@page { size: 9.5in 5.5in; margin: 10mm 19mm 4mm 19mm; }'
         : '@page { size: 108mm auto; margin: 0; }' +
           '@media print { html, body { width: 108mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; } }';
     document.head.appendChild(s);
