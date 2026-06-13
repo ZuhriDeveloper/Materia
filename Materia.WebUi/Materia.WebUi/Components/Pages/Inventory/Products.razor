@@ -179,10 +179,11 @@
                     <tr>
                         <th>Nama</th>
                         <th>Satuan Dasar</th>
+                        <th class="text-end">Stok</th>
+                        <th class="text-end">Harga Beli</th>
                         <th class="text-end">Harga Jual</th>
                         <th>Barcode</th>
                         <th>Kategori</th>
-                        <th>Warna</th>
                         <th>Status</th>
                         <th>Diperbarui</th>
                         <th></th>
@@ -191,10 +192,30 @@
                 <tbody>
                     @foreach (var p in _products.Items)
                     {
-                        <tr>
-                            <td class="fw-semibold">@p.Name</td>
+                        <tr class="@(p.NeedsAttention ? "table-warning" : null)">
+                            <td class="fw-semibold">
+                                @if (p.NeedsAttention)
+                                {
+                                    <i class="bi bi-exclamation-triangle-fill text-warning me-1"
+                                       title="@AttentionReason(p)"></i>
+                                }
+                                @p.Name
+                            </td>
                             <td>
                                 <span class="badge bg-light text-dark border">@p.BaseUnit</span>
+                            </td>
+                            <td class="text-end @(p.HasStock ? "" : "text-danger fw-semibold")">
+                                @if (p.HasStock)
+                                {
+                                    @($"{p.StockQuantity:0.##} {p.BaseUnit}")
+                                }
+                                else
+                                {
+                                    <span title="Stok habis / belum ada">0</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                @(p.HasPurchasePrice ? $"Rp {p.LatestPurchasePrice:N0}" : "—")
                             </td>
                             <td class="text-end">
                                 @(p.SalePrice > 0 ? $"Rp {p.SalePrice:N0}" : "—")
@@ -213,21 +234,6 @@
                                 @(p.Categories.Count == 0
                                     ? "—"
                                     : string.Join(", ", p.Categories.Select(c => c.Name)))
-                            </td>
-                            <td class="small">
-                                @{
-                                    var variantCount = p.ColorVariants?.Count ?? 0;
-                                }
-                                @if (variantCount > 0)
-                                {
-                                    <span class="badge bg-light text-dark border">
-                                        @variantCount warna
-                                    </span>
-                                }
-                                else
-                                {
-                                    <span class="text-muted">—</span>
-                                }
                             </td>
                             <td>
                                 @if (p.IsActive)
@@ -258,6 +264,16 @@
                     Menampilkan
                     <strong>@((_page - 1) * PageSize + 1)</strong>–<strong>@(Math.Min(_page * PageSize, _products.TotalCount))</strong>
                     dari <strong>@_products.TotalCount</strong> produk
+                    @{
+                        var attentionCount = _products.Items.Count(p => p.NeedsAttention);
+                    }
+                    @if (attentionCount > 0)
+                    {
+                        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle fw-normal ms-2">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            @attentionCount perlu perhatian
+                        </span>
+                    }
                 </small>
 
                 @if (_products.TotalPages > 1)
@@ -447,5 +463,17 @@
     {
         _page = page;
         await LoadAsync();
+    }
+
+    // ── Attention marker ────────────────────────────────────────────────────────
+    /// Human-readable list of the master-data gaps that make a product need attention.
+    private static string AttentionReason(ProductDto p)
+    {
+        var missing = new List<string>();
+        if (!p.HasSupplier)      missing.Add("supplier");
+        if (!p.HasStock)         missing.Add("stok");
+        if (!p.HasPurchasePrice) missing.Add("harga beli");
+        if (!p.HasSalePrice)     missing.Add("harga jual");
+        return missing.Count == 0 ? "" : "Belum ada: " + string.Join(", ", missing);
     }
 }

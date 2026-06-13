@@ -6,7 +6,6 @@
     <Project Path="Materia.Backend/Materia.WebApi/Materia.WebApi.csproj" Id="d509516c-513f-4c69-99e6-a299a25bc75a" />
   </Folder>
   <Folder Name="/Materia.WebUi/">
-    <Project Path="Materia.WebUi/Materia.WebUi.Client/Materia.WebUi.Client.csproj" />
     <Project Path="Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj" />
   </Folder>
   <Project Path="Materia.AppHost/Materia.AppHost.csproj" />

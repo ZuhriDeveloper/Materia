@@ -22,7 +22,19 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             .ToListAsync(ct);
         var variants = variantRows.Select(v => ToVariantDto(v, p.SalePrice)).ToList();
 
-        return Map(p, categories, variants);
+        var stock = await context.StockReadModels
+            .Where(s => s.ProductId == id && s.VariantId == null)
+            .Select(s => (decimal?)s.Quantity)
+            .FirstOrDefaultAsync(ct);
+        var purchaseInfo = await BuildPurchaseInfoAsync([id], ct);
+        var (latestPrice, hasSupplier) = purchaseInfo.GetValueOrDefault(id);
+
+        return Map(p, categories, variants) with
+        {
+            StockQuantity = stock ?? 0m,
+            LatestPurchasePrice = latestPrice,
+            HasSupplier = hasSupplier,
+        };
     }
 
     public async Task<PagedResult<ProductDto>> GetPagedAsync(
@@ -75,11 +87,29 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             .GroupBy(v => v.ProductId)
             .ToDictionary(g => g.Key, g => g.OrderBy(v => v.ColorName).ToList());
 
-        var dtos = items.Select(p => Map(
-            p,
-            BuildCategories(p.CategoryIdsJson, categoryMap),
-            (variantsByProduct.TryGetValue(p.Id, out var vs) ? vs : [])
-                .Select(v => ToVariantDto(v, p.SalePrice)).ToList())).ToList();
+        // Product-level stock for this page (variant rows excluded — variant stock is deferred).
+        var stockByProduct = await context.StockReadModels
+            .Where(s => productIds.Contains(s.ProductId) && s.VariantId == null)
+            .ToDictionaryAsync(s => s.ProductId, s => s.Quantity, ct);
+
+        // Latest purchase price (harga beli) and supplier presence, from supplier catalogs.
+        var purchaseInfo = await BuildPurchaseInfoAsync(productIds, ct);
+
+        var dtos = items.Select(p =>
+        {
+            var dto = Map(
+                p,
+                BuildCategories(p.CategoryIdsJson, categoryMap),
+                (variantsByProduct.TryGetValue(p.Id, out var vs) ? vs : [])
+                    .Select(v => ToVariantDto(v, p.SalePrice)).ToList());
+            var (latestPrice, hasSupplier) = purchaseInfo.GetValueOrDefault(p.Id);
+            return dto with
+            {
+                StockQuantity = stockByProduct.GetValueOrDefault(p.Id),
+                LatestPurchasePrice = latestPrice,
+                HasSupplier = hasSupplier,
+            };
+        }).ToList();
         return new PagedResult<ProductDto>(dtos, total, page, pageSize);
     }
 
@@ -123,6 +153,51 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
         => new(v.Id, v.ColorName, v.ColorCode, v.Barcode, v.PriceOverride,
                v.PriceOverride ?? productSalePrice, v.IsActive);
 
+    /// <summary>
+    /// For the given products, derives whether any supplier catalogs them and the most
+    /// recent purchase price (harga beli) across all suppliers. Suppliers are few, so a
+    /// single in-memory scan of their catalog JSON is cheaper than per-product queries.
+    /// </summary>
+    private async Task<Dictionary<Guid, (decimal? LatestPurchasePrice, bool HasSupplier)>>
+        BuildPurchaseInfoAsync(IReadOnlyCollection<Guid> productIds, CancellationToken ct)
+    {
+        if (productIds.Count == 0) return [];
+
+        var wanted = productIds.ToHashSet();
+        var catalogs = await context.SupplierReadModels
+            .Select(s => s.CatalogJson)
+            .ToListAsync(ct);
+
+        // Per product, keep the price entry with the newest EffectiveFrom seen across suppliers.
+        var latestByProduct = new Dictionary<Guid, (decimal Amount, DateTime EffectiveFrom)>();
+        var supplied = new HashSet<Guid>();
+
+        foreach (var json in catalogs)
+        {
+            var entries = JsonSerializer.Deserialize<List<CatalogEntryJson>>(
+                json, CatalogJsonOptions) ?? [];
+
+            foreach (var entry in entries)
+            {
+                if (!wanted.Contains(entry.ProductId)) continue;
+                supplied.Add(entry.ProductId);
+
+                var latest = entry.Prices?.MaxBy(p => p.EffectiveFrom);
+                if (latest is null) continue;
+
+                if (!latestByProduct.TryGetValue(entry.ProductId, out var current)
+                    || latest.EffectiveFrom > current.EffectiveFrom)
+                {
+                    latestByProduct[entry.ProductId] = (latest.Amount, latest.EffectiveFrom);
+                }
+            }
+        }
+
+        return supplied.ToDictionary(
+            id => id,
+            id => (latestByProduct.TryGetValue(id, out var p) ? p.Amount : (decimal?)null, true));
+    }
+
     public Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null, CancellationToken ct = default)
     {
         var trimmed = name.Trim();
@@ -138,6 +213,13 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             ? context.ProductReadModels.AnyAsync(p => p.Barcode == trimmed && p.Id != excludeId.Value, ct)
             : context.ProductReadModels.AnyAsync(p => p.Barcode == trimmed, ct);
     }
+
+    // Supplier catalog JSON shape (mirrors SupplierQueryRepository); case-insensitive read.
+    private static readonly JsonSerializerOptions CatalogJsonOptions =
+        new() { PropertyNameCaseInsensitive = true };
+
+    private sealed record CatalogEntryJson(Guid ProductId, List<CatalogPriceJson>? Prices);
+    private sealed record CatalogPriceJson(decimal Amount, string Currency, string Unit, DateTime EffectiveFrom);
 
     // JSON is written as { "Value": "...", "toUnit": "...", "Factor": ... } — mixed casing.
     // Use explicit [JsonPropertyName] attributes so case-sensitive deserialization works correctly.

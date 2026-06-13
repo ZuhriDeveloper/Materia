@@ -1,10 +1,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-# Copy project files first for restore layer caching
-# Both the server and the WASM client must be present (server references client)
-COPY Materia.WebUi/Materia.WebUi.Client/Materia.WebUi.Client.csproj Materia.WebUi/Materia.WebUi.Client/
-COPY Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj               Materia.WebUi/Materia.WebUi/
+# Copy project file first for restore layer caching
+COPY Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj Materia.WebUi/Materia.WebUi/
 RUN dotnet restore Materia.WebUi/Materia.WebUi/Materia.WebUi.csproj
 
 COPY Materia.WebUi/ Materia.WebUi/
