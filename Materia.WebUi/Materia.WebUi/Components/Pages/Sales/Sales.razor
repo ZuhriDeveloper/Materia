@@ -4,6 +4,7 @@
 @using Materia.WebUi.Services
 @inject SaleApiClient Api
 @inject StoreSettingsApiClient StoreApi
+@inject CustomerApiClient CustomerApi
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
@@ -166,7 +167,8 @@ else
 @* Hidden print template — rendered for the row chosen via the print button. *@
 @if (_printSale is not null)
 {
-    <SaleDocumentPrint Sale="_printSale" StoreProfile="_storeProfile" StoreLogo="_storeLogo" />
+    <SaleDocumentPrint Sale="_printSale" StoreProfile="_storeProfile" StoreLogo="_storeLogo"
+                       CustomerPhone="_printPhone" CustomerAddress="_printAddress" />
 }
 
 @code {
@@ -185,6 +187,8 @@ else
     private bool             _printPending;
     private StoreProfileDto? _storeProfile;
     private string?          _storeLogo;
+    private string?          _printPhone;
+    private string?          _printAddress;
 
     protected override async Task OnInitializedAsync()
     {
@@ -234,11 +238,23 @@ else
         await LoadAsync();
     }
 
-    // The list rows already carry the full SaleDto, so we can print without an
-    // extra fetch. Set the target, let it render into the hidden template, then
-    // trigger the browser print dialog from OnAfterRenderAsync.
-    private void RequestPrint(SaleDto sale)
+    // The list rows already carry the full SaleDto. We only fetch the customer to
+    // enrich the printed Surat Jalan with phone + address (SaleDto has neither).
+    // Set the target, let it render into the hidden template, then trigger the
+    // browser print dialog from OnAfterRenderAsync.
+    private async Task RequestPrint(SaleDto sale)
     {
+        _printPhone   = null;
+        _printAddress = null;
+        if (sale.CustomerId is { } customerId)
+        {
+            try
+            {
+                var customer = await CustomerApi.GetCustomerByIdAsync(customerId);
+                (_printPhone, _printAddress) = SaleDocumentPrint.CustomerContact(customer);
+            }
+            catch { /* contact is optional for the print */ }
+        }
         _printSale    = sale;
         _printPending = true;
     }

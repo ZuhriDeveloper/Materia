@@ -4,6 +4,7 @@
 @using Materia.WebUi.Services
 @inject SaleApiClient          Api
 @inject StoreSettingsApiClient StoreApi
+@inject CustomerApiClient      CustomerApi
 @inject NavigationManager      Navigation
 @inject IJSRuntime             JS
 
@@ -198,7 +199,8 @@ else
 
 @if (_sale is not null)
 {
-    <SaleDocumentPrint Sale="_sale" StoreProfile="_storeProfile" StoreLogo="_storeLogo" />
+    <SaleDocumentPrint Sale="_sale" StoreProfile="_storeProfile" StoreLogo="_storeLogo"
+                       CustomerPhone="_custPhone" CustomerAddress="_custAddress" />
 }
 
 @code {
@@ -213,6 +215,8 @@ else
     private bool             _saving;
     private StoreProfileDto? _storeProfile;
     private string?          _storeLogo;
+    private string?          _custPhone;     // sourced from the customer record for the print
+    private string?          _custAddress;
 
     private bool CanCancel => _sale is not null
         && _sale.Status is not SaleStatus.Paid and not SaleStatus.Cancelled;
@@ -234,7 +238,19 @@ else
     private async Task LoadAsync()
     {
         _sale = await Api.GetSaleByIdAsync(Id);
-        if (_sale is null) Navigation.NavigateTo("/sales");
+        if (_sale is null) { Navigation.NavigateTo("/sales"); return; }
+
+        // Pull the customer's phone + address for the printed Surat Jalan
+        // (SaleDto has no phone, and may not carry a delivery address).
+        if (_sale.CustomerId is { } customerId)
+        {
+            try
+            {
+                var customer = await CustomerApi.GetCustomerByIdAsync(customerId);
+                (_custPhone, _custAddress) = SaleDocumentPrint.CustomerContact(customer);
+            }
+            catch { /* contact is optional for the print */ }
+        }
     }
 
     /// Registered customer + delivery = Surat Jalan; walk-in or no delivery = standard receipt.

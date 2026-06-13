@@ -52,7 +52,7 @@
                 @* Recipient *@
                 <div style="border:1px solid #000;padding:1.5mm 2mm;margin-bottom:1.5mm;font-size:11pt">
                     <span style="font-weight:700">Kepada Yth.&nbsp;:</span> <b>@Sale.CustomerName</b>@(string.IsNullOrWhiteSpace(CustomerPhone) ? "" : $" · Telp. {CustomerPhone}")<br />
-                    Alamat&nbsp;: @(!string.IsNullOrWhiteSpace(Sale.DeliveryAddress) ? Sale.DeliveryAddress : "—")
+                    Alamat&nbsp;: @DisplayAddress
                 </div>
 
                 @* Item table (totals moved to the footer) *@
@@ -298,10 +298,31 @@
     [Parameter] public StoreProfileDto? StoreProfile { get; set; }
     [Parameter] public string? StoreLogo { get; set; }
 
-    /// Optional — SaleDto has no phone, so callers that have it (POS) pass it in.
+    /// Optional — SaleDto has no phone, so callers that have it look it up and pass it in.
     [Parameter] public string? CustomerPhone { get; set; }
 
+    /// Optional address fallback. The sale's own DeliveryAddress wins; when the sale
+    /// didn't capture one, callers pass the customer's (default) address here.
+    [Parameter] public string? CustomerAddress { get; set; }
+
     private bool IsSuratJalan => IsSuratJalanFor(Sale);
+
+    private string DisplayAddress =>
+        !string.IsNullOrWhiteSpace(Sale.DeliveryAddress) ? Sale.DeliveryAddress!
+        : !string.IsNullOrWhiteSpace(CustomerAddress)    ? CustomerAddress!
+        : "—";
+
+    /// Picks a customer's phone + default (or first) address as print-ready text.
+    public static (string? Phone, string? Address) CustomerContact(CustomerDto? c)
+    {
+        if (c is null) return (null, null);
+        var addr = c.Addresses.FirstOrDefault(a => a.IsDefault) ?? c.Addresses.FirstOrDefault();
+        var text = addr is null ? null : string.Join(", ",
+            new[] { addr.Street, addr.City, addr.Province }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+        return (string.IsNullOrWhiteSpace(c.Phone) ? null : c.Phone,
+                string.IsNullOrWhiteSpace(text) ? null : text);
+    }
 
     /// Registered customer + delivery = Surat Jalan; walk-in or pickup = standard receipt.
     /// Static so callers can pass the same flag to printReceipt(isSuratJalan).
