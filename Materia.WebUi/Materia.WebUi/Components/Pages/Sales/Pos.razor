@@ -518,7 +518,7 @@ else
 @* ══════════════════════════════════════════════════════════════
    PRINT TEMPLATE — Always in DOM; hidden on screen.
    Branch A : standard thermal receipt (80mm, Courier New)
-   Branch B : Surat Jalan / Delivery Order (A5, Arial)
+   Branch B : Surat Jalan / Delivery Order (9.5x5.5in half form, dot matrix)
    Condition: IsSuratJalan = registered customer AND delivery required
    ══════════════════════════════════════════════════════════════ *@
 <div class="receipt-print-only @(_receipt?.IsSuratJalan is true ? "is-surat-jalan" : "")">
@@ -527,131 +527,76 @@ else
         @if (_receipt.IsSuratJalan)
         {
             @* ══════════════════════════════════════════════
-               BRANCH B — SURAT JALAN (DELIVERY ORDER)  A5
+               BRANCH B — SURAT JALAN (DELIVERY ORDER)  9.5x5.5in half form
                ══════════════════════════════════════════════ *@
 
             @* ─── Store header ─────────────────────────── *@
-            <div style="text-align:center;border-bottom:2px solid #000;
-                        padding-bottom:3mm;margin-bottom:4mm">
-                @if (!string.IsNullOrEmpty(_storeLogo))
-                {
-                    <img src="@_storeLogo" style="height:16mm;margin-bottom:2mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
-                }
-                <div style="font-size:16pt;font-weight:700;letter-spacing:1px">@(_storeProfile?.Name ?? "MATERIA")</div>
+            @* Logo intentionally omitted — 9-pin dot matrix rasterises images
+               slowly and faintly; a bold text header prints crisply instead. *@
+            <div style="text-align:center;border-bottom:1px solid #000;
+                        padding-bottom:1mm;margin-bottom:1.5mm">
+                <span style="font-size:13pt;font-weight:700;letter-spacing:.5px">@(_storeProfile?.Name ?? "MATERIA")</span>
                 @if (!string.IsNullOrWhiteSpace(_storeProfile?.Address))
                 {
-                    <div style="font-size:9pt;margin-top:1mm">@_storeProfile.Address</div>
+                    <span style="font-size:8pt"> · @_storeProfile.Address</span>
                 }
                 @if (!string.IsNullOrWhiteSpace(_storeProfile?.Phone))
                 {
-                    <div style="font-size:9pt">Telp. @_storeProfile.Phone</div>
+                    <span style="font-size:8pt"> · Telp. @_storeProfile.Phone</span>
                 }
             </div>
 
             @* ─── Document title ───────────────────────── *@
-            <div style="text-align:center;font-size:14pt;font-weight:700;
-                        letter-spacing:.5px;margin-bottom:5mm">
-                SURAT JALAN (DELIVERY ORDER)
+            <div style="text-align:center;font-size:12pt;font-weight:700;
+                        letter-spacing:1px;margin-bottom:1.5mm">
+                SURAT JALAN
             </div>
 
             @* ─── Document meta ────────────────────────── *@
-            <table style="width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:5mm">
+            <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:1.5mm">
                 <tr>
-                    <td style="width:30%;padding:1mm 0">No.</td>
-                    <td>: <b>@_receipt.ReferenceNo</b></td>
-                </tr>
-                <tr>
-                    <td style="padding:1mm 0">Tanggal</td>
-                    <td>: @_receipt.IssuedAt.ToString("dd MMMM yyyy HH:mm")</td>
-                </tr>
-                <tr>
-                    <td style="padding:1mm 0">Diproses Oleh</td>
-                    <td>: @_receipt.ServedBy</td>
+                    <td style="padding:.3mm 0;width:40%">No.&nbsp;: <b>@_receipt.ReferenceNo</b></td>
+                    <td style="padding:.3mm 0;width:38%">Tanggal&nbsp;: @_receipt.IssuedAt.ToString("dd/MM/yyyy HH:mm")</td>
+                    <td style="padding:.3mm 0">Petugas&nbsp;: @_receipt.ServedBy</td>
                 </tr>
             </table>
 
             @* ─── Customer info block ──────────────────── *@
-            <div style="border:1px solid #000;padding:3mm;margin-bottom:5mm;font-size:9.5pt">
-                <div style="font-weight:700;font-size:10pt;margin-bottom:2mm">KEPADA YTH.</div>
-                <table style="width:100%;border-collapse:collapse">
-                    <tr>
-                        <td style="width:30%;vertical-align:top;padding:1mm 0">Nama</td>
-                        <td style="vertical-align:top">: <b>@_receipt.CustomerName</b></td>
-                    </tr>
-                    <tr>
-                        <td style="vertical-align:top;padding:1mm 0">Alamat</td>
-                        <td style="vertical-align:top">: @(_receipt.CustomerAddress ?? "—")</td>
-                    </tr>
-                    <tr>
-                        <td style="padding:1mm 0">Telepon</td>
-                        <td>: @(_receipt.CustomerPhone ?? "—")</td>
-                    </tr>
-                </table>
+            <div style="border:1px solid #000;padding:1mm 1.5mm;margin-bottom:1.5mm;font-size:8.5pt">
+                <span style="font-weight:700">Kepada Yth.&nbsp;:</span> <b>@_receipt.CustomerName</b>
+                &nbsp;&nbsp;|&nbsp;&nbsp;Telp. @(_receipt.CustomerPhone ?? "—")<br />
+                Alamat&nbsp;: @(_receipt.CustomerAddress ?? "—")
             </div>
 
-            @* ─── Delivery details ─────────────────────── *@
-            <div style="border:1px solid #000;padding:3mm;margin-bottom:5mm;font-size:9.5pt">
-                <div style="font-weight:700;font-size:10pt;margin-bottom:2mm">
-                    KETERANGAN PENGIRIMAN
-                </div>
-                <table style="width:100%;border-collapse:collapse">
-                    <tr>
-                        <td style="width:30%;padding:2mm 0">No. Polisi</td>
-                        <td>
-                            : <span style="border-bottom:1px solid #000;
-                                           display:inline-block;min-width:55mm">&nbsp;</span>
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:2mm 0">Nama Sopir</td>
-                        <td>
-                            : <span style="border-bottom:1px solid #000;
-                                           display:inline-block;min-width:55mm">&nbsp;</span>
-                        </td>
-                    </tr>
-                </table>
-            </div>
 
             @* ─── Item table ───────────────────────────── *@
-            <table style="width:100%;border-collapse:collapse;font-size:9.5pt;margin-bottom:5mm">
+            <table style="width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:1.5mm">
                 <thead>
-                    <tr style="border-top:2px solid #000;border-bottom:1px solid #000">
-                        <th style="text-align:center;padding:2mm;width:8%">No.</th>
-                        <th style="text-align:left;padding:2mm">Nama Barang</th>
-                        <th style="text-align:center;padding:2mm;width:18%">Jumlah</th>
-                        <th style="text-align:center;padding:2mm;width:14%">Satuan</th>
+                    <tr style="border-top:1px solid #000;border-bottom:1px solid #000">
+                        <th style="text-align:center;padding:.6mm 1mm;width:6%;border-right:1px solid #000">No.</th>
+                        <th style="text-align:left;padding:.6mm 1.5mm;border-right:1px solid #000">Nama Barang</th>
+                        <th style="text-align:center;padding:.6mm 1mm;width:12%;border-right:1px solid #000">Jumlah</th>
+                        <th style="text-align:center;padding:.6mm 1mm;width:12%;border-right:1px solid #000">Satuan</th>
+                        <th style="text-align:left;padding:.6mm 1.5mm;width:24%">Keterangan</th>
                     </tr>
                 </thead>
                 <tbody>
                     @for (int i = 0; i < _receipt.Lines.Count; i++)
                     {
                         var ln = _receipt.Lines[i];
-                        <tr style="border-bottom:1px solid #ddd">
-                            <td style="text-align:center;padding:2mm 1mm;vertical-align:top">
-                                @(i + 1).
-                            </td>
-                            <td style="padding:2mm 1mm;font-weight:600;vertical-align:top">
-                                @ln.ProductName@(string.IsNullOrEmpty(ln.ColorName) ? "" : $" — {ln.ColorName}")
-                            </td>
-                            <td style="text-align:center;padding:2mm 1mm;vertical-align:top">
-                                @FormatQty(ln.Quantity)
-                            </td>
-                            <td style="text-align:center;padding:2mm 1mm;vertical-align:top">
-                                @ln.UnitName
-                            </td>
+                        <tr style="border-bottom:1px solid #000">
+                            <td style="text-align:center;padding:.5mm 1mm;border-right:1px solid #000;vertical-align:top">@(i + 1)</td>
+                            <td style="padding:.5mm 1.5mm;font-weight:600;border-right:1px solid #000;vertical-align:top">@ln.ProductName@(string.IsNullOrEmpty(ln.ColorName) ? "" : $" — {ln.ColorName}")</td>
+                            <td style="text-align:center;padding:.5mm 1mm;border-right:1px solid #000;vertical-align:top">@FormatQty(ln.Quantity)</td>
+                            <td style="text-align:center;padding:.5mm 1mm;border-right:1px solid #000;vertical-align:top">@ln.UnitName</td>
+                            <td style="padding:.5mm 1.5mm;vertical-align:top">&nbsp;</td>
                         </tr>
                     }
                 </tbody>
                 <tfoot>
-                    <tr style="border-top:2px solid #000">
-                        <td colspan="3"
-                            style="padding:2mm;text-align:right;font-weight:700;font-size:10pt">
-                            TOTAL
-                        </td>
-                        <td colspan="1"
-                            style="padding:2mm;font-weight:700;font-size:10pt;text-align:center">
-                            Rp @_receipt.GrandTotal.ToString("N0")
-                        </td>
+                    <tr style="border-top:1px solid #000">
+                        <td colspan="2" style="padding:.6mm 1.5mm;font-weight:700">@_receipt.Lines.Count jenis barang</td>
+                        <td colspan="3" style="padding:.6mm 1.5mm;text-align:right;font-weight:700">TOTAL: Rp @_receipt.GrandTotal.ToString("N0")</td>
                     </tr>
                 </tfoot>
             </table>
@@ -659,65 +604,46 @@ else
             @* ─── Payment status (credit / bon) ────────── *@
             @if (_receipt.IsCredit)
             {
-                <table style="width:100%;border-collapse:collapse;font-size:9.5pt;
-                              border:2px solid #000;margin-bottom:5mm">
+                <table style="width:100%;border-collapse:collapse;font-size:8.5pt;
+                              border:1px solid #000;margin-bottom:1.5mm">
                     <tr>
-                        <td style="padding:2mm;font-weight:700;width:60%">
-                            STATUS: BELUM LUNAS (BON)
-                        </td>
-                        <td style="padding:2mm;text-align:right">
+                        <td style="padding:.8mm 1.5mm;font-weight:700;width:38%">STATUS: BELUM LUNAS (BON)</td>
+                        <td style="padding:.8mm 1.5mm;text-align:right;border-left:1px solid #000">
                             Bayar (@_receipt.PaymentMethodLabel): Rp @_receipt.AmountPaid.ToString("N0")
                         </td>
-                    </tr>
-                    <tr>
-                        <td style="padding:2mm;font-weight:700;border-top:1px solid #000">
-                            SISA PIUTANG
-                        </td>
-                        <td style="padding:2mm;text-align:right;font-weight:700;border-top:1px solid #000">
-                            Rp @_receipt.Outstanding.ToString("N0")
+                        <td style="padding:.8mm 1.5mm;text-align:right;font-weight:700;border-left:1px solid #000">
+                            SISA PIUTANG: Rp @_receipt.Outstanding.ToString("N0")
                         </td>
                     </tr>
                 </table>
             }
 
-            @* ─── 3-column signature matrix ────────────── *@
+            @* ─── 3-column signature row (borderless, compact) ────────────── *@
             <table style="width:100%;border-collapse:collapse;text-align:center;
-                          font-size:9pt;margin-top:10mm">
+                          font-size:8pt;margin-top:2mm">
                 <tr>
-                    <td style="width:33%;border:1px solid #000;padding:2mm;font-weight:700">
-                        Penyiapan Barang<br />
-                        <span style="font-weight:400;font-size:8.5pt">(Gudang)</span>
+                    <td style="width:33.33%;padding:.4mm;font-weight:700">
+                        Disiapkan,
+                        <span style="font-weight:400;font-size:7pt">(Gudang)</span>
                     </td>
-                    <td style="width:34%;border:1px solid #000;border-left:none;
-                               padding:2mm;font-weight:700">
-                        Pengirim Barang<br />
-                        <span style="font-weight:400;font-size:8.5pt">(Sopir)</span>
+                    <td style="width:33.33%;padding:.4mm;font-weight:700">
+                        Dikirim,
+                        <span style="font-weight:400;font-size:7pt">(Sopir)</span>
                     </td>
-                    <td style="width:33%;border:1px solid #000;border-left:none;
-                               padding:2mm;font-weight:700">
-                        Penerima Barang<br />
-                        <span style="font-weight:400;font-size:8.5pt">(Pelanggan)</span>
+                    <td style="width:33.34%;padding:.4mm;font-weight:700">
+                        Diterima,
+                        <span style="font-weight:400;font-size:7pt">(Pelanggan)</span>
                     </td>
                 </tr>
                 <tr>
-                    <td style="border:1px solid #000;border-top:none;height:28mm"></td>
-                    <td style="border:1px solid #000;border-top:none;border-left:none;
-                               height:28mm"></td>
-                    <td style="border:1px solid #000;border-top:none;border-left:none;
-                               height:28mm"></td>
+                    <td style="height:12mm"></td>
+                    <td style="height:12mm"></td>
+                    <td style="height:12mm"></td>
                 </tr>
                 <tr>
-                    <td style="border:1px solid #000;border-top:none;padding:2mm;font-size:8pt">
-                        (______________________)
-                    </td>
-                    <td style="border:1px solid #000;border-top:none;border-left:none;
-                               padding:2mm;font-size:8pt">
-                        (______________________)
-                    </td>
-                    <td style="border:1px solid #000;border-top:none;border-left:none;
-                               padding:2mm;font-size:8pt">
-                        (______________________)
-                    </td>
+                    <td style="padding:.3mm;font-size:7.5pt">(________________)</td>
+                    <td style="padding:.3mm;font-size:7.5pt">(________________)</td>
+                    <td style="padding:.3mm;font-size:7.5pt">(________________)</td>
                 </tr>
             </table>
         }

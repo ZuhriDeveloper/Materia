@@ -144,12 +144,12 @@ h1:focus {
     ──────────────────────────────────────────────────────────────────────────── */
     .receipt-print-only.is-surat-jalan {
         font-family: Arial, Helvetica, sans-serif !important;
-        font-size:   10pt !important;
-        line-height: 1.5 !important;
+        font-size:   9pt  !important;
+        line-height: 1.2  !important;
         padding:     0    !important;
         width:       auto !important;
-        /* The 1.5x receipt zoom is for the 72mm thermal roll only — the A5
-           delivery order must print at its natural size. */
+        /* The 1.5x receipt zoom is for the 72mm thermal roll only — the surat
+           jalan must print at its natural size on the dot-matrix form. */
         zoom:        1    !important;
     }
 }

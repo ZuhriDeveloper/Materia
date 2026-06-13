@@ -5,7 +5,8 @@
  * the browser targets the right paper size without a separate stylesheet.
  *
  * - Standard receipt  → 80mm thermal roll, zero margins
- * - Surat Jalan       → A5 portrait, 12mm/15mm margins
+ * - Surat Jalan       → 9.5x5.5in continuous form (LX-310 dot matrix),
+ *                       8in content band centred via 19mm side margins
  *
  * The injected <style> is appended last in <head> so it always wins the
  * cascade over the static app.css @page rule.
@@ -21,7 +22,7 @@ window.printReceipt = function (isSuratJalan) {
     // default 100% scale on this printer. The page box must therefore be the
     // zoomed width — 72mm x 1.5 = 108mm — or the enlarged content gets clipped.
     s.textContent = isSuratJalan
-        ? '@page { size: A5 portrait; margin: 12mm 15mm; }'
+        ? '@page { size: 9.5in 5.5in; margin: 4mm 19mm; }'
         : '@page { size: 108mm auto; margin: 0; }' +
           '@media print { html, body { width: 108mm !important; min-width: 0 !important; margin: 0 !important; padding: 0 !important; } }';
     document.head.appendChild(s);
