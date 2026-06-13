@@ -3,7 +3,10 @@
 @rendermode InteractiveServer
 @using Materia.WebUi.Services
 @inject SaleApiClient Api
+@inject StoreSettingsApiClient StoreApi
+@inject CustomerApiClient CustomerApi
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Penjualan — Materia</PageTitle>
 
@@ -123,8 +126,12 @@ else
                             <td class="small text-muted">
                                 @s.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
                             </td>
-                            <td>
-                                <a href="/sales/@s.Id" class="btn btn-sm btn-outline-secondary">
+                            <td class="text-nowrap">
+                                <button class="btn btn-sm btn-outline-primary me-1" title="Cetak"
+                                        @onclick="() => RequestPrint(s)">
+                                    <i class="bi bi-printer"></i>
+                                </button>
+                                <a href="/sales/@s.Id" class="btn btn-sm btn-outline-secondary" title="Detail">
                                     <i class="bi bi-eye"></i>
                                 </a>
                             </td>
@@ -157,6 +164,13 @@ else
     }
 }
 
+@* Hidden print template — rendered for the row chosen via the print button. *@
+@if (_printSale is not null)
+{
+    <SaleDocumentPrint Sale="_printSale" StoreProfile="_storeProfile" StoreLogo="_storeLogo"
+                       CustomerPhone="_printPhone" CustomerAddress="_printAddress" />
+}
+
 @code {
     private PagedSalesDto? _sales;
     private string    _statusFilter    = "";
@@ -168,7 +182,27 @@ else
     private int       _page            = 1;
     private const int _pageSize        = 20;
 
-    protected override async Task OnInitializedAsync() => await LoadAsync();
+    // ── Print ────────────────────────────────────────────────────────────────
+    private SaleDto?         _printSale;
+    private bool             _printPending;
+    private StoreProfileDto? _storeProfile;
+    private string?          _storeLogo;
+    private string?          _printPhone;
+    private string?          _printAddress;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+
+        // Store profile/logo for the print header (optional — degrade gracefully).
+        try
+        {
+            _storeProfile = await StoreApi.GetProfileAsync();
+            if (_storeProfile?.HasLogo == true)
+                _storeLogo = await StoreApi.GetLogoDataUrlAsync();
+        }
+        catch { /* print header is optional */ }
+    }
 
     private async Task LoadAsync()
         => _sales = await Api.GetSalesAsync(
@@ -202,6 +236,34 @@ else
     {
         _page = page;
         await LoadAsync();
+    }
+
+    // The list rows already carry the full SaleDto. We only fetch the customer to
+    // enrich the printed Surat Jalan with phone + address (SaleDto has neither).
+    // Set the target, let it render into the hidden template, then trigger the
+    // browser print dialog from OnAfterRenderAsync.
+    private async Task RequestPrint(SaleDto sale)
+    {
+        _printPhone   = null;
+        _printAddress = null;
+        if (sale.CustomerId is { } customerId)
+        {
+            try
+            {
+                var customer = await CustomerApi.GetCustomerByIdAsync(customerId);
+                (_printPhone, _printAddress) = SaleDocumentPrint.CustomerContact(customer);
+            }
+            catch { /* contact is optional for the print */ }
+        }
+        _printSale    = sale;
+        _printPending = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_printPending || _printSale is null) return;
+        _printPending = false;
+        await JS.InvokeVoidAsync("printReceipt", SaleDocumentPrint.IsSuratJalanFor(_printSale));
     }
 
     private static MarkupString StatusBadge(SaleStatus status) => status switch

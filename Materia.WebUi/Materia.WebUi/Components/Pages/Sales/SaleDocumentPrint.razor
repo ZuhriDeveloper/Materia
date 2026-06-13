@@ -1,0 +1,345 @@
+@using Materia.WebUi.Services
+
+@* ══════════════════════════════════════════════════════════════
+   SHARED PRINT TEMPLATE — Hidden on screen; visible during window.print().
+   Branch A : standard thermal receipt (80mm)
+   Branch B : Surat Jalan (9.5x5.5in continuous form, dot matrix)
+   Single source of truth shared by Pos, SaleDetail and the Sales list.
+   The matching @page rule is injected by printReceipt(isSuratJalan) in print.js.
+   ══════════════════════════════════════════════════════════════ *@
+<div class="receipt-print-only @(IsSuratJalan ? "is-surat-jalan" : "")">
+    @if (IsSuratJalan)
+    {
+        @* ══════════════════════════════════════════════
+           BRANCH B — SURAT JALAN (DELIVERY ORDER)  9.5x5.5in half form
+           The footer (total · status · signatures) is pinned to the bottom of
+           the form via a min-height flex column, so it lands near the tear-off
+           regardless of how many item rows there are.
+           ══════════════════════════════════════════════ *@
+        <div style="display:flex;flex-direction:column;width:100%;min-height:122mm">
+
+            @* ── Top: header, parties, items ── *@
+            <div>
+                @* Store header — logo omitted (9-pin rasterises images slowly). *@
+                <div style="text-align:center;border-bottom:1px solid #000;
+                            padding-bottom:1mm;margin-bottom:1.5mm">
+                    <span style="font-size:16pt;font-weight:700;letter-spacing:.5px">@(StoreProfile?.Name ?? "MATERIA")</span>
+                    @if (!string.IsNullOrWhiteSpace(StoreProfile?.Address))
+                    {
+                        <span style="font-size:10pt"> · @StoreProfile.Address</span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(StoreProfile?.Phone))
+                    {
+                        <span style="font-size:10pt"> · Telp. @StoreProfile.Phone</span>
+                    }
+                </div>
+
+                @* Document title *@
+                <div style="text-align:center;font-size:14pt;font-weight:700;
+                            letter-spacing:1px;margin-bottom:1.5mm">
+                    SURAT JALAN
+                </div>
+
+                @* Document meta *@
+                <table style="width:100%;border-collapse:collapse;font-size:11pt;margin-bottom:1.5mm">
+                    <tr>
+                        <td style="padding:.8mm 0;width:40%">No.&nbsp;: <b>@Sale.ReferenceNo</b></td>
+                        <td style="padding:.8mm 0;width:38%">Tanggal&nbsp;: @Sale.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+                        <td style="padding:.8mm 0">Petugas&nbsp;: @(Sale.ServedBy ?? Sale.CreatedBy)</td>
+                    </tr>
+                </table>
+
+                @* Recipient *@
+                <div style="border:1px solid #000;padding:1.5mm 2mm;margin-bottom:1.5mm;font-size:11pt">
+                    <span style="font-weight:700">Kepada Yth.&nbsp;:</span> <b>@Sale.CustomerName</b>@(string.IsNullOrWhiteSpace(CustomerPhone) ? "" : $" · Telp. {CustomerPhone}")<br />
+                    Alamat&nbsp;: @DisplayAddress
+                </div>
+
+                @* Item table (totals moved to the footer) *@
+                <table style="width:100%;border-collapse:collapse;font-size:11pt">
+                    <thead>
+                        <tr style="border-top:1px solid #000;border-bottom:1px solid #000">
+                            <th style="text-align:center;padding:1mm;width:6%;border-right:1px solid #000">No.</th>
+                            <th style="text-align:left;padding:1mm 1.5mm;border-right:1px solid #000">Nama Barang</th>
+                            <th style="text-align:center;padding:1mm;width:12%;border-right:1px solid #000">Jumlah</th>
+                            <th style="text-align:center;padding:1mm;width:12%;border-right:1px solid #000">Satuan</th>
+                            <th style="text-align:left;padding:1mm 1.5mm;width:24%">Keterangan</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (int i = 0; i < Sale.Items.Count; i++)
+                        {
+                            var it = Sale.Items[i];
+                            <tr style="border-bottom:1px solid #000">
+                                <td style="text-align:center;padding:1mm;border-right:1px solid #000;vertical-align:top">@(i + 1)</td>
+                                <td style="padding:1mm 1.5mm;font-weight:600;border-right:1px solid #000;vertical-align:top">@it.ProductName@(string.IsNullOrEmpty(it.ColorName) ? "" : $" — {it.ColorName}")</td>
+                                <td style="text-align:center;padding:1mm;border-right:1px solid #000;vertical-align:top">@FormatQty(it.Quantity)</td>
+                                <td style="text-align:center;padding:1mm;border-right:1px solid #000;vertical-align:top">@it.UnitName</td>
+                                <td style="padding:1mm 1.5mm;vertical-align:top">&nbsp;</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            @* ── Footer: pinned to the bottom of the form ── *@
+            <div style="margin-top:auto">
+
+                @* Grand total *@
+                <table style="width:100%;border-collapse:collapse;font-size:11pt;
+                              border-top:2px solid #000;border-bottom:1px solid #000;margin-bottom:1.5mm">
+                    <tr>
+                        <td style="padding:1mm 1.5mm;font-weight:700">@Sale.Items.Count jenis barang</td>
+                        <td style="padding:1mm 1.5mm;text-align:right;font-weight:700;font-size:13pt">TOTAL: Rp @Sale.GrandTotal.ToString("N0")</td>
+                    </tr>
+                </table>
+
+                @* Payment status (credit / bon) *@
+                @if (Sale.OutstandingAmount > 0)
+                {
+                    <table style="width:100%;border-collapse:collapse;font-size:11pt;
+                                  border:1px solid #000;margin-bottom:1.5mm">
+                        <tr>
+                            <td style="padding:1.2mm 1.5mm;font-weight:700;width:38%">STATUS: BELUM LUNAS (BON)</td>
+                            <td style="padding:1.2mm 1.5mm;text-align:right;border-left:1px solid #000">
+                                Bayar (@PaymentMethodLabel(Sale.Payment?.Method)): Rp @Sale.AmountPaid.ToString("N0")
+                            </td>
+                            <td style="padding:1.2mm 1.5mm;text-align:right;font-weight:700;border-left:1px solid #000">
+                                SISA PIUTANG: Rp @Sale.OutstandingAmount.ToString("N0")
+                            </td>
+                        </tr>
+                    </table>
+                }
+
+                @* 3-column signature row (borderless, compact) *@
+                <table style="width:100%;border-collapse:collapse;text-align:center;font-size:10pt">
+                    <tr>
+                        <td style="width:33.33%;padding:.4mm;font-weight:700">
+                            Disiapkan,
+                            <span style="font-weight:400;font-size:9pt">(Gudang)</span>
+                        </td>
+                        <td style="width:33.33%;padding:.4mm;font-weight:700">
+                            Dikirim,
+                            <span style="font-weight:400;font-size:9pt">(Sopir)</span>
+                        </td>
+                        <td style="width:33.34%;padding:.4mm;font-weight:700">
+                            Diterima,
+                            <span style="font-weight:400;font-size:9pt">(Pelanggan)</span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="height:14mm"></td>
+                        <td style="height:14mm"></td>
+                        <td style="height:14mm"></td>
+                    </tr>
+                    <tr>
+                        <td style="padding:.3mm;font-size:10pt">(________________)</td>
+                        <td style="padding:.3mm;font-size:10pt">(________________)</td>
+                        <td style="padding:.3mm;font-size:10pt">(________________)</td>
+                    </tr>
+                </table>
+
+            </div>
+
+        </div>
+    }
+    else
+    {
+        @* ══════════════════════════════════════════════
+           BRANCH A — STANDARD RECEIPT (80mm thermal)
+           ══════════════════════════════════════════════ *@
+
+        @* ─── Store header ─────────────────────────── *@
+        <div style="text-align:center;margin-bottom:2.5mm">
+            @if (!string.IsNullOrEmpty(StoreLogo))
+            {
+                <img src="@StoreLogo" style="height:14mm;margin-bottom:1mm;display:block;margin-left:auto;margin-right:auto" alt="logo" />
+            }
+            <div style="font-size:16pt;font-weight:700;letter-spacing:.5px;line-height:1.1">@(StoreProfile?.Name ?? "MATERIA")</div>
+            @if (!string.IsNullOrWhiteSpace(StoreProfile?.Address))
+            {
+                <div style="font-size:9.5pt;margin-top:1mm;line-height:1.25">@StoreProfile.Address</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(StoreProfile?.Phone))
+            {
+                <div style="font-size:9.5pt">Telp. @StoreProfile.Phone</div>
+            }
+        </div>
+
+        @* ─── Meta ─────────────────────────────────── *@
+        <div class="rcpt-sep-strong"></div>
+        <table style="width:100%;border-collapse:collapse;font-size:10pt;margin:1.5mm 0">
+            <tr>
+                <td style="width:24%">No.</td>
+                <td>: <b>@Sale.ReferenceNo</b></td>
+            </tr>
+            <tr>
+                <td>Tgl.</td>
+                <td>: @Sale.CreatedAt.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</td>
+            </tr>
+            <tr>
+                <td>Kasir</td>
+                <td>: @(Sale.ServedBy ?? Sale.CreatedBy)</td>
+            </tr>
+            <tr>
+                <td>Plg.</td>
+                <td>: @Sale.CustomerName</td>
+            </tr>
+        </table>
+        <div class="rcpt-sep"></div>
+
+        @* ─── Item lines ────────────────────────────── *@
+        <div style="margin:1.5mm 0">
+            @foreach (var item in Sale.Items)
+            {
+                <div style="margin-bottom:2mm">
+                    <div style="font-weight:700;font-size:11pt;line-height:1.2">
+                        @item.ProductName@(string.IsNullOrEmpty(item.ColorName) ? "" : $" — {item.ColorName}")
+                    </div>
+                    <div style="display:flex;justify-content:space-between;
+                                font-size:10.5pt;padding-left:2mm">
+                        <span>
+                            @FormatQty(item.Quantity) @item.UnitName
+                            &times; @item.UnitPrice.ToString("N0")
+                        </span>
+                        <span style="font-weight:700">@item.Subtotal.ToString("N0")</span>
+                    </div>
+                </div>
+            }
+        </div>
+        <div class="rcpt-sep"></div>
+
+        @* ─── Totals ────────────────────────────────── *@
+        <div style="font-size:10.5pt;margin:1.5mm 0">
+            <div style="display:flex;justify-content:space-between">
+                <span>Subtotal</span>
+                <span>@Sale.Subtotal.ToString("N0")</span>
+            </div>
+            @if (Sale.Discount > 0)
+            {
+                <div style="display:flex;justify-content:space-between">
+                    <span>Diskon</span>
+                    <span>-@Sale.Discount.ToString("N0")</span>
+                </div>
+            }
+            @if (Sale.Tax > 0)
+            {
+                <div style="display:flex;justify-content:space-between">
+                    <span>PPN 11%</span>
+                    <span>@Sale.Tax.ToString("N0")</span>
+                </div>
+            }
+        </div>
+
+        @* ─── Grand total ──────────────────────────── *@
+        <div class="rcpt-sep-strong"></div>
+        <div style="display:flex;justify-content:space-between;
+                    font-size:14pt;font-weight:700;padding:1mm 0">
+            <span>TOTAL</span>
+            <span>Rp @Sale.GrandTotal.ToString("N0")</span>
+        </div>
+        <div class="rcpt-sep-strong"></div>
+
+        @* ─── Payment info ──────────────────────────── *@
+        @if (Sale.Payment is not null)
+        {
+            <div style="font-size:10pt;margin:1.5mm 0">
+                <div style="display:flex;justify-content:space-between">
+                    <span>Metode</span>
+                    <span>@PaymentMethodLabel(Sale.Payment.Method)</span>
+                </div>
+                <div style="display:flex;justify-content:space-between">
+                    <span>Bayar</span>
+                    <span>Rp @Sale.Payment.PaidAmount.ToString("N0")</span>
+                </div>
+                @if (Sale.OutstandingAmount > 0)
+                {
+                    <div style="display:flex;justify-content:space-between;font-weight:700">
+                        <span>Sisa Piutang</span>
+                        <span>Rp @Sale.OutstandingAmount.ToString("N0")</span>
+                    </div>
+                }
+                else
+                {
+                    <div style="display:flex;justify-content:space-between;font-weight:700">
+                        <span>Kembali</span>
+                        <span>Rp @Sale.Payment.Change.ToString("N0")</span>
+                    </div>
+                }
+            </div>
+        }
+
+        @* ─── Delivery notice ───────────────────────── *@
+        @if (Sale.IsDeliveryRequired || Sale.SaleType == SaleType.Delivery)
+        {
+            <div class="rcpt-sep"></div>
+            <div style="text-align:center;font-size:11pt;font-weight:700;margin:1.5mm 0">
+                *** DIANTAR ***
+                <div style="font-weight:400;margin-top:2mm;font-size:9.5pt">
+                    Tanda Tangan Penerima:
+                    <div style="margin-top:7mm">(____________________)</div>
+                </div>
+            </div>
+            <div class="rcpt-sep"></div>
+        }
+
+        @* ─── Footer ────────────────────────────────── *@
+        <div style="text-align:center;font-size:9.5pt;margin-top:3mm">
+            <div style="margin:2mm 0">
+                Terima kasih atas kunjungan<br />
+                dan kepercayaan Anda!
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SaleDto Sale { get; set; } = default!;
+    [Parameter] public StoreProfileDto? StoreProfile { get; set; }
+    [Parameter] public string? StoreLogo { get; set; }
+
+    /// Optional — SaleDto has no phone, so callers that have it look it up and pass it in.
+    [Parameter] public string? CustomerPhone { get; set; }
+
+    /// Optional address fallback. The sale's own DeliveryAddress wins; when the sale
+    /// didn't capture one, callers pass the customer's (default) address here.
+    [Parameter] public string? CustomerAddress { get; set; }
+
+    private bool IsSuratJalan => IsSuratJalanFor(Sale);
+
+    private string DisplayAddress =>
+        !string.IsNullOrWhiteSpace(Sale.DeliveryAddress) ? Sale.DeliveryAddress!
+        : !string.IsNullOrWhiteSpace(CustomerAddress)    ? CustomerAddress!
+        : "—";
+
+    /// Picks a customer's phone + default (or first) address as print-ready text.
+    public static (string? Phone, string? Address) CustomerContact(CustomerDto? c)
+    {
+        if (c is null) return (null, null);
+        var addr = c.Addresses.FirstOrDefault(a => a.IsDefault) ?? c.Addresses.FirstOrDefault();
+        var text = addr is null ? null : string.Join(", ",
+            new[] { addr.Street, addr.City, addr.Province }
+                .Where(s => !string.IsNullOrWhiteSpace(s)));
+        return (string.IsNullOrWhiteSpace(c.Phone) ? null : c.Phone,
+                string.IsNullOrWhiteSpace(text) ? null : text);
+    }
+
+    /// Registered customer + delivery = Surat Jalan; walk-in or pickup = standard receipt.
+    /// Static so callers can pass the same flag to printReceipt(isSuratJalan).
+    public static bool IsSuratJalanFor(SaleDto sale) =>
+        sale.CustomerId is not null
+        && (sale.IsDeliveryRequired || sale.SaleType == SaleType.Delivery);
+
+    /// Formats qty without trailing zeros: 2.000 → "2", 2.500 → "2.5"
+    private static string FormatQty(decimal q) => q.ToString("0.###");
+
+    private static string PaymentMethodLabel(PaymentMethod? method) => method switch
+    {
+        PaymentMethod.Cash         => "Tunai",
+        PaymentMethod.BankTransfer => "Transfer Bank",
+        PaymentMethod.QRIS         => "QRIS",
+        PaymentMethod.Debit        => "Kartu Debit",
+        PaymentMethod.Credit       => "Kredit",
+        _                          => "—",
+    };
+}

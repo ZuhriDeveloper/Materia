@@ -144,13 +144,44 @@ h1:focus {
     ──────────────────────────────────────────────────────────────────────────── */
     .receipt-print-only.is-surat-jalan {
         font-family: Arial, Helvetica, sans-serif !important;
-        font-size:   10pt !important;
-        line-height: 1.5 !important;
+        font-size:   11pt !important;
+        line-height: 1.35 !important;
         padding:     0    !important;
-        width:       auto !important;
-        /* The 1.5x receipt zoom is for the 72mm thermal roll only — the A5
-           delivery order must print at its natural size. */
+        width:       100% !important;
+        /* The 1.5x receipt zoom is for the 72mm thermal roll only — the surat
+           jalan must print at its natural size on the dot-matrix form. */
         zoom:        1    !important;
+    }
+
+    /* ── Single-page guard ───────────────────────────────────────────────────
+       The app chrome is only hidden with visibility:hidden, so it still takes
+       up layout height and — on the short 5.5in form — overflows onto a blank
+       second page. Collapse the MudBlazor shell to zero height and make it
+       non-positioning, so the absolutely-positioned receipt is the only box
+       that defines the printed page count. */
+    .mud-layout,
+    .mud-main-content,
+    .mud-container {
+        position:   static  !important;
+        max-height: 0       !important;
+        min-height: 0       !important;
+        overflow:   hidden  !important;
+        padding:    0       !important;
+        margin:     0       !important;
+    }
+
+    .mud-appbar,
+    .mud-drawer,
+    .mud-overlay,
+    #blazor-error-ui {
+        display: none !important;
+    }
+
+    html, body {
+        height:     auto !important;
+        min-height: 0    !important;
+        margin:     0    !important;
+        padding:    0    !important;
     }
 }
 
