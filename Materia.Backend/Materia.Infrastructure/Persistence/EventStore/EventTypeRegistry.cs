@@ -47,6 +47,7 @@ public static class EventTypeRegistry
         [nameof(StockInitialized)]            = typeof(StockInitialized),
         [nameof(StockAdjusted)]               = typeof(StockAdjusted),
         [nameof(StockReconciledFromPurchase)] = typeof(StockReconciledFromPurchase),
+        [nameof(StockReducedFromPurchaseReturn)] = typeof(StockReducedFromPurchaseReturn),
 
         // Customer events
         [nameof(CustomerCreated)]               = typeof(CustomerCreated),
@@ -71,6 +72,7 @@ public static class EventTypeRegistry
         [nameof(PurchaseOrderCreated)]   = typeof(PurchaseOrderCreated),
         [nameof(PurchaseOrderConfirmed)] = typeof(PurchaseOrderConfirmed),
         [nameof(PurchaseOrderReceived)]  = typeof(PurchaseOrderReceived),
+        [nameof(PurchaseOrderReturned)]  = typeof(PurchaseOrderReturned),
         [nameof(PurchaseOrderCancelled)] = typeof(PurchaseOrderCancelled),
 
         // Sale events

@@ -39,17 +39,21 @@ public class PurchaseOrderQueryRepository(AppDbContext context) : IPurchaseOrder
             row.SupplierName,
             row.Status,
             lines.Select(l => new PurchaseOrderLineDto(
-                l.ProductId, null, l.OrderedQty, l.ReceivedQty, l.UnitCost, l.Unit))
+                l.ProductId, null, l.OrderedQty, l.ReceivedQty, l.ReturnedQty, l.UnitCost, l.Unit))
                 .ToList(),
             row.CreatedBy,
             row.CreatedAt,
-            row.ReceivedAt);
+            row.ReceivedAt,
+            row.PaymentTermValue,
+            row.PaymentTermUnit,
+            row.PaymentDueDate);
     }
 
     private sealed record LineJson(
         Guid ProductId,
         decimal OrderedQty,
         decimal ReceivedQty,
+        decimal ReturnedQty,
         decimal UnitCost,
         string Unit);
 }

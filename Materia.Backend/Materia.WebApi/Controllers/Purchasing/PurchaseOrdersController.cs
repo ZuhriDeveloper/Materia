@@ -4,6 +4,7 @@ using Materia.Application.Commands.Purchasing.CancelPurchaseOrder;
 using Materia.Application.Commands.Purchasing.ConfirmPurchaseOrder;
 using Materia.Application.Commands.Purchasing.CreatePurchaseOrder;
 using Materia.Application.Commands.Purchasing.ReceivePurchaseOrder;
+using Materia.Application.Commands.Purchasing.RecordPurchaseReturn;
 using Materia.Application.Contracts.Purchasing;
 using Materia.Application.Queries.Purchasing;
 using Microsoft.AspNetCore.Authorization;
@@ -18,6 +19,7 @@ public class PurchaseOrdersController(
     CreatePurchaseOrderCommandHandler        createHandler,
     ConfirmPurchaseOrderCommandHandler       confirmHandler,
     ReceivePurchaseOrderCommandHandler       receiveHandler,
+    RecordPurchaseReturnCommandHandler       returnHandler,
     CancelPurchaseOrderCommandHandler        cancelHandler,
     GetPurchaseOrdersQueryHandler            getAllHandler,
     GetPurchaseOrderByIdQueryHandler         getByIdHandler,
@@ -25,6 +27,7 @@ public class PurchaseOrdersController(
     IPurchaseInvoiceImageRepository          invoiceImageRepository,
     IValidator<CreatePurchaseOrderCommand>   createValidator,
     IValidator<ReceivePurchaseOrderCommand>  receiveValidator,
+    IValidator<RecordPurchaseReturnCommand>  returnValidator,
     IValidator<CancelPurchaseOrderCommand>   cancelValidator) : ControllerBase
 {
     private string CurrentUser =>
@@ -123,7 +126,9 @@ public class PurchaseOrdersController(
     public async Task<IActionResult> Create(
         [FromBody] CreatePurchaseOrderRequest request, CancellationToken ct)
     {
-        var command = new CreatePurchaseOrderCommand(request.SupplierId, request.Lines, CurrentUser);
+        var command = new CreatePurchaseOrderCommand(
+            request.SupplierId, request.Lines, CurrentUser,
+            request.PaymentTermValue, request.PaymentTermUnit);
 
         var validation = await createValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
@@ -154,6 +159,20 @@ public class PurchaseOrdersController(
         return NoContent();
     }
 
+    [HttpPost("{id:guid}/return")]
+    public async Task<IActionResult> Return(
+        Guid id, [FromBody] RecordPurchaseReturnRequest request, CancellationToken ct)
+    {
+        var command = new RecordPurchaseReturnCommand(id, request.Lines, request.Reason, CurrentUser);
+
+        var validation = await returnValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        await returnHandler.HandleAsync(command, ct);
+        return NoContent();
+    }
+
     [HttpPost("{id:guid}/cancel")]
     public async Task<IActionResult> Cancel(
         Guid id, [FromBody] CancelPurchaseOrderRequest request, CancellationToken ct)
@@ -171,9 +190,15 @@ public class PurchaseOrdersController(
 
 public record CreatePurchaseOrderRequest(
     Guid SupplierId,
-    IReadOnlyList<CreatePurchaseOrderLineInput> Lines);
+    IReadOnlyList<CreatePurchaseOrderLineInput> Lines,
+    int? PaymentTermValue = null,
+    string? PaymentTermUnit = null);
 
 public record ReceivePurchaseOrderRequest(
     IReadOnlyList<ReceivePurchaseOrderLineInput> Lines);
+
+public record RecordPurchaseReturnRequest(
+    IReadOnlyList<ReturnPurchaseOrderLineInput> Lines,
+    string Reason);
 
 public record CancelPurchaseOrderRequest(string Reason);

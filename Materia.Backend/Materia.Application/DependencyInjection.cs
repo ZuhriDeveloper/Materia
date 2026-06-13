@@ -32,6 +32,7 @@ using Materia.Application.Commands.Purchasing.CancelPurchaseOrder;
 using Materia.Application.Commands.Purchasing.ConfirmPurchaseOrder;
 using Materia.Application.Commands.Purchasing.CreatePurchaseOrder;
 using Materia.Application.Commands.Purchasing.ReceivePurchaseOrder;
+using Materia.Application.Commands.Purchasing.RecordPurchaseReturn;
 using Materia.Application.Commands.Purchasing.RegisterSupplier;
 using Materia.Application.Commands.Purchasing.SetPurchasePrice;
 using Materia.Application.Commands.Purchasing.SetSupplierStatus;
@@ -122,6 +123,7 @@ public static class DependencyInjection
         services.AddScoped<CreatePurchaseOrderCommandHandler>();
         services.AddScoped<ConfirmPurchaseOrderCommandHandler>();
         services.AddScoped<ReceivePurchaseOrderCommandHandler>();
+        services.AddScoped<RecordPurchaseReturnCommandHandler>();
         services.AddScoped<CancelPurchaseOrderCommandHandler>();
 
         // Purchasing — queries

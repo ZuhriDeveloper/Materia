@@ -61,6 +61,24 @@ public class Stock : AggregateRoot<StockId>
             purchaseOrderId, unitCost, unit, reconciledBy, DateTime.UtcNow));
     }
 
+    public void ReduceFromPurchaseReturn(
+        decimal returnedQty,
+        PurchaseOrderId purchaseOrderId,
+        decimal unitCost,
+        string unit,
+        string reducedBy)
+    {
+        if (returnedQty <= 0)
+            throw new DomainException("Returned quantity must be positive.");
+
+        // Allowed to go negative: the goods may already have been sold before the
+        // broken-on-arrival return is processed (consistent with Adjust).
+        var newQuantity = Quantity - returnedQty;
+        Raise(new StockReducedFromPurchaseReturn(
+            Id, ProductId, returnedQty, newQuantity,
+            purchaseOrderId, unitCost, unit, reducedBy, DateTime.UtcNow));
+    }
+
     // ── Event Application ─────────────────────────────────────────────────────
 
     protected override void Apply(IDomainEvent domainEvent)
@@ -80,6 +98,10 @@ public class Stock : AggregateRoot<StockId>
                 break;
 
             case StockReconciledFromPurchase e:
+                Quantity = e.NewQuantity;
+                break;
+
+            case StockReducedFromPurchaseReturn e:
                 Quantity = e.NewQuantity;
                 break;
         }

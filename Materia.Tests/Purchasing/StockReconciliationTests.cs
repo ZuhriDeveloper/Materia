@@ -55,6 +55,48 @@ public class StockReconciliationTests
     }
 
     [Fact]
+    public void ReduceFromPurchaseReturn_LowersQuantity()
+    {
+        var stock = Stock.Initialize(ProductId.New(), "pcs", "system");
+        stock.ReconcileFromPurchase(10m, PurchaseOrderId.New(), 50_000m, "pcs", "warehouse");
+        stock.ClearDomainEvents();
+
+        var poId = PurchaseOrderId.New();
+        stock.ReduceFromPurchaseReturn(3m, poId, 50_000m, "pcs", "warehouse");
+
+        stock.Quantity.Should().Be(7m);
+        var evt = stock.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<StockReducedFromPurchaseReturn>().Subject;
+        evt.ReturnedQty.Should().Be(3m);
+        evt.NewQuantity.Should().Be(7m);
+        evt.PurchaseOrderId.Should().Be(poId);
+    }
+
+    [Fact]
+    public void ReduceFromPurchaseReturn_MayDriveStockNegative()
+    {
+        var stock = Stock.Initialize(ProductId.New(), "pcs", "system");
+        stock.ReconcileFromPurchase(5m, PurchaseOrderId.New(), 50_000m, "pcs", "warehouse");
+        stock.Adjust(-5m, "sold before return processed", "cashier1");
+        stock.ClearDomainEvents();
+
+        stock.ReduceFromPurchaseReturn(2m, PurchaseOrderId.New(), 50_000m, "pcs", "warehouse");
+
+        stock.Quantity.Should().Be(-2m);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-4)]
+    public void ReduceFromPurchaseReturn_NonPositiveQty_ThrowsDomainException(decimal qty)
+    {
+        var stock = Stock.Initialize(ProductId.New(), "pcs", "system");
+
+        Action act = () => stock.ReduceFromPurchaseReturn(qty, PurchaseOrderId.New(), 50_000m, "pcs", "warehouse");
+        act.Should().Throw<DomainException>().WithMessage("*positive*");
+    }
+
+    [Fact]
     public void Adjust_NegativeDelta_AllowsStockBelowZero()
     {
         var stock = Stock.Initialize(ProductId.New(), "pcs", "system");

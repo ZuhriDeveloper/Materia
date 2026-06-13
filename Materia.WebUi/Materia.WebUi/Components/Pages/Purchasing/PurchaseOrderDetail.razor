@@ -48,6 +48,10 @@ else
                     {
                         <span class="badge text-bg-primary">Mode Penerimaan</span>
                     }
+                    @if (_returning)
+                    {
+                        <span class="badge text-bg-danger">Mode Retur / Koreksi</span>
+                    }
                 </div>
                 <div class="card-body p-0">
                     <table class="table table-sm mb-0 align-middle">
@@ -61,6 +65,10 @@ else
                                 @if (_receiving)
                                 {
                                     <th class="text-end" style="width:140px">Terima Qty</th>
+                                }
+                                @if (_returning)
+                                {
+                                    <th class="text-end" style="width:140px">Retur Qty</th>
                                 }
                             </tr>
                         </thead>
@@ -76,7 +84,14 @@ else
                                     <td class="text-end">@line.OrderedQty.ToString("G29")</td>
                                     <td class="text-end">
                                         @line.ReceivedQty.ToString("G29")
-                                        @if (remaining > 0 && line.ReceivedQty > 0)
+                                        @if (line.ReturnedQty > 0)
+                                        {
+                                            <div class="small text-danger">
+                                                − retur @line.ReturnedQty.ToString("G29")
+                                                (net @line.NetReceivedQty.ToString("G29"))
+                                            </div>
+                                        }
+                                        else if (remaining > 0 && line.ReceivedQty > 0)
                                         {
                                             <span class="text-muted small">(sisa @remaining.ToString("G29"))</span>
                                         }
@@ -100,6 +115,21 @@ else
                                             }
                                         </td>
                                     }
+                                    @if (_returning)
+                                    {
+                                        <td class="text-end">
+                                            @if (line.NetReceivedQty > 0)
+                                            {
+                                                <input type="number" class="form-control form-control-sm text-end"
+                                                       @bind="_returnQty[line.ProductId]"
+                                                       min="0" max="@line.NetReceivedQty" step="0.001" />
+                                            }
+                                            else
+                                            {
+                                                <span class="text-muted small">—</span>
+                                            }
+                                        </td>
+                                    }
                                 </tr>
                             }
                         </tbody>
@@ -107,7 +137,7 @@ else
                             <tr>
                                 <td colspan="4" class="text-end fw-bold">Total</td>
                                 <td class="text-end fw-bold">Rp @Total.ToString("N0")</td>
-                                @if (_receiving) { <td></td> }
+                                @if (_receiving || _returning) { <td></td> }
                             </tr>
                         </tfoot>
                     </table>
@@ -125,6 +155,29 @@ else
                         </button>
                     </div>
                 }
+
+                @if (_returning)
+                {
+                    <div class="card-footer">
+                        <label class="form-label small">Alasan retur <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-sm mb-2" rows="2" @bind="_returnReason"
+                                  placeholder="cth. barang rusak / pecah saat diterima"></textarea>
+                        <div class="d-flex gap-2 justify-content-between align-items-center flex-wrap">
+                            <button class="btn btn-sm btn-outline-danger" @onclick="FillFullReturn" disabled="@_saving">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Retur Penuh (Void)
+                            </button>
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-outline-secondary" @onclick="CancelReturn" disabled="@_saving">
+                                    Batal
+                                </button>
+                                <button class="btn btn-sm btn-danger" @onclick="HandleReturn"
+                                        disabled="@(_saving || !HasReturnQty || string.IsNullOrWhiteSpace(_returnReason))">
+                                    <i class="bi bi-box-arrow-up me-1"></i> Konfirmasi Retur
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                }
             </div>
 
             @if (_receiving)
@@ -133,6 +186,16 @@ else
                     <i class="bi bi-info-circle me-1"></i>
                     Saat penerimaan dikonfirmasi, saldo stok tiap produk akan bertambah (merekonsiliasi
                     stok negatif) dan harga beli dari order ini dicatat sebagai lapisan biaya historis.
+                </div>
+            }
+
+            @if (_returning)
+            {
+                <div class="alert alert-warning small mt-3 mb-0">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Gunakan ini untuk barang rusak yang dikembalikan ke pemasok. Saat retur dikonfirmasi,
+                    stok produk akan berkurang dan nilai terutang ke pemasok ikut berkurang. Gunakan
+                    <span class="fw-semibold">Retur Penuh (Void)</span> untuk membatalkan seluruh penerimaan.
                 </div>
             }
         </div>
@@ -160,10 +223,34 @@ else
                             <dt class="col-5 text-muted fw-normal">Diterima</dt>
                             <dd class="col-7">@_po.ReceivedAt.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
                         }
+
+                        <dt class="col-5 text-muted fw-normal">Termin</dt>
+                        <dd class="col-7">@TermDisplay()</dd>
+
+                        @if (_po.PaymentTermValue.HasValue)
+                        {
+                            <dt class="col-5 text-muted fw-normal">Jatuh tempo</dt>
+                            <dd class="col-7">
+                                @if (_po.DueDate.HasValue)
+                                {
+                                    <span class="fw-semibold">@_po.DueDate.Value.ToLocalTime().ToString("dd MMM yyyy")</span>
+                                }
+                                else
+                                {
+                                    <span class="text-muted">~@EstimatedDueDate().ToString("dd MMM yyyy") (estimasi)</span>
+                                }
+                            </dd>
+                        }
+
+                        @if (NetOwed > 0 || _po.Lines.Any(l => l.ReturnedQty > 0))
+                        {
+                            <dt class="col-5 text-muted fw-normal">Nilai terutang</dt>
+                            <dd class="col-7 fw-semibold">Rp @NetOwed.ToString("N0")</dd>
+                        }
                     </dl>
                 </div>
 
-                @if (!_receiving && CanAct)
+                @if (!_receiving && !_returning && (CanAct || CanReturn))
                 {
                     <div class="card-footer d-grid gap-2">
                         @if (_po.Status == "Draft")
@@ -178,9 +265,18 @@ else
                                 <i class="bi bi-box-arrow-in-down me-1"></i> Terima Barang
                             </button>
                         }
-                        <button class="btn btn-sm btn-outline-danger" @onclick="ToggleCancelForm" disabled="@_saving">
-                            <i class="bi bi-x-circle me-1"></i> Batalkan Order
-                        </button>
+                        @if (CanReturn)
+                        {
+                            <button class="btn btn-sm btn-outline-warning" @onclick="StartReturn" disabled="@_saving">
+                                <i class="bi bi-box-arrow-up me-1"></i> Retur / Koreksi Barang
+                            </button>
+                        }
+                        @if (CanAct)
+                        {
+                            <button class="btn btn-sm btn-outline-danger" @onclick="ToggleCancelForm" disabled="@_saving">
+                                <i class="bi bi-x-circle me-1"></i> Batalkan Order
+                            </button>
+                        }
                     </div>
                 }
             </div>
@@ -216,17 +312,23 @@ else
     private List<ProductDto>?  _products;
 
     private bool _receiving;
+    private bool _returning;
     private bool _showCancelForm;
     private string _cancelReason = "";
+    private string _returnReason = "";
     private readonly Dictionary<Guid, decimal> _receiptQty = [];
+    private readonly Dictionary<Guid, decimal> _returnQty  = [];
 
     private string? _error;
     private string? _notice;
     private bool    _saving;
 
     private decimal Total => _po?.Lines.Sum(l => l.OrderedQty * l.UnitCost) ?? 0;
+    private decimal NetOwed => _po?.Lines.Sum(l => l.NetReceivedQty * l.UnitCost) ?? 0;
     private bool CanAct => _po is not null && _po.Status is "Draft" or "Confirmed" or "PartiallyReceived";
+    private bool CanReturn => _po is not null && _po.Status is "PartiallyReceived" or "Received";
     private bool HasReceiptQty => _receiptQty.Values.Any(q => q > 0);
+    private bool HasReturnQty => _returnQty.Values.Any(q => q > 0);
 
     protected override async Task OnInitializedAsync()
     {
@@ -257,6 +359,7 @@ else
     private void StartReceive()
     {
         _receiving = true;
+        _returning = false;
         _showCancelForm = false;
         _receiptQty.Clear();
         foreach (var line in _po!.Lines)
@@ -292,6 +395,51 @@ else
         await LoadAsync();
     }
 
+    private void StartReturn()
+    {
+        _returning = true;
+        _receiving = false;
+        _showCancelForm = false;
+        _returnReason = "";
+        _returnQty.Clear();
+        foreach (var line in _po!.Lines)
+            _returnQty[line.ProductId] = 0;
+    }
+
+    private void CancelReturn()
+    {
+        _returning = false;
+        _returnQty.Clear();
+        _returnReason = "";
+    }
+
+    private void FillFullReturn()
+    {
+        foreach (var line in _po!.Lines)
+            _returnQty[line.ProductId] = line.NetReceivedQty > 0 ? line.NetReceivedQty : 0;
+    }
+
+    private async Task HandleReturn()
+    {
+        var lines = _returnQty
+            .Where(kv => kv.Value > 0)
+            .Select(kv => new ReturnPoLineInput(kv.Key, kv.Value))
+            .ToList();
+
+        if (lines.Count == 0 || string.IsNullOrWhiteSpace(_returnReason)) return;
+
+        _saving = true; _error = null;
+        var error = await PoApi.ReturnAsync(Id, lines, _returnReason);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+
+        _returning = false;
+        _returnQty.Clear();
+        _returnReason = "";
+        _notice = "Retur berhasil dicatat. Stok dan nilai terutang telah dikurangi.";
+        await LoadAsync();
+    }
+
     private void ToggleCancelForm()
     {
         _showCancelForm = !_showCancelForm;
@@ -308,6 +456,34 @@ else
         _notice = "Order berhasil dibatalkan.";
         await LoadAsync();
     }
+
+    private string TermDisplay()
+    {
+        if (_po?.PaymentTermValue is not { } value || string.IsNullOrEmpty(_po.PaymentTermUnit))
+            return "Tunai (tanpa tempo)";
+        return $"{value} {UnitLabel(_po.PaymentTermUnit)}";
+    }
+
+    private DateTime EstimatedDueDate()
+    {
+        // Goods not yet received — estimate the due date from today.
+        var value = _po?.PaymentTermValue ?? 0;
+        return (_po?.PaymentTermUnit) switch
+        {
+            "Days"   => DateTime.Now.AddDays(value),
+            "Weeks"  => DateTime.Now.AddDays(value * 7),
+            "Months" => DateTime.Now.AddMonths(value),
+            _        => DateTime.Now,
+        };
+    }
+
+    private static string UnitLabel(string unit) => unit switch
+    {
+        "Days"   => "hari",
+        "Weeks"  => "minggu",
+        "Months" => "bulan",
+        _        => unit.ToLowerInvariant(),
+    };
 
     private static MarkupString StatusBadge(string status) => status switch
     {

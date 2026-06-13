@@ -18,7 +18,9 @@ public sealed class CreatePurchaseOrderCommandHandler(
             throw new DomainException("Cannot create PO for an inactive supplier.");
 
         var lines = BuildLines(supplier, command.Lines);
-        var po = PurchaseOrder.Create(SupplierId.From(command.SupplierId), lines, command.CreatedBy);
+        var paymentTerm = PaymentTerm.FromRaw(command.PaymentTermValue, command.PaymentTermUnit);
+        var po = PurchaseOrder.Create(
+            SupplierId.From(command.SupplierId), lines, command.CreatedBy, paymentTerm);
 
         await poRepository.SaveAsync(po, ct);
         return po.Id.Value;

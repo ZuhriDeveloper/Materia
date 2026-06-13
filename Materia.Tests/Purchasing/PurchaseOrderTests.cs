@@ -129,6 +129,134 @@ public class PurchaseOrderTests
         act.Should().Throw<DomainException>();
     }
 
+    // ── Payment tenor ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Create_WithPaymentTerm_StoresTermAndRaisesItOnEvent()
+    {
+        var po = PurchaseOrder.Create(
+            AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1",
+            new PaymentTerm(2, PaymentTermUnit.Months));
+
+        po.PaymentTerm.Should().Be(new PaymentTerm(2, PaymentTermUnit.Months));
+
+        var evt = po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderCreated>().Subject;
+        evt.PaymentTermValue.Should().Be(2);
+        evt.PaymentTermUnit.Should().Be("Months");
+    }
+
+    [Fact]
+    public void Create_WithoutPaymentTerm_IsCash()
+    {
+        var po = PurchaseOrder.Create(AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1");
+        po.PaymentTerm.Should().BeNull();
+    }
+
+    // ── Returns / void ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void RecordReturn_ReducesNetReceivedQty()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+        po.Receive([(productId, 10m)], "warehouse");
+        po.ClearDomainEvents();
+
+        po.RecordReturn([(productId, 3m)], "broken on arrival", "warehouse");
+
+        po.Lines[0].ReturnedQty.Should().Be(3m);
+        po.Lines[0].NetReceivedQty.Should().Be(7m);
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderReturned>();
+    }
+
+    [Fact]
+    public void RecordReturn_FullQty_NetsToZero()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+        po.Receive([(productId, 10m)], "warehouse");
+
+        po.RecordReturn([(productId, 10m)], "all broken", "warehouse");
+
+        po.Lines[0].NetReceivedQty.Should().Be(0m);
+    }
+
+    [Fact]
+    public void RecordReturn_MoreThanNetReceived_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+        po.Receive([(productId, 10m)], "warehouse");
+
+        Action act = () => po.RecordReturn([(productId, 11m)], "too many", "warehouse");
+        act.Should().Throw<DomainException>().WithMessage("*only 10*");
+    }
+
+    [Fact]
+    public void RecordReturn_AccumulatesAndRejectsOverNetAcrossCalls()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+        po.Receive([(productId, 10m)], "warehouse");
+        po.RecordReturn([(productId, 6m)], "first batch", "warehouse");
+
+        Action act = () => po.RecordReturn([(productId, 5m)], "second batch", "warehouse");
+        act.Should().Throw<DomainException>();
+        po.Lines[0].NetReceivedQty.Should().Be(4m);
+    }
+
+    [Fact]
+    public void RecordReturn_BeforeAnyReceipt_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+
+        Action act = () => po.RecordReturn([(productId, 1m)], "nothing received yet", "warehouse");
+        act.Should().Throw<DomainException>().WithMessage("*received goods*");
+    }
+
+    [Fact]
+    public void RecordReturn_WithoutReason_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+        po.Receive([(productId, 10m)], "warehouse");
+
+        Action act = () => po.RecordReturn([(productId, 2m)], "  ", "warehouse");
+        act.Should().Throw<DomainException>().WithMessage("*reason*");
+    }
+
+    [Fact]
+    public void RecordReturn_ProductNotInPo_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId);
+        po.Receive([(productId, 10m)], "warehouse");
+
+        Action act = () => po.RecordReturn([(ProductId.New(), 1m)], "wrong product", "warehouse");
+        act.Should().Throw<DomainException>().WithMessage("*not found in this PO*");
+    }
+
+    [Fact]
+    public void Reconstitute_WithReturnsAndTerm_RestoresState()
+    {
+        var productId = AnyProduct;
+        var original = PurchaseOrder.Create(
+            AnySupplier, [(productId, 10m, 50_000m, "pcs")], "user1",
+            new PaymentTerm(1, PaymentTermUnit.Weeks));
+        original.Confirm("user1");
+        original.Receive([(productId, 10m)], "warehouse");
+        original.RecordReturn([(productId, 4m)], "broken", "warehouse");
+
+        var reconstituted = PurchaseOrder.Reconstitute(original.DomainEvents);
+
+        reconstituted.PaymentTerm.Should().Be(new PaymentTerm(1, PaymentTermUnit.Weeks));
+        reconstituted.Lines[0].NetReceivedQty.Should().Be(6m);
+        reconstituted.DomainEvents.Should().BeEmpty();
+    }
+
     [Fact]
     public void Cancel_FromDraft_TransitionsToCancelled()
     {
