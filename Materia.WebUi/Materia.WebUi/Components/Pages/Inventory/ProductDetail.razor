@@ -59,7 +59,7 @@ else
                         <div class="row g-3 mb-3">
                             <div class="col-sm-6">
                                 <label class="form-label">Harga Jual (Rp)</label>
-                                <InputNumber class="form-control" @bind-Value="_editForm.SalePrice" min="0" step="100" />
+                                <InputNumber class="form-control" @bind-Value="_editForm.SalePrice" min="1" step="any" />
                                 <ValidationMessage For="() => _editForm.SalePrice" class="small text-danger" />
                             </div>
                             <div class="col-sm-6">
@@ -710,7 +710,7 @@ else
         [System.ComponentModel.DataAnnotations.MaxLength(1000)]
         public string? Description { get; set; }
 
-        [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Harga jual tidak boleh negatif.")]
+        [System.ComponentModel.DataAnnotations.Range(0.01, double.MaxValue, ErrorMessage = "Harga jual harus lebih dari 0.")]
         public decimal SalePrice { get; set; }
 
         [System.ComponentModel.DataAnnotations.MaxLength(100)]
