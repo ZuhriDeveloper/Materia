@@ -538,7 +538,8 @@
 
         var (id, error) = await SupplierApi.RegisterAsync(
             _supplier.CreateName.Trim(),
-            string.IsNullOrWhiteSpace(_supplier.CreatePhone) ? null : _supplier.CreatePhone!.Trim());
+            string.IsNullOrWhiteSpace(_supplier.CreatePhone) ? null : _supplier.CreatePhone!.Trim(),
+            description: null, salesmanName: null, salesmanPhone: null);
 
         _supplier.Busy = false;
 

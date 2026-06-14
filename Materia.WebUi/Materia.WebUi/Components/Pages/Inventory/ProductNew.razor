@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
+@inject SupplierApiClient  SupplierApi
 @inject NavigationManager Navigation
 
 <PageTitle>Produk Baru — Materia</PageTitle>
@@ -114,6 +115,58 @@
                 }
             </div>
 
+            @* ── Harga beli awal (opsional) ── *@
+            <div class="mb-4 border rounded p-3 bg-light-subtle">
+                <label class="form-label fw-semibold">
+                    Harga Beli <span class="text-muted small fw-normal">(opsional)</span>
+                </label>
+                @if (_suppliers.Count == 0)
+                {
+                    <div class="text-muted small">
+                        Belum ada pemasok aktif — harga beli bisa diatur nanti dari halaman produk.
+                    </div>
+                }
+                else
+                {
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label small">Pemasok</label>
+                            <select class="form-select form-select-sm" @bind="_buySupplierId">
+                                <option value="@Guid.Empty">— pilih pemasok —</option>
+                                @foreach (var s in _suppliers)
+                                {
+                                    <option value="@s.Id">@s.Name</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">Harga list (Rp)</label>
+                            <input type="number" class="form-control form-control-sm"
+                                   @bind="_buyList" @bind:event="oninput" min="0" step="100" placeholder="0" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small">
+                                Diskon bertingkat (%)
+                                <i class="bi bi-info-circle text-muted" title="mis. 12,5+7+5"></i>
+                            </label>
+                            <input type="text" class="form-control form-control-sm"
+                                   @bind="_buyDiscountText" @bind:event="oninput" placeholder="mis. 12,5+7+5" />
+                        </div>
+                    </div>
+                    @if (_buyList > 0)
+                    {
+                        var disc = DiscountInput.Parse(_buyDiscountText);
+                        <div class="small mt-2">
+                            Harga beli nett@(disc.Count > 0 ? $" ({DiscountInput.Format(disc)})" : ""):
+                            <span class="fw-semibold text-success">
+                                Rp @DiscountInput.ComputeNet(_buyList, disc).ToString("N0")
+                            </span>
+                        </div>
+                    }
+                    <div class="form-text">Disimpan ke katalog pemasok terpilih. Bisa juga diatur nanti.</div>
+                }
+            </div>
+
             <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary" disabled="@_saving">
                     <i class="bi bi-check-lg me-1"></i> Buat Produk
@@ -132,10 +185,18 @@
     private List<UnitDto>? _units;
     private readonly HashSet<Guid> _selectedIds = [];
 
+    // Optional initial buy price (per-supplier catalog).
+    private List<SupplierDto> _suppliers = [];
+    private Guid    _buySupplierId;
+    private decimal _buyList;
+    private string  _buyDiscountText = "";
+    private Guid?   _createdProductId;   // guards against re-creating on retry
+
     protected override async Task OnInitializedAsync()
     {
         var categoriesTask = Api.GetCategoriesAsync();
         var unitsTask = Api.GetUnitsAsync();
+        var suppliersTask = SupplierApi.GetSuppliersAsync(activeOnly: true);
 
         _categories = (await categoriesTask)
             ?.Where(c => c.IsActive)
@@ -146,6 +207,8 @@
             ?.Where(u => u.IsActive)
             .OrderBy(u => u.Name)
             .ToList() ?? [];
+
+        _suppliers = (await suppliersTask) ?? [];
     }
 
     private void ToggleCategory(Guid id, bool selected)
@@ -158,14 +221,36 @@
     {
         _saving = true;
         _error = null;
-        var (id, error) = await Api.CreateProductAsync(
-            _form.Name, _form.Description, _form.BaseUnit,
-            _selectedIds.Count > 0 ? [.. _selectedIds] : null,
-            _form.SalePrice,
-            string.IsNullOrWhiteSpace(_form.Barcode) ? null : _form.Barcode.Trim());
+
+        // Create the product once; on a retry (e.g. buy-price failed) skip re-creating it.
+        if (_createdProductId is null)
+        {
+            var (id, error) = await Api.CreateProductAsync(
+                _form.Name, _form.Description, _form.BaseUnit,
+                _selectedIds.Count > 0 ? [.. _selectedIds] : null,
+                _form.SalePrice,
+                string.IsNullOrWhiteSpace(_form.Barcode) ? null : _form.Barcode.Trim());
+            if (error is not null) { _saving = false; _error = error; return; }
+            _createdProductId = id;
+        }
+
+        // Optional initial buy price → supplier catalog (discount chain is a calculator; store net).
+        if (_buySupplierId != Guid.Empty && _buyList > 0)
+        {
+            var net = DiscountInput.ComputeNet(_buyList, DiscountInput.Parse(_buyDiscountText));
+            var priceErr = await SupplierApi.SetPriceAsync(
+                _buySupplierId, _createdProductId!.Value, net, "IDR", _form.BaseUnit, DateTime.Today);
+            if (priceErr is not null)
+            {
+                _saving = false;
+                _error = $"Produk dibuat, tetapi harga beli gagal disimpan: {priceErr}. " +
+                         "Coba simpan lagi, atau atur dari halaman produk.";
+                return;
+            }
+        }
+
         _saving = false;
-        if (error is not null) { _error = error; return; }
-        Navigation.NavigateTo($"/products/{id}?created=1", forceLoad: true);
+        Navigation.NavigateTo($"/products/{_createdProductId}?created=1", forceLoad: true);
     }
 
     private sealed class CreateForm

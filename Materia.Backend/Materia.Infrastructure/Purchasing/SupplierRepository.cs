@@ -78,6 +78,9 @@ public class SupplierRepository(AppDbContext context, ICurrentStore currentStore
 
         projection.Name = supplier.Name;
         projection.ContactPhone = supplier.ContactPhone;
+        projection.Description = supplier.Description;
+        projection.SalesmanName = supplier.SalesmanName;
+        projection.SalesmanPhone = supplier.SalesmanPhone;
         projection.IsActive = supplier.IsActive;
         projection.CatalogJson = JsonSerializer.Serialize(
             supplier.Catalog.Values.Select(entry => new

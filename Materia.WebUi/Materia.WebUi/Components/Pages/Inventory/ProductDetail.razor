@@ -3,6 +3,7 @@
 @attribute [Authorize(Roles = "Admin")]
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
+@inject SupplierApiClient  SupplierApi
 @inject NavigationManager Navigation
 
 <PageTitle>@(_product?.Name ?? "Produk") — Materia</PageTitle>
@@ -229,6 +230,124 @@ else
                         </div>
                         <div class="form-text">Masukkan nilai positif untuk menambah, negatif untuk mengurangi.</div>
                     </EditForm>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span class="fw-semibold">Harga Beli</span>
+                    @if (_product.LatestPurchasePrice is > 0m)
+                    {
+                        <span class="small">
+                            Terkini:
+                            <span class="fw-semibold text-success">Rp @_product.LatestPurchasePrice.Value.ToString("N0")</span>
+                        </span>
+                    }
+                </div>
+                <div class="card-body">
+                    @if (!string.IsNullOrEmpty(_buyPriceError))
+                    {
+                        <div class="alert alert-danger py-2 small">@_buyPriceError</div>
+                    }
+
+                    @* Current price per supplier *@
+                    @{
+                        var pricedSuppliers = _suppliers
+                            .Select(s => new
+                            {
+                                s.Id,
+                                s.Name,
+                                Latest = s.Catalog.FirstOrDefault(c => c.ProductId == Id)?
+                                          .Prices.OrderByDescending(p => p.EffectiveFrom).FirstOrDefault(),
+                            })
+                            .Where(x => x.Latest is not null)
+                            .ToList();
+                    }
+                    @if (pricedSuppliers.Count > 0)
+                    {
+                        <div class="table-responsive mb-3">
+                            <table class="table table-sm mb-0" style="max-width:560px">
+                                <thead class="table-light">
+                                    <tr><th>Pemasok</th><th class="text-end">Harga Beli</th><th>Berlaku</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var s in pricedSuppliers)
+                                    {
+                                        <tr>
+                                            <td>@s.Name</td>
+                                            <td class="text-end fw-semibold">
+                                                Rp @s.Latest!.Amount.ToString("N0")
+                                                <span class="text-muted small">/ @s.Latest.Unit</span>
+                                            </td>
+                                            <td class="small text-muted">
+                                                @s.Latest.EffectiveFrom.ToLocalTime().ToString("dd MMM yyyy")
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <p class="text-muted small">Belum ada harga beli. Tetapkan di bawah.</p>
+                    }
+
+                    <hr class="my-2" />
+                    <p class="fw-semibold mb-2">Tetapkan Harga Beli</p>
+                    @if (_suppliers.Count == 0)
+                    {
+                        <div class="alert alert-warning py-2 small mb-0">
+                            Belum ada pemasok aktif. <a href="/suppliers">Daftarkan pemasok</a> terlebih dahulu.
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="row g-2 align-items-end" style="max-width:720px">
+                            <div class="col-md-4">
+                                <label class="form-label small">Pemasok <span class="text-danger">*</span></label>
+                                <select class="form-select form-select-sm" @bind="_buySupplierId">
+                                    <option value="@Guid.Empty">— pilih pemasok —</option>
+                                    @foreach (var s in _suppliers)
+                                    {
+                                        <option value="@s.Id">@s.Name</option>
+                                    }
+                                </select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">Harga list (Rp) / @_product.BaseUnit</label>
+                                <input type="number" class="form-control form-control-sm"
+                                       @bind="_buyList" @bind:event="oninput" min="0" step="100" placeholder="0" />
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small">
+                                    Diskon bertingkat (%)
+                                    <i class="bi bi-info-circle text-muted" title="mis. 12,5+7+5"></i>
+                                </label>
+                                <input type="text" class="form-control form-control-sm"
+                                       @bind="_buyDiscountText" @bind:event="oninput" placeholder="mis. 12,5+7+5" />
+                            </div>
+                            <div class="col-12 d-flex align-items-center gap-3 flex-wrap">
+                                @if (_buyList > 0)
+                                {
+                                    var disc = DiscountInput.Parse(_buyDiscountText);
+                                    <span class="small">
+                                        Harga beli nett@(disc.Count > 0 ? $" ({DiscountInput.Format(disc)})" : ""):
+                                        <span class="fw-semibold text-success">
+                                            Rp @DiscountInput.ComputeNet(_buyList, disc).ToString("N0")
+                                        </span>
+                                    </span>
+                                }
+                                <button class="btn btn-sm btn-primary ms-auto"
+                                        @onclick="HandleSetBuyPrice"
+                                        disabled="@(_buyBusy || _buySupplierId == Guid.Empty || _buyList <= 0)">
+                                    <i class="bi bi-check-lg me-1"></i> Simpan Harga Beli
+                                </button>
+                            </div>
+                        </div>
+                    }
                 </div>
             </div>
         </div>
@@ -507,6 +626,14 @@ else
     private string? _stockError;
     private string? _notice;
 
+    // Harga beli (per-supplier catalog price) form.
+    private List<SupplierDto> _suppliers = [];
+    private Guid    _buySupplierId;
+    private decimal _buyList;
+    private string  _buyDiscountText = "";
+    private string? _buyPriceError;
+    private bool    _buyBusy;
+
     private string? _variantError;
     private bool _variantBusy;
     private Guid? _editingVariantId;
@@ -542,6 +669,7 @@ else
         _availableCategories = allCats.Where(c => c.IsActive && !assignedIds.Contains(c.Id)).ToList();
 
         _stock = await Api.GetStockByProductIdAsync(Id);
+        _suppliers = await SupplierApi.GetSuppliersAsync(activeOnly: true) ?? [];
 
         // Units available for new conversions: active units, excluding the base unit
         // and any unit already used in an existing conversion
@@ -603,6 +731,26 @@ else
             _stockForm = new();
             Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
         }
+    }
+
+    // ── Harga Beli (supplier catalog price) ───────────────────────────────────
+
+    private async Task HandleSetBuyPrice()
+    {
+        if (_product is null || _buySupplierId == Guid.Empty || _buyList <= 0) return;
+
+        _buyBusy = true;
+        _buyPriceError = null;
+
+        // The discount chain is a calculator — only the resulting net is stored in the catalog.
+        var net = DiscountInput.ComputeNet(_buyList, DiscountInput.Parse(_buyDiscountText));
+        var err = await SupplierApi.SetPriceAsync(
+            _buySupplierId, Id, net, "IDR", _product.BaseUnit, DateTime.Today);
+
+        _buyBusy = false;
+        if (err is not null) { _buyPriceError = err; return; }
+
+        Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
     }
 
     // ── Color Variants ──────────────────────────────────────────────────────────

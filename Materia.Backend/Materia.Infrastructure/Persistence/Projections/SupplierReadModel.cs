@@ -6,6 +6,9 @@ public class SupplierReadModel
     public Guid StoreId { get; set; }
     public string Name { get; set; } = default!;
     public string? ContactPhone { get; set; }
+    public string? Description { get; set; }
+    public string? SalesmanName { get; set; }
+    public string? SalesmanPhone { get; set; }
     public bool IsActive { get; set; }
     public string CatalogJson { get; set; } = "[]";
     public string CreatedBy { get; set; } = default!;

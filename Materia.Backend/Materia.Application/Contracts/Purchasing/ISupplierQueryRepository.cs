@@ -11,6 +11,9 @@ public record SupplierDto(
     Guid Id,
     string Name,
     string? ContactPhone,
+    string? Description,
+    string? SalesmanName,
+    string? SalesmanPhone,
     bool IsActive,
     IReadOnlyList<SupplierCatalogEntryDto> Catalog);
 
