@@ -158,18 +158,44 @@ else
                         <div class="row g-2">
                             <div class="col-12">
                                 <label class="form-label small">Produk <span class="text-danger">*</span></label>
-                                <select class="form-select form-select-sm" @onchange="OnProductChanged">
-                                    <option value="">— pilih produk —</option>
-                                    @if (_products is not null)
-                                    {
-                                        @foreach (var p in _products)
-                                        {
-                                            <option value="@p.Id" selected="@(p.Id == _priceForm.ProductId)">
-                                                @p.Name (@p.BaseUnit)
-                                            </option>
-                                        }
-                                    }
-                                </select>
+                                <MudAutocomplete T="ProductSearchDto"
+                                                 @ref="_productAutocomplete"
+                                                 Value="_selectedProduct"
+                                                 ValueChanged="OnProductSelected"
+                                                 SearchFunc="SearchProductsAsync"
+                                                 ToStringFunc="@(p => p?.Name ?? string.Empty)"
+                                                 ResetValueOnEmptyText="true"
+                                                 CoerceText="false"
+                                                 Placeholder="Cari produk berdasarkan nama atau SKU…"
+                                                 Variant="Variant.Outlined"
+                                                 Margin="Margin.Dense"
+                                                 Dense="true"
+                                                 Clearable="true"
+                                                 Immediate="true"
+                                                 DebounceInterval="180"
+                                                 MinCharacters="1"
+                                                 MaxItems="8"
+                                                 Adornment="Adornment.Start"
+                                                 AdornmentIcon="@Icons.Material.Filled.Search"
+                                                 AdornmentColor="Color.Primary">
+                                    <ItemTemplate Context="p">
+                                        <div class="d-flex justify-space-between align-center px-1 py-0">
+                                            <div>
+                                                <MudText Typo="Typo.body2" Style="font-weight:600;line-height:1.3">@p.Name</MudText>
+                                                <MudText Typo="Typo.caption" Color="Color.Secondary">
+                                                    @p.BaseUnit &nbsp;·&nbsp; Rp @p.SalePrice.ToString("N0")
+                                                </MudText>
+                                            </div>
+                                            <MudText Typo="Typo.caption" Color="Color.Tertiary"
+                                                     Style="font-family:monospace">@p.Sku</MudText>
+                                        </div>
+                                    </ItemTemplate>
+                                    <NoItemsTemplate>
+                                        <MudText Align="Align.Center" Class="px-4 py-1" Color="Color.Secondary">
+                                            Produk tidak ditemukan
+                                        </MudText>
+                                    </NoItemsTemplate>
+                                </MudAutocomplete>
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small">Harga (Rp) <span class="text-danger">*</span></label>
@@ -181,10 +207,10 @@ else
                                 <select class="form-select form-select-sm" @bind="_priceForm.Unit">
                                     @if (_selectedProduct is not null)
                                     {
-                                        <option value="@_selectedProduct.BaseUnit">@_selectedProduct.BaseUnit (dasar)</option>
-                                        @foreach (var conv in _selectedProduct.UnitConversions)
+                                        @for (var i = 0; i < _selectedProduct.Units.Count; i++)
                                         {
-                                            <option value="@conv.ToUnit">@conv.ToUnit</option>
+                                            var u = _selectedProduct.Units[i];
+                                            <option value="@u.UnitName">@u.UnitName@(i == 0 ? " (dasar)" : "")</option>
                                         }
                                     }
                                     else
@@ -219,8 +245,12 @@ else
     [Parameter] public Guid Id { get; set; }
 
     private SupplierDto?      _supplier;
-    private List<ProductDto>? _products;
-    private ProductDto?       _selectedProduct;
+    private ProductSearchDto? _selectedProduct;
+    private MudAutocomplete<ProductSearchDto>? _productAutocomplete;
+
+    // Catalog entries only carry a ProductId; resolve display names on demand
+    // (product search results omit them, so we can no longer rely on a bulk list).
+    private readonly Dictionary<Guid, string> _productNames = new();
 
     private string? _error;
     private string? _notice;
@@ -229,12 +259,7 @@ else
     private readonly EditForm_   _editForm  = new();
     private readonly PriceForm_  _priceForm = new();
 
-    protected override async Task OnInitializedAsync()
-    {
-        var productsTask = InventoryApi.GetProductsAsync(pageSize: 500, isActive: true);
-        await LoadAsync();
-        _products = (await productsTask)?.Items ?? [];
-    }
+    protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
@@ -242,26 +267,60 @@ else
         if (_supplier is null) { Navigation.NavigateTo("/suppliers"); return; }
         _editForm.Name         = _supplier.Name;
         _editForm.ContactPhone = _supplier.ContactPhone;
+        await EnsureCatalogNamesAsync();
+    }
+
+    /// Resolve product display names for catalog entries we haven't seen yet, so the
+    /// list shows real names instead of a raw id fragment.
+    private async Task EnsureCatalogNamesAsync()
+    {
+        if (_supplier is null) return;
+        foreach (var entry in _supplier.Catalog)
+        {
+            if (_productNames.ContainsKey(entry.ProductId)) continue;
+            var product = await InventoryApi.GetProductByIdAsync(entry.ProductId);
+            if (product is not null) _productNames[entry.ProductId] = product.Name;
+        }
     }
 
     private string ProductName(Guid productId)
-        => _products?.FirstOrDefault(p => p.Id == productId)?.Name
-           ?? productId.ToString()[..8];
+        => _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
 
-    private void OnProductChanged(ChangeEventArgs e)
+    // ── Product search (text autocomplete, mirrors the PoS cashier field) ──────
+    private async Task<IEnumerable<ProductSearchDto>> SearchProductsAsync(
+        string value, CancellationToken ct)
     {
-        if (Guid.TryParse(e.Value?.ToString(), out var pid))
+        if (string.IsNullOrWhiteSpace(value)) return [];
+        try
         {
-            _priceForm.ProductId = pid;
-            _selectedProduct     = _products?.FirstOrDefault(p => p.Id == pid);
-            _priceForm.Unit      = _selectedProduct?.BaseUnit ?? "";
+            return await InventoryApi.SearchProductsAsync(value, 8, ct);
         }
-        else
+        catch (OperationCanceledException)
+        {
+            // Superseded by a newer keystroke — expected, just drop this result set.
+            return [];
+        }
+        catch (Exception ex)
+        {
+            _error = $"Pencarian produk gagal: {ex.Message}";
+            await InvokeAsync(StateHasChanged);
+            return [];
+        }
+    }
+
+    private void OnProductSelected(ProductSearchDto? product)
+    {
+        _selectedProduct = product;
+        if (product is null)
         {
             _priceForm.ProductId = Guid.Empty;
-            _selectedProduct     = null;
             _priceForm.Unit      = "";
+            return;
         }
+        _priceForm.ProductId = product.Id;
+        // Default to the base unit (always the first entry of Units).
+        _priceForm.Unit      = product.Units.Count > 0 ? product.Units[0].UnitName : product.BaseUnit;
+        _productNames[product.Id] = product.Name;
     }
 
     private async Task HandleEdit()
@@ -304,6 +363,8 @@ else
         _priceForm.ProductId = Guid.Empty;
         _priceForm.Unit      = "";
         _selectedProduct     = null;
+        if (_productAutocomplete is not null)
+            await _productAutocomplete.ClearAsync();
         await LoadAsync();
     }
 
