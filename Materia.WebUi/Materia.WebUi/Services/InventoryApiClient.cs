@@ -24,6 +24,35 @@ public class InventoryApiClient(HttpClient http)
     public Task<ProductDto?> GetProductByIdAsync(Guid id, CancellationToken ct = default)
         => http.GetFromJsonAsync<ProductDto>($"api/products/{id}", ct);
 
+    /// <summary>
+    /// Downloads the .xlsx export for the products matching the active filters (no paging).
+    /// Returns the file bytes and the server-provided file name, or null on failure.
+    /// </summary>
+    public async Task<(byte[] Content, string FileName)?> ExportProductsAsync(
+        bool? isActive = null, string? search = null, Guid? categoryId = null,
+        CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (isActive.HasValue)
+            query.Add($"isActive={isActive.Value}");
+        if (!string.IsNullOrWhiteSpace(search))
+            query.Add($"search={Uri.EscapeDataString(search.Trim())}");
+        if (categoryId.HasValue)
+            query.Add($"categoryId={categoryId.Value}");
+
+        var url = "api/products/export" + (query.Count > 0 ? "?" + string.Join("&", query) : "");
+
+        var response = await http.GetAsync(url, ct);
+        if (!response.IsSuccessStatusCode)
+            return null;
+
+        var bytes = await response.Content.ReadAsByteArrayAsync(ct);
+        var fileName = response.Content.Headers.ContentDisposition?.FileNameStar
+            ?? response.Content.Headers.ContentDisposition?.FileName?.Trim('"')
+            ?? $"Produk_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+        return (bytes, fileName);
+    }
+
     /// <summary>Redis-backed product-name autocomplete for the PoS cashier.</summary>
     public async Task<List<ProductSearchDto>> SearchProductsAsync(
         string term, int limit = 8, CancellationToken ct = default)

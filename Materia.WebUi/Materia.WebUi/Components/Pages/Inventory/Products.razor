@@ -4,14 +4,29 @@
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
 @inject NavigationManager Navigation
+@inject IJSRuntime JS
 
 <PageTitle>Produk — Materia</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0 fw-bold">Produk</h4>
-    <a href="/products/new" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i> Produk Baru
-    </a>
+    <div class="d-flex gap-2">
+        <button type="button" class="btn btn-outline-success btn-sm"
+                @onclick="ExportExcel" disabled="@(_exporting || _loading)">
+            @if (_exporting)
+            {
+                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+            }
+            else
+            {
+                <i class="bi bi-file-earmark-excel me-1"></i>
+            }
+            Ekspor Excel
+        </button>
+        <a href="/products/new" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i> Produk Baru
+        </a>
+    </div>
 </div>
 
 @if (!string.IsNullOrEmpty(_notice))
@@ -19,6 +34,14 @@
     <div class="alert alert-success alert-dismissible">
         @_notice
         <button type="button" class="btn-close" @onclick="() => _notice = null"></button>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_exportError))
+{
+    <div class="alert alert-danger alert-dismissible">
+        @_exportError
+        <button type="button" class="btn-close" @onclick="() => _exportError = null"></button>
     </div>
 }
 
@@ -356,7 +379,9 @@
     private PagedProductsDto?  _products;
     private List<CategoryDto>  _categories = [];
     private bool               _loading    = true;
+    private bool               _exporting;
     private string?            _notice;
+    private string?            _exportError;
     private int                _page       = 1;
 
     // Filter state: _searchInput is the live text; _appliedSearch is what was last searched.
@@ -402,6 +427,42 @@
             categoryId: catId);
 
         _loading = false;
+    }
+
+    // ── Excel export ──────────────────────────────────────────────────────────
+    /// Exports every product matching the active filters (no paging) to an .xlsx download.
+    private async Task ExportExcel()
+    {
+        _exporting = true;
+        _exportError = null;
+        StateHasChanged();
+
+        try
+        {
+            Guid? catId = Guid.TryParse(_categoryFilter, out var g) ? g : null;
+            string? searchArg = string.IsNullOrWhiteSpace(_appliedSearch) ? null : _appliedSearch.Trim();
+
+            var result = await Api.ExportProductsAsync(
+                isActive: _statusFilter, search: searchArg, categoryId: catId);
+
+            if (result is null)
+            {
+                _exportError = "Gagal mengekspor produk. Silakan coba lagi.";
+                return;
+            }
+
+            using var stream = new MemoryStream(result.Value.Content);
+            using var streamRef = new DotNetStreamReference(stream);
+            await JS.InvokeVoidAsync("downloadFileFromStream", result.Value.FileName, streamRef);
+        }
+        catch (Exception)
+        {
+            _exportError = "Gagal mengekspor produk. Silakan coba lagi.";
+        }
+        finally
+        {
+            _exporting = false;
+        }
     }
 
     // ── Filter handlers ───────────────────────────────────────────────────────

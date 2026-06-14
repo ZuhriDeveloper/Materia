@@ -92,6 +92,7 @@ public static class DependencyInjection
         // Inventory — queries
         services.AddScoped<GetProductByIdQueryHandler>();
         services.AddScoped<GetProductsQueryHandler>();
+        services.AddScoped<ExportProductsQueryHandler>();
         services.AddScoped<GetCategoriesQueryHandler>();
         services.AddScoped<GetUnitsQueryHandler>();
         services.AddScoped<GetStockByProductIdQueryHandler>();
