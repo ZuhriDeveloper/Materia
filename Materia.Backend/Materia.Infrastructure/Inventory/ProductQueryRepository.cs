@@ -42,8 +42,33 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
         string? search = null, Guid? categoryId = null,
         CancellationToken ct = default)
     {
-        var query = context.ProductReadModels.AsQueryable();
+        var query = ApplyFilters(context.ProductReadModels.AsQueryable(), isActive, search, categoryId);
 
+        var total = await query.CountAsync(ct);
+        var items = await query
+            .OrderBy(p => p.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        var dtos = await EnrichAsync(items, ct);
+        return new PagedResult<ProductDto>(dtos, total, page, pageSize);
+    }
+
+    public async Task<IReadOnlyList<ProductDto>> GetAllAsync(
+        bool? isActive, string? search = null, Guid? categoryId = null,
+        CancellationToken ct = default)
+    {
+        var items = await ApplyFilters(context.ProductReadModels.AsQueryable(), isActive, search, categoryId)
+            .OrderBy(p => p.Name)
+            .ToListAsync(ct);
+
+        return await EnrichAsync(items, ct);
+    }
+
+    private static IQueryable<ProductReadModel> ApplyFilters(
+        IQueryable<ProductReadModel> query, bool? isActive, string? search, Guid? categoryId)
+    {
         if (isActive.HasValue)
             query = query.Where(p => p.IsActive == isActive.Value);
 
@@ -63,13 +88,15 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             query = query.Where(p => p.CategoryIdsJson.Contains(catStr));
         }
 
-        var total = await query.CountAsync(ct);
-        var items = await query
-            .OrderBy(p => p.Name)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync(ct);
+        return query;
+    }
 
+    /// <summary>
+    /// Enriches read-model rows with categories, color variants, product-level stock, and the
+    /// latest purchase price / supplier presence, then maps each to a <see cref="ProductDto"/>.
+    /// </summary>
+    private async Task<List<ProductDto>> EnrichAsync(List<ProductReadModel> items, CancellationToken ct)
+    {
         var categoryIds = items
             .SelectMany(p => JsonSerializer.Deserialize<Guid[]>(p.CategoryIdsJson) ?? [])
             .Distinct()
@@ -87,7 +114,7 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             .GroupBy(v => v.ProductId)
             .ToDictionary(g => g.Key, g => g.OrderBy(v => v.ColorName).ToList());
 
-        // Product-level stock for this page (variant rows excluded — variant stock is deferred).
+        // Product-level stock (variant rows excluded — variant stock is deferred).
         var stockByProduct = await context.StockReadModels
             .Where(s => productIds.Contains(s.ProductId) && s.VariantId == null)
             .ToDictionaryAsync(s => s.ProductId, s => s.Quantity, ct);
@@ -95,7 +122,7 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
         // Latest purchase price (harga beli) and supplier presence, from supplier catalogs.
         var purchaseInfo = await BuildPurchaseInfoAsync(productIds, ct);
 
-        var dtos = items.Select(p =>
+        return items.Select(p =>
         {
             var dto = Map(
                 p,
@@ -110,7 +137,6 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
                 HasSupplier = hasSupplier,
             };
         }).ToList();
-        return new PagedResult<ProductDto>(dtos, total, page, pageSize);
     }
 
     private async Task<IReadOnlyList<CategorySummaryDto>> ResolveCategories(

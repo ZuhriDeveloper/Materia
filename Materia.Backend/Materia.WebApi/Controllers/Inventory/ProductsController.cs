@@ -38,6 +38,7 @@ public class ProductsController(
     AdjustStockCommandHandler adjustStockHandler,
     GetProductByIdQueryHandler getByIdHandler,
     GetProductsQueryHandler getPagedHandler,
+    ExportProductsQueryHandler exportHandler,
     GetStockByProductIdQueryHandler getStockHandler,
     GetProductStocksQueryHandler getProductStocksHandler,
     IValidator<CreateProductCommand> createValidator,
@@ -73,6 +74,24 @@ public class ProductsController(
     {
         var result = await getByIdHandler.HandleAsync(new GetProductByIdQuery(id), ct);
         return result is null ? NotFound() : Ok(result);
+    }
+
+    /// <summary>Exports all products matching the filters (no paging) as an .xlsx file.</summary>
+    [HttpGet("export")]
+    public async Task<IActionResult> Export(
+        [FromQuery] bool? isActive = null,
+        [FromQuery] string? search = null,
+        [FromQuery] Guid? categoryId = null,
+        CancellationToken ct = default)
+    {
+        var bytes = await exportHandler.HandleAsync(
+            new ExportProductsQuery(isActive, search, categoryId), ct);
+
+        var fileName = $"Produk_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
+        return File(
+            bytes,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            fileName);
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────
