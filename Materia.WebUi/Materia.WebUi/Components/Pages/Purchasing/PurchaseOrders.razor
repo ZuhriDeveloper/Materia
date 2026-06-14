@@ -22,6 +22,7 @@
                 <option value="Confirmed">Dikonfirmasi</option>
                 <option value="PartiallyReceived">Diterima Sebagian</option>
                 <option value="Received">Diterima</option>
+                <option value="Closed">Selesai</option>
                 <option value="Cancelled">Dibatalkan</option>
             </select>
         </div>
@@ -99,6 +100,7 @@ else
         "Confirmed"         => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
         "PartiallyReceived" => (MarkupString)"<span class='badge bg-info text-dark'>Diterima Sebagian</span>",
         "Received"          => (MarkupString)"<span class='badge bg-success'>Diterima</span>",
+        "Closed"            => (MarkupString)"<span class='badge text-bg-dark'>Selesai</span>",
         "Cancelled"         => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
         _                   => (MarkupString)$"<span class='badge bg-secondary'>{status}</span>",
     };

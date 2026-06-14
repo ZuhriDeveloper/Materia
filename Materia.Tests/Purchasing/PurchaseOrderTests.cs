@@ -317,6 +317,110 @@ public class PurchaseOrderTests
         reconstituted.DomainEvents.Should().BeEmpty();
     }
 
+    // ── Short-close ("Selesaikan PO") ─────────────────────────────────────────
+
+    [Fact]
+    public void Close_FromPartiallyReceived_TransitionsToClosedAndSetsReceivedAt()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");   // partial
+        po.ClearDomainEvents();
+
+        po.Close("supplier out of stock", "user1");
+
+        po.Status.Should().Be(PurchaseOrderStatus.Closed);
+        po.ReceivedAt.Should().NotBeNull();
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderClosed>();
+    }
+
+    [Fact]
+    public void Close_WithoutReason_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");
+
+        Action act = () => po.Close("  ", "user1");
+        act.Should().Throw<DomainException>().WithMessage("*reason*");
+    }
+
+    [Fact]
+    public void Close_WhenNothingReceived_ThrowsDomainException()
+    {
+        var po = BuildConfirmedPo();   // Confirmed, no receipts
+
+        Action act = () => po.Close("supplier out of stock", "user1");
+        act.Should().Throw<DomainException>().WithMessage("*partially-received*");
+    }
+
+    [Fact]
+    public void Close_WhenFullyReceived_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 10m)], "warehouse");   // full → Received
+
+        Action act = () => po.Close("too late", "user1");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void RecordReturn_OnClosedPo_Succeeds()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 6m)], "warehouse");
+        po.Close("supplier out of stock", "user1");
+        po.ClearDomainEvents();
+
+        po.RecordReturn([(productId, 2m)], "broken", "warehouse");
+
+        po.Lines[0].NetReceivedQty.Should().Be(4m);
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderReturned>();
+    }
+
+    [Fact]
+    public void Receive_WhenClosed_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");
+        po.Close("supplier out of stock", "user1");
+
+        Action act = () => po.Receive([(productId, 1m)], "warehouse");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Reconstitute_AfterClose_RestoresClosedState()
+    {
+        var productId = AnyProduct;
+        var original = BuildConfirmedPo(productId, orderedQty: 10m);
+        original.Receive([(productId, 4m)], "warehouse");
+        original.Close("supplier out of stock", "user1");
+
+        var reconstituted = PurchaseOrder.Reconstitute(original.DomainEvents);
+
+        reconstituted.Status.Should().Be(PurchaseOrderStatus.Closed);
+        reconstituted.ReceivedAt.Should().NotBeNull();
+    }
+
+    // ── Cancel ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Cancel_WhenPartiallyReceived_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");   // partial → has receipts
+
+        Action act = () => po.Cancel("changed mind", "user1");
+        act.Should().Throw<DomainException>();
+    }
+
     [Fact]
     public void Cancel_FromDraft_TransitionsToCancelled()
     {

@@ -4,7 +4,7 @@ using Materia.Domain.Purchasing.Events;
 
 namespace Materia.Domain.Purchasing;
 
-public enum PurchaseOrderStatus { Draft, Confirmed, PartiallyReceived, Received, Cancelled }
+public enum PurchaseOrderStatus { Draft, Confirmed, PartiallyReceived, Received, Closed, Cancelled }
 
 public sealed class PurchaseOrderLine
 {
@@ -117,7 +117,7 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         IReadOnlyList<(ProductId ProductId, decimal ReceivedQty)> receipts,
         string receivedBy)
     {
-        if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Cancelled)
+        if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Closed or PurchaseOrderStatus.Cancelled)
             throw new DomainException($"PO cannot be received in status: {Status}.");
 
         foreach (var (productId, qty) in receipts)
@@ -141,7 +141,9 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         string reason,
         string returnedBy)
     {
-        if (Status is not (PurchaseOrderStatus.PartiallyReceived or PurchaseOrderStatus.Received))
+        if (Status is not (PurchaseOrderStatus.PartiallyReceived
+                           or PurchaseOrderStatus.Received
+                           or PurchaseOrderStatus.Closed))
             throw new DomainException(
                 $"Only received goods can be returned. Current status: {Status}.");
         if (string.IsNullOrWhiteSpace(reason))
@@ -169,9 +171,23 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
             DateTime.UtcNow));
     }
 
+    public void Close(string reason, string closedBy)
+    {
+        // Short-close: supplier won't ship the rest. Only meaningful once something was received.
+        if (Status != PurchaseOrderStatus.PartiallyReceived)
+            throw new DomainException(
+                $"Only partially-received POs can be closed. Current status: {Status}. " +
+                "Use Cancel for an order with no receipts.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("Close reason is required.");
+
+        Raise(new PurchaseOrderClosed(Id, reason, closedBy, DateTime.UtcNow));
+    }
+
     public void Cancel(string reason, string cancelledBy)
     {
-        if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Cancelled)
+        // Once any goods are received the whole PO can no longer be voided — use Return or Close.
+        if (Status is not (PurchaseOrderStatus.Draft or PurchaseOrderStatus.Confirmed))
             throw new DomainException($"PO cannot be cancelled in status: {Status}.");
         if (string.IsNullOrWhiteSpace(reason))
             throw new DomainException("Cancellation reason is required.");
@@ -223,6 +239,11 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                     var line = _lines.First(l => l.ProductId.Value == ret.ProductId);
                     line.AddReturn(ret.ReturnedQty);
                 }
+                break;
+
+            case PurchaseOrderClosed e:
+                Status = PurchaseOrderStatus.Closed;
+                ReceivedAt = e.OccurredAt;
                 break;
 
             case PurchaseOrderCancelled:

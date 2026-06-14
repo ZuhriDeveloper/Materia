@@ -29,6 +29,7 @@ using Materia.Application.Commands.Inventory.SyncProductCategories;
 using Materia.Application.Commands.Inventory.UpdateColorVariant;
 using Materia.Application.Commands.Inventory.UpdateProduct;
 using Materia.Application.Commands.Purchasing.CancelPurchaseOrder;
+using Materia.Application.Commands.Purchasing.ClosePurchaseOrder;
 using Materia.Application.Commands.Purchasing.ConfirmPurchaseOrder;
 using Materia.Application.Commands.Purchasing.CreatePurchaseOrder;
 using Materia.Application.Commands.Purchasing.ReceivePurchaseOrder;
@@ -124,6 +125,7 @@ public static class DependencyInjection
         services.AddScoped<ConfirmPurchaseOrderCommandHandler>();
         services.AddScoped<ReceivePurchaseOrderCommandHandler>();
         services.AddScoped<RecordPurchaseReturnCommandHandler>();
+        services.AddScoped<ClosePurchaseOrderCommandHandler>();
         services.AddScoped<CancelPurchaseOrderCommandHandler>();
 
         // Purchasing — queries

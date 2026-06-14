@@ -45,6 +45,13 @@ public class PurchaseOrderApiClient(HttpClient http)
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
+    public async Task<string?> CloseAsync(Guid id, string reason, CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync($"api/purchase-orders/{id}/close",
+            new { reason }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
     public async Task<string?> CancelAsync(Guid id, string reason, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync($"api/purchase-orders/{id}/cancel",
