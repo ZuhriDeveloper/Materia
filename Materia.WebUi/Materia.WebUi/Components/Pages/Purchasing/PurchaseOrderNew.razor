@@ -77,12 +77,21 @@
                             <div class="col-12">
                                 <div class="d-flex flex-wrap gap-3 small">
                                     <span>
-                                        Harga beli terkini:
-                                        <span class="fw-semibold text-success">
+                                        Harga list:
+                                        <span class="fw-semibold">
                                             Rp @_lineUnitCost.ToString("N0")
                                         </span>
                                         <span class="text-muted">/ @_lineUnit</span>
                                     </span>
+                                    @if (_lineDiscounts.Count > 0)
+                                    {
+                                        <span>
+                                            Nett (@DiscountInput.Format(_lineDiscounts)):
+                                            <span class="fw-semibold text-success">
+                                                Rp @DiscountInput.ComputeNet(_lineUnitCost, _lineDiscounts).ToString("N0")
+                                            </span>
+                                        </span>
+                                    }
                                     @if (_lineStock is not null)
                                     {
                                         @if (_lineStock.Quantity < 0)
@@ -101,13 +110,22 @@
                                     }
                                 </div>
                             </div>
-                            <div class="col-md-5">
+                            <div class="col-md-4">
                                 <label class="form-label small">Kuantitas (@_lineUnit)</label>
                                 <input type="number" class="form-control form-control-sm"
                                        @bind="_lineQty" min="0.001" step="0.001" placeholder="0" />
                             </div>
-                            <div class="col-md-4 d-flex align-items-end">
-                                <button class="btn btn-sm btn-primary"
+                            <div class="col-md-5">
+                                <label class="form-label small">
+                                    Diskon bertingkat (%)
+                                    <i class="bi bi-info-circle text-muted" title="mis. 12,5+7+5"></i>
+                                </label>
+                                <input type="text" class="form-control form-control-sm"
+                                       @bind="_lineDiscountText" @bind:event="oninput"
+                                       placeholder="mis. 12,5+7+5" />
+                            </div>
+                            <div class="col-md-3 d-flex align-items-end">
+                                <button class="btn btn-sm btn-primary w-100"
                                         @onclick="AddLine"
                                         disabled="@(_lineQty <= 0 || HasLine(_lineProductId))">
                                     <i class="bi bi-plus me-1"></i> Tambah
@@ -150,7 +168,16 @@
                                             <span class="badge text-bg-light border ms-1 small">@line.Unit</span>
                                         </td>
                                         <td class="text-center">@line.Qty.ToString("G29")</td>
-                                        <td class="text-end">Rp @line.UnitCost.ToString("N0")</td>
+                                        <td class="text-end">
+                                            Rp @line.UnitCost.ToString("N0")
+                                            @if (line.HasDiscount)
+                                            {
+                                                <div class="small text-muted">
+                                                    <s>Rp @line.ListUnitCost.ToString("N0")</s>
+                                                    <span class="badge text-bg-light border ms-1">@DiscountInput.Format(line.Discounts)</span>
+                                                </div>
+                                            }
+                                        </td>
                                         <td class="text-end fw-semibold">Rp @((line.Qty * line.UnitCost).ToString("N0"))</td>
                                         <td class="text-end">
                                             <button class="btn btn-xs btn-outline-danger"
@@ -255,7 +282,10 @@
     private decimal  _lineUnitCost;
     private string   _lineUnit = "";
     private decimal  _lineQty;
+    private string   _lineDiscountText = "";
     private StockDto? _lineStock;
+
+    private List<decimal> _lineDiscounts => DiscountInput.Parse(_lineDiscountText);
 
     private readonly List<PoLine> _lines = [];
 
@@ -317,7 +347,7 @@
     {
         if (_lineProductId == Guid.Empty || _lineQty <= 0 || HasLine(_lineProductId)) return;
 
-        _lines.Add(new PoLine(_lineProductId, _lineQty, _lineUnitCost, _lineUnit));
+        _lines.Add(new PoLine(_lineProductId, _lineQty, _lineUnitCost, _lineDiscounts, _lineUnit));
         ResetLineForm();
     }
 
@@ -345,7 +375,10 @@
         _processing = true;
         _error      = null;
 
-        var inputs = _lines.Select(l => new CreatePoLineInput(l.ProductId, l.Qty)).ToList();
+        var inputs = _lines
+            .Select(l => new CreatePoLineInput(
+                l.ProductId, l.Qty, l.Discounts.Count > 0 ? l.Discounts : null))
+            .ToList();
 
         int?            termValue = _isCash ? null : _termValue;
         PaymentTermUnit? termUnit = _isCash ? null : _termUnit;
@@ -364,12 +397,20 @@
 
     private void ResetLineForm()
     {
-        _lineProductId = Guid.Empty;
-        _lineUnitCost  = 0;
-        _lineUnit      = "";
-        _lineQty       = 0;
-        _lineStock     = null;
+        _lineProductId    = Guid.Empty;
+        _lineUnitCost     = 0;
+        _lineUnit         = "";
+        _lineQty          = 0;
+        _lineDiscountText = "";
+        _lineStock        = null;
     }
 
-    private sealed record PoLine(Guid ProductId, decimal Qty, decimal UnitCost, string Unit);
+    private sealed record PoLine(
+        Guid ProductId, decimal Qty, decimal ListUnitCost,
+        IReadOnlyList<decimal> Discounts, string Unit)
+    {
+        /// <summary>Net buy price after the chained discount (mirrors the server).</summary>
+        public decimal UnitCost => DiscountInput.ComputeNet(ListUnitCost, Discounts);
+        public bool HasDiscount => Discounts.Count > 0;
+    }
 }

@@ -26,11 +26,11 @@ public sealed class CreatePurchaseOrderCommandHandler(
         return po.Id.Value;
     }
 
-    private static List<(ProductId, decimal, decimal, string)> BuildLines(
+    private static List<(ProductId, decimal, decimal, IReadOnlyList<decimal>, string)> BuildLines(
         Supplier supplier,
         IReadOnlyList<CreatePurchaseOrderLineInput> inputs)
     {
-        var lines = new List<(ProductId, decimal, decimal, string)>(inputs.Count);
+        var lines = new List<(ProductId, decimal, decimal, IReadOnlyList<decimal>, string)>(inputs.Count);
 
         foreach (var input in inputs)
         {
@@ -42,7 +42,10 @@ public sealed class CreatePurchaseOrderCommandHandler(
                 ?? throw new DomainException(
                     $"No purchase price defined for product {input.ProductId}.");
 
-            lines.Add((ProductId.From(input.ProductId), input.Qty, latestPrice.Amount, latestPrice.Unit));
+            // The catalog price is the list/base cost; the per-line chain (if any) discounts it.
+            lines.Add((
+                ProductId.From(input.ProductId), input.Qty,
+                latestPrice.Amount, input.Discounts ?? [], latestPrice.Unit));
         }
 
         return lines;

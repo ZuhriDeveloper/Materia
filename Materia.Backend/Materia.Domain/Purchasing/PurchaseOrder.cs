@@ -12,7 +12,16 @@ public sealed class PurchaseOrderLine
     public decimal OrderedQty { get; init; }
     public decimal ReceivedQty { get; private set; }
     public decimal ReturnedQty { get; private set; }
+
+    /// <summary>Net buy price (after any chained discount) — the basis for every cost calc.</summary>
     public decimal UnitCost { get; init; }
+
+    /// <summary>List/base buy price before the chained discount. Equals <see cref="UnitCost"/> when no discount.</summary>
+    public decimal ListUnitCost { get; init; }
+
+    /// <summary>The chained trade discount applied to this line (% per level), or empty.</summary>
+    public IReadOnlyList<decimal> Discounts { get; init; } = [];
+
     public string Unit { get; init; } = default!;
 
     /// <summary>Received goods still on hand for this PO — the basis for the amount owed.</summary>
@@ -44,19 +53,42 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         IReadOnlyList<(ProductId ProductId, decimal Qty, decimal UnitCost, string Unit)> lines,
         string createdBy,
         PaymentTerm? paymentTerm = null)
+        => Create(
+            supplierId,
+            lines.Select(l =>
+                (l.ProductId, l.Qty, l.UnitCost, (IReadOnlyList<decimal>)[], l.Unit)).ToList(),
+            createdBy,
+            paymentTerm);
+
+    public static PurchaseOrder Create(
+        SupplierId supplierId,
+        IReadOnlyList<(ProductId ProductId, decimal Qty, decimal ListUnitCost,
+                       IReadOnlyList<decimal> Discounts, string Unit)> lines,
+        string createdBy,
+        PaymentTerm? paymentTerm = null)
     {
         if (lines.Count == 0)
             throw new DomainException("Purchase order must have at least one line.");
         if (lines.Any(l => l.Qty <= 0))
             throw new DomainException("Ordered quantity must be positive.");
-        if (lines.Any(l => l.UnitCost <= 0))
+        if (lines.Any(l => l.ListUnitCost <= 0))
             throw new DomainException("Unit cost must be positive.");
+
+        var lineData = lines.Select(l =>
+        {
+            var net = DiscountChain.ComputeNet(l.ListUnitCost, l.Discounts);
+            if (net <= 0)
+                throw new DomainException("Net unit cost after discount must be positive.");
+
+            return new PurchaseOrderLineData(
+                l.ProductId.Value, l.Qty, net, l.Unit, l.ListUnitCost, l.Discounts);
+        }).ToList();
 
         var po = new PurchaseOrder();
         po.Raise(new PurchaseOrderCreated(
             PurchaseOrderId.New(),
             supplierId,
-            lines.Select(l => new PurchaseOrderLineData(l.ProductId.Value, l.Qty, l.UnitCost, l.Unit)).ToList(),
+            lineData,
             createdBy,
             DateTime.UtcNow,
             paymentTerm?.Value,
@@ -164,6 +196,8 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                     ProductId = ProductId.From(l.ProductId),
                     OrderedQty = l.OrderedQty,
                     UnitCost = l.UnitCost,
+                    ListUnitCost = l.ListUnitCost ?? l.UnitCost,
+                    Discounts = l.Discounts ?? [],
                     Unit = l.Unit,
                 }));
                 break;

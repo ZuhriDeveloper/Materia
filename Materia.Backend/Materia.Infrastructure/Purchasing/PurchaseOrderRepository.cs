@@ -98,6 +98,8 @@ public class PurchaseOrderRepository(AppDbContext context, ICurrentStore current
                 receivedQty = l.ReceivedQty,
                 returnedQty = l.ReturnedQty,
                 unitCost = l.UnitCost,
+                listUnitCost = l.ListUnitCost,
+                discounts = l.Discounts,
                 unit = l.Unit,
             }));
     }

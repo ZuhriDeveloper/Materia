@@ -17,4 +17,9 @@ public record PurchaseOrderLineData(
     Guid ProductId,
     decimal OrderedQty,
     decimal UnitCost,
-    string Unit);
+    string Unit,
+    // Buy price before the per-line chained discount, and the chain itself (% per level).
+    // UnitCost stays the NET. Appended after the original shape — legacy events:
+    // ListUnitCost ?? UnitCost, Discounts ?? [].
+    decimal? ListUnitCost = null,
+    IReadOnlyList<decimal>? Discounts = null);

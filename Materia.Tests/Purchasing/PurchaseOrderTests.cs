@@ -29,7 +29,8 @@ public class PurchaseOrderTests
     [Fact]
     public void Create_WithNoLines_ThrowsDomainException()
     {
-        Action act = () => PurchaseOrder.Create(AnySupplier, [], "user1");
+        var noLines = new List<(ProductId ProductId, decimal Qty, decimal UnitCost, string Unit)>();
+        Action act = () => PurchaseOrder.Create(AnySupplier, noLines, "user1");
         act.Should().Throw<DomainException>().WithMessage("*at least one line*");
     }
 
@@ -127,6 +128,65 @@ public class PurchaseOrderTests
 
         Action act = () => po.Receive([(productId, 1m)], "warehouse");
         act.Should().Throw<DomainException>();
+    }
+
+    // ── Per-line chained discount ─────────────────────────────────────────────
+
+    [Fact]
+    public void Create_WithLineDiscounts_StoresNetUnitCostAndChain()
+    {
+        var productId = AnyProduct;
+        var po = PurchaseOrder.Create(
+            AnySupplier,
+            [(productId, 10m, 100_000m, (IReadOnlyList<decimal>)[12.5m, 7m, 5m], "pcs")],
+            "user1");
+
+        var line = po.Lines.Should().ContainSingle().Subject;
+        line.ListUnitCost.Should().Be(100_000m);
+        line.UnitCost.Should().Be(77_306.25m);   // net after 12.5+7+5
+        line.Discounts.Should().Equal(12.5m, 7m, 5m);
+
+        var evt = po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderCreated>().Subject;
+        evt.Lines[0].UnitCost.Should().Be(77_306.25m);
+        evt.Lines[0].ListUnitCost.Should().Be(100_000m);
+        evt.Lines[0].Discounts.Should().Equal(12.5m, 7m, 5m);
+    }
+
+    [Fact]
+    public void Create_FlatOverload_LeavesListEqualToNetAndNoDiscounts()
+    {
+        var po = PurchaseOrder.Create(AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1");
+
+        var line = po.Lines[0];
+        line.UnitCost.Should().Be(50_000m);
+        line.ListUnitCost.Should().Be(50_000m);
+        line.Discounts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Create_WithDiscounts_NetFlowsIntoReconstitutedLine()
+    {
+        var productId = AnyProduct;
+        var original = PurchaseOrder.Create(
+            AnySupplier,
+            [(productId, 4m, 100_000m, (IReadOnlyList<decimal>)[12.5m, 7m, 5m], "pcs")],
+            "user1");
+
+        var reconstituted = PurchaseOrder.Reconstitute(original.DomainEvents);
+
+        reconstituted.Lines[0].UnitCost.Should().Be(77_306.25m);
+        reconstituted.Lines[0].Discounts.Should().Equal(12.5m, 7m, 5m);
+    }
+
+    [Fact]
+    public void Create_WithDiscountOutOfRange_ThrowsDomainException()
+    {
+        Action act = () => PurchaseOrder.Create(
+            AnySupplier,
+            [(AnyProduct, 1m, 100_000m, (IReadOnlyList<decimal>)[120m], "pcs")],
+            "user1");
+        act.Should().Throw<DomainException>().WithMessage("*between 0 and 100*");
     }
 
     // ── Payment tenor ─────────────────────────────────────────────────────────

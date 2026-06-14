@@ -96,7 +96,16 @@ else
                                             <span class="text-muted small">(sisa @remaining.ToString("G29"))</span>
                                         }
                                     </td>
-                                    <td class="text-end">Rp @line.UnitCost.ToString("N0")</td>
+                                    <td class="text-end">
+                                        Rp @line.UnitCost.ToString("N0")
+                                        @if (line.HasDiscount)
+                                        {
+                                            <div class="small text-muted">
+                                                <s>Rp @line.ListUnitCost.ToString("N0")</s>
+                                                <span class="badge text-bg-light border ms-1">@DiscountInput.Format(line.Discounts)</span>
+                                            </div>
+                                        }
+                                    </td>
                                     <td class="text-end fw-semibold">
                                         Rp @((line.OrderedQty * line.UnitCost).ToString("N0"))
                                     </td>
