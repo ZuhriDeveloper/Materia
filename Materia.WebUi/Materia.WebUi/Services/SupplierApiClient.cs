@@ -11,10 +11,11 @@ public class SupplierApiClient(HttpClient http)
         => http.GetFromJsonAsync<SupplierDto>($"api/suppliers/{id}", ct);
 
     public async Task<(Guid? Id, string? Error)> RegisterAsync(
-        string name, string? contactPhone, CancellationToken ct = default)
+        string name, string? contactPhone, string? description,
+        string? salesmanName, string? salesmanPhone, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/suppliers",
-            new { name, contactPhone }, ct);
+            new { name, contactPhone, description, salesmanName, salesmanPhone }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
         var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);
@@ -22,10 +23,11 @@ public class SupplierApiClient(HttpClient http)
     }
 
     public async Task<string?> UpdateAsync(
-        Guid id, string name, string? contactPhone, CancellationToken ct = default)
+        Guid id, string name, string? contactPhone, string? description,
+        string? salesmanName, string? salesmanPhone, CancellationToken ct = default)
     {
         var response = await http.PutAsJsonAsync($"api/suppliers/{id}",
-            new { name, contactPhone }, ct);
+            new { name, contactPhone, description, salesmanName, salesmanPhone }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

@@ -8,6 +8,9 @@ public sealed class Supplier : AggregateRoot<SupplierId>
 {
     public string Name { get; private set; } = default!;
     public string? ContactPhone { get; private set; }
+    public string? Description { get; private set; }
+    public string? SalesmanName { get; private set; }
+    public string? SalesmanPhone { get; private set; }
     public bool IsActive { get; private set; }
 
     private readonly Dictionary<Guid, SupplierCatalogEntry> _catalog = [];
@@ -17,14 +20,21 @@ public sealed class Supplier : AggregateRoot<SupplierId>
 
     // ── Factories ─────────────────────────────────────────────────────────────
 
-    public static Supplier Register(string name, string? contactPhone, string createdBy)
+    public static Supplier Register(
+        string name,
+        string? contactPhone,
+        string? description,
+        string? salesmanName,
+        string? salesmanPhone,
+        string createdBy)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("Supplier name is required.");
 
         var supplier = new Supplier();
         supplier.Raise(new SupplierRegistered(
-            SupplierId.New(), name, contactPhone, createdBy, DateTime.UtcNow));
+            SupplierId.New(), name, contactPhone, description, salesmanName, salesmanPhone,
+            createdBy, DateTime.UtcNow));
         return supplier;
     }
 
@@ -37,12 +47,20 @@ public sealed class Supplier : AggregateRoot<SupplierId>
 
     // ── Commands ──────────────────────────────────────────────────────────────
 
-    public void Update(string name, string? contactPhone, string updatedBy)
+    public void Update(
+        string name,
+        string? contactPhone,
+        string? description,
+        string? salesmanName,
+        string? salesmanPhone,
+        string updatedBy)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new DomainException("Supplier name is required.");
 
-        Raise(new SupplierUpdated(Id, name, contactPhone, updatedBy, DateTime.UtcNow));
+        Raise(new SupplierUpdated(
+            Id, name, contactPhone, description, salesmanName, salesmanPhone,
+            updatedBy, DateTime.UtcNow));
     }
 
     public void SetPurchasePrice(ProductId productId, PurchasePrice price, string updatedBy)
@@ -77,12 +95,18 @@ public sealed class Supplier : AggregateRoot<SupplierId>
                 Id = e.SupplierId;
                 Name = e.Name;
                 ContactPhone = e.ContactPhone;
+                Description = e.Description;
+                SalesmanName = e.SalesmanName;
+                SalesmanPhone = e.SalesmanPhone;
                 IsActive = true;
                 break;
 
             case SupplierUpdated e:
                 Name = e.Name;
                 ContactPhone = e.ContactPhone;
+                Description = e.Description;
+                SalesmanName = e.SalesmanName;
+                SalesmanPhone = e.SalesmanPhone;
                 break;
 
             case SupplierPurchasePriceSet e:

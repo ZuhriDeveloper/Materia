@@ -66,6 +66,26 @@ else
                                        disabled="@(!_supplier.IsActive)" />
                             <ValidationMessage For="() => _editForm.ContactPhone" class="small text-danger" />
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label">Deskripsi</label>
+                            <InputTextArea class="form-control" rows="3" @bind-Value="_editForm.Description"
+                                           disabled="@(!_supplier.IsActive)" />
+                            <ValidationMessage For="() => _editForm.Description" class="small text-danger" />
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Sales</label>
+                                <InputText class="form-control" @bind-Value="_editForm.SalesmanName"
+                                           disabled="@(!_supplier.IsActive)" />
+                                <ValidationMessage For="() => _editForm.SalesmanName" class="small text-danger" />
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Telepon Sales</label>
+                                <InputText class="form-control" @bind-Value="_editForm.SalesmanPhone"
+                                           disabled="@(!_supplier.IsActive)" />
+                                <ValidationMessage For="() => _editForm.SalesmanPhone" class="small text-danger" />
+                            </div>
+                        </div>
                         @if (_supplier.IsActive)
                         {
                             <button type="submit" class="btn btn-primary btn-sm" disabled="@_saving">
@@ -265,8 +285,11 @@ else
     {
         _supplier = await Api.GetSupplierByIdAsync(Id);
         if (_supplier is null) { Navigation.NavigateTo("/suppliers"); return; }
-        _editForm.Name         = _supplier.Name;
-        _editForm.ContactPhone = _supplier.ContactPhone;
+        _editForm.Name          = _supplier.Name;
+        _editForm.ContactPhone  = _supplier.ContactPhone;
+        _editForm.Description    = _supplier.Description;
+        _editForm.SalesmanName  = _supplier.SalesmanName;
+        _editForm.SalesmanPhone = _supplier.SalesmanPhone;
         await EnsureCatalogNamesAsync();
     }
 
@@ -329,7 +352,10 @@ else
         _error  = null;
         var error = await Api.UpdateAsync(
             Id, _editForm.Name,
-            string.IsNullOrWhiteSpace(_editForm.ContactPhone) ? null : _editForm.ContactPhone);
+            string.IsNullOrWhiteSpace(_editForm.ContactPhone) ? null : _editForm.ContactPhone,
+            string.IsNullOrWhiteSpace(_editForm.Description) ? null : _editForm.Description,
+            string.IsNullOrWhiteSpace(_editForm.SalesmanName) ? null : _editForm.SalesmanName,
+            string.IsNullOrWhiteSpace(_editForm.SalesmanPhone) ? null : _editForm.SalesmanPhone);
         _saving = false;
         if (error is not null) { _error = error; return; }
         _notice = "Data pemasok berhasil diperbarui.";
@@ -376,6 +402,15 @@ else
 
         [MaxLength(50)]
         public string? ContactPhone { get; set; }
+
+        [MaxLength(1000)]
+        public string? Description { get; set; }
+
+        [MaxLength(200)]
+        public string? SalesmanName { get; set; }
+
+        [MaxLength(50)]
+        public string? SalesmanPhone { get; set; }
     }
 
     private sealed class PriceForm_

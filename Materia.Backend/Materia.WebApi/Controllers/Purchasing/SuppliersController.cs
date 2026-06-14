@@ -53,7 +53,9 @@ public class SuppliersController(
     public async Task<IActionResult> Register(
         [FromBody] RegisterSupplierRequest request, CancellationToken ct)
     {
-        var command    = new RegisterSupplierCommand(request.Name, request.ContactPhone, CurrentUser);
+        var command    = new RegisterSupplierCommand(
+            request.Name, request.ContactPhone, request.Description,
+            request.SalesmanName, request.SalesmanPhone, CurrentUser);
         var validation = await registerValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -66,7 +68,9 @@ public class SuppliersController(
     public async Task<IActionResult> Update(
         Guid id, [FromBody] UpdateSupplierRequest request, CancellationToken ct)
     {
-        var command    = new UpdateSupplierCommand(id, request.Name, request.ContactPhone, CurrentUser);
+        var command    = new UpdateSupplierCommand(
+            id, request.Name, request.ContactPhone, request.Description,
+            request.SalesmanName, request.SalesmanPhone, CurrentUser);
         var validation = await updateValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
@@ -100,8 +104,12 @@ public class SuppliersController(
     }
 }
 
-public record RegisterSupplierRequest(string Name, string? ContactPhone);
-public record UpdateSupplierRequest(string Name, string? ContactPhone);
+public record RegisterSupplierRequest(
+    string Name, string? ContactPhone, string? Description,
+    string? SalesmanName, string? SalesmanPhone);
+public record UpdateSupplierRequest(
+    string Name, string? ContactPhone, string? Description,
+    string? SalesmanName, string? SalesmanPhone);
 public record SetStatusRequest(bool IsActive);
 public record SetPurchasePriceRequest(
     Guid      ProductId,

@@ -6,5 +6,8 @@ public record SupplierRegistered(
     SupplierId SupplierId,
     string Name,
     string? ContactPhone,
+    string? Description,
+    string? SalesmanName,
+    string? SalesmanPhone,
     string CreatedBy,
     DateTime OccurredAt) : IDomainEvent;

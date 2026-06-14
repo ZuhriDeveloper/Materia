@@ -11,7 +11,9 @@ public sealed class UpdateSupplierCommandHandler(ISupplierRepository repository)
         var supplier = await repository.GetByIdAsync(SupplierId.From(command.SupplierId), ct)
             ?? throw new DomainException($"Supplier {command.SupplierId} not found.");
 
-        supplier.Update(command.Name, command.ContactPhone, command.UpdatedBy);
+        supplier.Update(
+            command.Name, command.ContactPhone, command.Description,
+            command.SalesmanName, command.SalesmanPhone, command.UpdatedBy);
         await repository.SaveAsync(supplier, ct);
     }
 }

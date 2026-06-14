@@ -57,6 +57,9 @@ public class SupplierQueryRepository(AppDbContext context) : ISupplierQueryRepos
             row.Id,
             row.Name,
             row.ContactPhone,
+            row.Description,
+            row.SalesmanName,
+            row.SalesmanPhone,
             row.IsActive,
             catalog.Select(e => new SupplierCatalogEntryDto(
                 e.ProductId,

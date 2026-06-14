@@ -7,7 +7,9 @@ public sealed class RegisterSupplierCommandHandler(ISupplierRepository repositor
 {
     public async Task<Guid> HandleAsync(RegisterSupplierCommand command, CancellationToken ct = default)
     {
-        var supplier = Supplier.Register(command.Name, command.ContactPhone, command.CreatedBy);
+        var supplier = Supplier.Register(
+            command.Name, command.ContactPhone, command.Description,
+            command.SalesmanName, command.SalesmanPhone, command.CreatedBy);
         await repository.SaveAsync(supplier, ct);
         return supplier.Id.Value;
     }

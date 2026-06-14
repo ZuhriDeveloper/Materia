@@ -42,6 +42,8 @@ else
                     <tr>
                         <th>Nama</th>
                         <th>Telepon</th>
+                        <th>Deskripsi</th>
+                        <th>Sales</th>
                         <th class="text-center">Produk Dipasok</th>
                         <th>Status</th>
                         <th class="text-end">Aksi</th>
@@ -53,6 +55,31 @@ else
                         <tr>
                             <td class="fw-semibold">@s.Name</td>
                             <td class="text-muted">@(string.IsNullOrEmpty(s.ContactPhone) ? "—" : s.ContactPhone)</td>
+                            <td class="text-muted">
+                                @if (string.IsNullOrEmpty(s.Description))
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    <span class="d-inline-block text-truncate" style="max-width:240px"
+                                          title="@s.Description">@s.Description</span>
+                                }
+                            </td>
+                            <td class="text-muted">
+                                @if (string.IsNullOrEmpty(s.SalesmanName) && string.IsNullOrEmpty(s.SalesmanPhone))
+                                {
+                                    <span>—</span>
+                                }
+                                else
+                                {
+                                    <div>@(string.IsNullOrEmpty(s.SalesmanName) ? "—" : s.SalesmanName)</div>
+                                    @if (!string.IsNullOrEmpty(s.SalesmanPhone))
+                                    {
+                                        <div class="small"><i class="bi bi-telephone me-1"></i>@s.SalesmanPhone</div>
+                                    }
+                                }
+                            </td>
                             <td class="text-center">
                                 <span class="badge text-bg-light border">@s.Catalog.Count</span>
                             </td>

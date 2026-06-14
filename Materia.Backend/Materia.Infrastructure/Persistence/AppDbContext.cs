@@ -163,6 +163,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
             e.HasKey(x => x.Id);
             e.Property(x => x.Name).HasMaxLength(200).IsRequired();
             e.Property(x => x.ContactPhone).HasMaxLength(50);
+            e.Property(x => x.Description).HasMaxLength(1000);
+            e.Property(x => x.SalesmanName).HasMaxLength(200);
+            e.Property(x => x.SalesmanPhone).HasMaxLength(50);
             e.Property(x => x.CatalogJson).HasColumnType("jsonb");
             e.HasIndex(x => x.Name);
             e.HasIndex(x => x.IsActive);
