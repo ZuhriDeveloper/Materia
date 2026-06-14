@@ -20,17 +20,18 @@ public sealed class CreatePurchaseOrderCommandHandler(
         var lines = BuildLines(supplier, command.Lines);
         var paymentTerm = PaymentTerm.FromRaw(command.PaymentTermValue, command.PaymentTermUnit);
         var po = PurchaseOrder.Create(
-            SupplierId.From(command.SupplierId), lines, command.CreatedBy, paymentTerm);
+            SupplierId.From(command.SupplierId), lines, command.CreatedBy, paymentTerm,
+            command.UpdateCatalogOnReceipt);
 
         await poRepository.SaveAsync(po, ct);
         return po.Id.Value;
     }
 
-    private static List<(ProductId, decimal, decimal, string)> BuildLines(
+    private static List<(ProductId, decimal, decimal, IReadOnlyList<decimal>, string)> BuildLines(
         Supplier supplier,
         IReadOnlyList<CreatePurchaseOrderLineInput> inputs)
     {
-        var lines = new List<(ProductId, decimal, decimal, string)>(inputs.Count);
+        var lines = new List<(ProductId, decimal, decimal, IReadOnlyList<decimal>, string)>(inputs.Count);
 
         foreach (var input in inputs)
         {
@@ -42,7 +43,12 @@ public sealed class CreatePurchaseOrderCommandHandler(
                 ?? throw new DomainException(
                     $"No purchase price defined for product {input.ProductId}.");
 
-            lines.Add((ProductId.From(input.ProductId), input.Qty, latestPrice.Amount, latestPrice.Unit));
+            // The catalog price is the default list/base cost; the admin may override it per line,
+            // and the per-line chain (if any) discounts it down to the net.
+            var listUnitCost = input.ListUnitCost ?? latestPrice.Amount;
+            lines.Add((
+                ProductId.From(input.ProductId), input.Qty,
+                listUnitCost, input.Discounts ?? [], latestPrice.Unit));
         }
 
         return lines;

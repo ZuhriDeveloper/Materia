@@ -29,7 +29,8 @@ public class PurchaseOrderTests
     [Fact]
     public void Create_WithNoLines_ThrowsDomainException()
     {
-        Action act = () => PurchaseOrder.Create(AnySupplier, [], "user1");
+        var noLines = new List<(ProductId ProductId, decimal Qty, decimal UnitCost, string Unit)>();
+        Action act = () => PurchaseOrder.Create(AnySupplier, noLines, "user1");
         act.Should().Throw<DomainException>().WithMessage("*at least one line*");
     }
 
@@ -127,6 +128,100 @@ public class PurchaseOrderTests
 
         Action act = () => po.Receive([(productId, 1m)], "warehouse");
         act.Should().Throw<DomainException>();
+    }
+
+    // ── Per-line chained discount ─────────────────────────────────────────────
+
+    [Fact]
+    public void Create_WithLineDiscounts_StoresNetUnitCostAndChain()
+    {
+        var productId = AnyProduct;
+        var po = PurchaseOrder.Create(
+            AnySupplier,
+            [(productId, 10m, 100_000m, (IReadOnlyList<decimal>)[12.5m, 7m, 5m], "pcs")],
+            "user1");
+
+        var line = po.Lines.Should().ContainSingle().Subject;
+        line.ListUnitCost.Should().Be(100_000m);
+        line.UnitCost.Should().Be(77_306.25m);   // net after 12.5+7+5
+        line.Discounts.Should().Equal(12.5m, 7m, 5m);
+
+        var evt = po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderCreated>().Subject;
+        evt.Lines[0].UnitCost.Should().Be(77_306.25m);
+        evt.Lines[0].ListUnitCost.Should().Be(100_000m);
+        evt.Lines[0].Discounts.Should().Equal(12.5m, 7m, 5m);
+    }
+
+    [Fact]
+    public void Create_FlatOverload_LeavesListEqualToNetAndNoDiscounts()
+    {
+        var po = PurchaseOrder.Create(AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1");
+
+        var line = po.Lines[0];
+        line.UnitCost.Should().Be(50_000m);
+        line.ListUnitCost.Should().Be(50_000m);
+        line.Discounts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Create_WithDiscounts_NetFlowsIntoReconstitutedLine()
+    {
+        var productId = AnyProduct;
+        var original = PurchaseOrder.Create(
+            AnySupplier,
+            [(productId, 4m, 100_000m, (IReadOnlyList<decimal>)[12.5m, 7m, 5m], "pcs")],
+            "user1");
+
+        var reconstituted = PurchaseOrder.Reconstitute(original.DomainEvents);
+
+        reconstituted.Lines[0].UnitCost.Should().Be(77_306.25m);
+        reconstituted.Lines[0].Discounts.Should().Equal(12.5m, 7m, 5m);
+    }
+
+    [Fact]
+    public void Create_WithEditedListUnitCost_UsesItForNet()
+    {
+        var productId = AnyProduct;
+        var po = PurchaseOrder.Create(
+            AnySupplier,
+            [(productId, 5m, 110_000m, (IReadOnlyList<decimal>)[], "pcs")],
+            "user1");
+
+        po.Lines[0].ListUnitCost.Should().Be(110_000m);
+        po.Lines[0].UnitCost.Should().Be(110_000m);   // no discount → net == list
+    }
+
+    // ── Update-catalog-on-receipt flag ────────────────────────────────────────
+
+    [Fact]
+    public void Create_WithUpdateCatalogOnReceipt_StoresFlagAndRaisesItOnEvent()
+    {
+        var po = PurchaseOrder.Create(
+            AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1",
+            paymentTerm: null, updateCatalogOnReceipt: true);
+
+        po.UpdateCatalogOnReceipt.Should().BeTrue();
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderCreated>()
+            .Which.UpdateCatalogOnReceipt.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_DefaultsUpdateCatalogOnReceiptToFalse()
+    {
+        var po = PurchaseOrder.Create(AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1");
+        po.UpdateCatalogOnReceipt.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_WithDiscountOutOfRange_ThrowsDomainException()
+    {
+        Action act = () => PurchaseOrder.Create(
+            AnySupplier,
+            [(AnyProduct, 1m, 100_000m, (IReadOnlyList<decimal>)[120m], "pcs")],
+            "user1");
+        act.Should().Throw<DomainException>().WithMessage("*between 0 and 100*");
     }
 
     // ── Payment tenor ─────────────────────────────────────────────────────────
@@ -255,6 +350,110 @@ public class PurchaseOrderTests
         reconstituted.PaymentTerm.Should().Be(new PaymentTerm(1, PaymentTermUnit.Weeks));
         reconstituted.Lines[0].NetReceivedQty.Should().Be(6m);
         reconstituted.DomainEvents.Should().BeEmpty();
+    }
+
+    // ── Short-close ("Selesaikan PO") ─────────────────────────────────────────
+
+    [Fact]
+    public void Close_FromPartiallyReceived_TransitionsToClosedAndSetsReceivedAt()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");   // partial
+        po.ClearDomainEvents();
+
+        po.Close("supplier out of stock", "user1");
+
+        po.Status.Should().Be(PurchaseOrderStatus.Closed);
+        po.ReceivedAt.Should().NotBeNull();
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderClosed>();
+    }
+
+    [Fact]
+    public void Close_WithoutReason_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");
+
+        Action act = () => po.Close("  ", "user1");
+        act.Should().Throw<DomainException>().WithMessage("*reason*");
+    }
+
+    [Fact]
+    public void Close_WhenNothingReceived_ThrowsDomainException()
+    {
+        var po = BuildConfirmedPo();   // Confirmed, no receipts
+
+        Action act = () => po.Close("supplier out of stock", "user1");
+        act.Should().Throw<DomainException>().WithMessage("*partially-received*");
+    }
+
+    [Fact]
+    public void Close_WhenFullyReceived_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 10m)], "warehouse");   // full → Received
+
+        Action act = () => po.Close("too late", "user1");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void RecordReturn_OnClosedPo_Succeeds()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 6m)], "warehouse");
+        po.Close("supplier out of stock", "user1");
+        po.ClearDomainEvents();
+
+        po.RecordReturn([(productId, 2m)], "broken", "warehouse");
+
+        po.Lines[0].NetReceivedQty.Should().Be(4m);
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderReturned>();
+    }
+
+    [Fact]
+    public void Receive_WhenClosed_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");
+        po.Close("supplier out of stock", "user1");
+
+        Action act = () => po.Receive([(productId, 1m)], "warehouse");
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Reconstitute_AfterClose_RestoresClosedState()
+    {
+        var productId = AnyProduct;
+        var original = BuildConfirmedPo(productId, orderedQty: 10m);
+        original.Receive([(productId, 4m)], "warehouse");
+        original.Close("supplier out of stock", "user1");
+
+        var reconstituted = PurchaseOrder.Reconstitute(original.DomainEvents);
+
+        reconstituted.Status.Should().Be(PurchaseOrderStatus.Closed);
+        reconstituted.ReceivedAt.Should().NotBeNull();
+    }
+
+    // ── Cancel ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Cancel_WhenPartiallyReceived_ThrowsDomainException()
+    {
+        var productId = AnyProduct;
+        var po = BuildConfirmedPo(productId, orderedQty: 10m);
+        po.Receive([(productId, 4m)], "warehouse");   // partial → has receipts
+
+        Action act = () => po.Cancel("changed mind", "user1");
+        act.Should().Throw<DomainException>();
     }
 
     [Fact]

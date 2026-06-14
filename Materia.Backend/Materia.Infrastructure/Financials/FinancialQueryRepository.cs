@@ -28,7 +28,7 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
         // COGS — received purchase orders in the period (supplier cost)
         var posRaw = await context.PurchaseOrderReadModels
             .AsNoTracking()
-            .Where(p => p.Status == "Received"
+            .Where(p => (p.Status == "Received" || p.Status == "Closed")
                      && p.ReceivedAt.HasValue
                      && p.ReceivedAt.Value >= from
                      && p.ReceivedAt.Value <= to)
@@ -94,7 +94,7 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
         // Outflows — received purchase orders (cash paid to suppliers)
         var posRaw = await context.PurchaseOrderReadModels
             .AsNoTracking()
-            .Where(p => p.Status == "Received"
+            .Where(p => (p.Status == "Received" || p.Status == "Closed")
                      && p.ReceivedAt.HasValue
                      && p.ReceivedAt.Value >= from
                      && p.ReceivedAt.Value <= to)

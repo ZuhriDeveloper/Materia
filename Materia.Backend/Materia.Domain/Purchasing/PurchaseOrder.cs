@@ -4,7 +4,7 @@ using Materia.Domain.Purchasing.Events;
 
 namespace Materia.Domain.Purchasing;
 
-public enum PurchaseOrderStatus { Draft, Confirmed, PartiallyReceived, Received, Cancelled }
+public enum PurchaseOrderStatus { Draft, Confirmed, PartiallyReceived, Received, Closed, Cancelled }
 
 public sealed class PurchaseOrderLine
 {
@@ -12,7 +12,16 @@ public sealed class PurchaseOrderLine
     public decimal OrderedQty { get; init; }
     public decimal ReceivedQty { get; private set; }
     public decimal ReturnedQty { get; private set; }
+
+    /// <summary>Net buy price (after any chained discount) — the basis for every cost calc.</summary>
     public decimal UnitCost { get; init; }
+
+    /// <summary>List/base buy price before the chained discount. Equals <see cref="UnitCost"/> when no discount.</summary>
+    public decimal ListUnitCost { get; init; }
+
+    /// <summary>The chained trade discount applied to this line (% per level), or empty.</summary>
+    public IReadOnlyList<decimal> Discounts { get; init; } = [];
+
     public string Unit { get; init; } = default!;
 
     /// <summary>Received goods still on hand for this PO — the basis for the amount owed.</summary>
@@ -32,6 +41,9 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
     /// <summary>Term of payment (tempo). Null = cash / no tempo.</summary>
     public PaymentTerm? PaymentTerm { get; private set; }
 
+    /// <summary>When true, receiving goods updates the supplier catalog list price for each product.</summary>
+    public bool UpdateCatalogOnReceipt { get; private set; }
+
     private readonly List<PurchaseOrderLine> _lines = [];
     public IReadOnlyList<PurchaseOrderLine> Lines => _lines.AsReadOnly();
 
@@ -43,24 +55,51 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         SupplierId supplierId,
         IReadOnlyList<(ProductId ProductId, decimal Qty, decimal UnitCost, string Unit)> lines,
         string createdBy,
-        PaymentTerm? paymentTerm = null)
+        PaymentTerm? paymentTerm = null,
+        bool updateCatalogOnReceipt = false)
+        => Create(
+            supplierId,
+            lines.Select(l =>
+                (l.ProductId, l.Qty, l.UnitCost, (IReadOnlyList<decimal>)[], l.Unit)).ToList(),
+            createdBy,
+            paymentTerm,
+            updateCatalogOnReceipt);
+
+    public static PurchaseOrder Create(
+        SupplierId supplierId,
+        IReadOnlyList<(ProductId ProductId, decimal Qty, decimal ListUnitCost,
+                       IReadOnlyList<decimal> Discounts, string Unit)> lines,
+        string createdBy,
+        PaymentTerm? paymentTerm = null,
+        bool updateCatalogOnReceipt = false)
     {
         if (lines.Count == 0)
             throw new DomainException("Purchase order must have at least one line.");
         if (lines.Any(l => l.Qty <= 0))
             throw new DomainException("Ordered quantity must be positive.");
-        if (lines.Any(l => l.UnitCost <= 0))
+        if (lines.Any(l => l.ListUnitCost <= 0))
             throw new DomainException("Unit cost must be positive.");
+
+        var lineData = lines.Select(l =>
+        {
+            var net = DiscountChain.ComputeNet(l.ListUnitCost, l.Discounts);
+            if (net <= 0)
+                throw new DomainException("Net unit cost after discount must be positive.");
+
+            return new PurchaseOrderLineData(
+                l.ProductId.Value, l.Qty, net, l.Unit, l.ListUnitCost, l.Discounts);
+        }).ToList();
 
         var po = new PurchaseOrder();
         po.Raise(new PurchaseOrderCreated(
             PurchaseOrderId.New(),
             supplierId,
-            lines.Select(l => new PurchaseOrderLineData(l.ProductId.Value, l.Qty, l.UnitCost, l.Unit)).ToList(),
+            lineData,
             createdBy,
             DateTime.UtcNow,
             paymentTerm?.Value,
-            paymentTerm?.Unit.ToString()));
+            paymentTerm?.Unit.ToString(),
+            updateCatalogOnReceipt));
         return po;
     }
 
@@ -85,7 +124,7 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         IReadOnlyList<(ProductId ProductId, decimal ReceivedQty)> receipts,
         string receivedBy)
     {
-        if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Cancelled)
+        if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Closed or PurchaseOrderStatus.Cancelled)
             throw new DomainException($"PO cannot be received in status: {Status}.");
 
         foreach (var (productId, qty) in receipts)
@@ -109,7 +148,9 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         string reason,
         string returnedBy)
     {
-        if (Status is not (PurchaseOrderStatus.PartiallyReceived or PurchaseOrderStatus.Received))
+        if (Status is not (PurchaseOrderStatus.PartiallyReceived
+                           or PurchaseOrderStatus.Received
+                           or PurchaseOrderStatus.Closed))
             throw new DomainException(
                 $"Only received goods can be returned. Current status: {Status}.");
         if (string.IsNullOrWhiteSpace(reason))
@@ -137,9 +178,23 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
             DateTime.UtcNow));
     }
 
+    public void Close(string reason, string closedBy)
+    {
+        // Short-close: supplier won't ship the rest. Only meaningful once something was received.
+        if (Status != PurchaseOrderStatus.PartiallyReceived)
+            throw new DomainException(
+                $"Only partially-received POs can be closed. Current status: {Status}. " +
+                "Use Cancel for an order with no receipts.");
+        if (string.IsNullOrWhiteSpace(reason))
+            throw new DomainException("Close reason is required.");
+
+        Raise(new PurchaseOrderClosed(Id, reason, closedBy, DateTime.UtcNow));
+    }
+
     public void Cancel(string reason, string cancelledBy)
     {
-        if (Status is PurchaseOrderStatus.Received or PurchaseOrderStatus.Cancelled)
+        // Once any goods are received the whole PO can no longer be voided — use Return or Close.
+        if (Status is not (PurchaseOrderStatus.Draft or PurchaseOrderStatus.Confirmed))
             throw new DomainException($"PO cannot be cancelled in status: {Status}.");
         if (string.IsNullOrWhiteSpace(reason))
             throw new DomainException("Cancellation reason is required.");
@@ -159,11 +214,14 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                 Status = PurchaseOrderStatus.Draft;
                 CreatedAt = e.OccurredAt;
                 PaymentTerm = PaymentTerm.FromRaw(e.PaymentTermValue, e.PaymentTermUnit);
+                UpdateCatalogOnReceipt = e.UpdateCatalogOnReceipt;
                 _lines.AddRange(e.Lines.Select(l => new PurchaseOrderLine
                 {
                     ProductId = ProductId.From(l.ProductId),
                     OrderedQty = l.OrderedQty,
                     UnitCost = l.UnitCost,
+                    ListUnitCost = l.ListUnitCost ?? l.UnitCost,
+                    Discounts = l.Discounts ?? [],
                     Unit = l.Unit,
                 }));
                 break;
@@ -189,6 +247,11 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                     var line = _lines.First(l => l.ProductId.Value == ret.ProductId);
                     line.AddReturn(ret.ReturnedQty);
                 }
+                break;
+
+            case PurchaseOrderClosed e:
+                Status = PurchaseOrderStatus.Closed;
+                ReceivedAt = e.OccurredAt;
                 break;
 
             case PurchaseOrderCancelled:

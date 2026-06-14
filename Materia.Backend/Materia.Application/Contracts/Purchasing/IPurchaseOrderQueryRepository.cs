@@ -26,4 +26,6 @@ public record PurchaseOrderLineDto(
     decimal ReceivedQty,
     decimal ReturnedQty,
     decimal UnitCost,
-    string Unit);
+    string Unit,
+    decimal ListUnitCost,
+    IReadOnlyList<decimal> Discounts);

@@ -96,7 +96,16 @@ else
                                             <span class="text-muted small">(sisa @remaining.ToString("G29"))</span>
                                         }
                                     </td>
-                                    <td class="text-end">Rp @line.UnitCost.ToString("N0")</td>
+                                    <td class="text-end">
+                                        Rp @line.UnitCost.ToString("N0")
+                                        @if (line.HasDiscount)
+                                        {
+                                            <div class="small text-muted">
+                                                <s>Rp @line.ListUnitCost.ToString("N0")</s>
+                                                <span class="badge text-bg-light border ms-1">@DiscountInput.Format(line.Discounts)</span>
+                                            </div>
+                                        }
+                                    </td>
                                     <td class="text-end fw-semibold">
                                         Rp @((line.OrderedQty * line.UnitCost).ToString("N0"))
                                     </td>
@@ -220,7 +229,7 @@ else
 
                         @if (_po.ReceivedAt.HasValue)
                         {
-                            <dt class="col-5 text-muted fw-normal">Diterima</dt>
+                            <dt class="col-5 text-muted fw-normal">@(_po.Status == "Closed" ? "Ditutup" : "Diterima")</dt>
                             <dd class="col-7">@_po.ReceivedAt.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")</dd>
                         }
 
@@ -271,7 +280,13 @@ else
                                 <i class="bi bi-box-arrow-up me-1"></i> Retur / Koreksi Barang
                             </button>
                         }
-                        @if (CanAct)
+                        @if (CanClose)
+                        {
+                            <button class="btn btn-sm btn-outline-dark" @onclick="ToggleCloseForm" disabled="@_saving">
+                                <i class="bi bi-check2-all me-1"></i> Selesaikan PO
+                            </button>
+                        }
+                        @if (CanCancel)
                         {
                             <button class="btn btn-sm btn-outline-danger" @onclick="ToggleCancelForm" disabled="@_saving">
                                 <i class="bi bi-x-circle me-1"></i> Batalkan Order
@@ -280,6 +295,30 @@ else
                     </div>
                 }
             </div>
+
+            @if (_showCloseForm)
+            {
+                <div class="card mt-3 border-dark">
+                    <div class="card-header fw-semibold">Selesaikan PO</div>
+                    <div class="card-body">
+                        <p class="small text-muted mb-2">
+                            Sisa item yang belum dikirim pemasok dianggap selesai. Stok dan nilai terutang
+                            hanya untuk barang yang sudah diterima.
+                        </p>
+                        <label class="form-label small">Alasan <span class="text-danger">*</span></label>
+                        <textarea class="form-control form-control-sm mb-2" rows="2"
+                                  @bind="_closeReason" placeholder="cth. Stok pemasok habis"></textarea>
+                        <div class="d-flex gap-2 justify-content-end">
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    @onclick="ToggleCloseForm" disabled="@_saving">Batal</button>
+                            <button class="btn btn-sm btn-dark" @onclick="HandleClose"
+                                    disabled="@(_saving || string.IsNullOrWhiteSpace(_closeReason))">
+                                Ya, Selesaikan
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            }
 
             @if (_showCancelForm)
             {
@@ -314,7 +353,9 @@ else
     private bool _receiving;
     private bool _returning;
     private bool _showCancelForm;
+    private bool _showCloseForm;
     private string _cancelReason = "";
+    private string _closeReason = "";
     private string _returnReason = "";
     private readonly Dictionary<Guid, decimal> _receiptQty = [];
     private readonly Dictionary<Guid, decimal> _returnQty  = [];
@@ -326,7 +367,9 @@ else
     private decimal Total => _po?.Lines.Sum(l => l.OrderedQty * l.UnitCost) ?? 0;
     private decimal NetOwed => _po?.Lines.Sum(l => l.NetReceivedQty * l.UnitCost) ?? 0;
     private bool CanAct => _po is not null && _po.Status is "Draft" or "Confirmed" or "PartiallyReceived";
-    private bool CanReturn => _po is not null && _po.Status is "PartiallyReceived" or "Received";
+    private bool CanCancel => _po is not null && _po.Status is "Draft" or "Confirmed";
+    private bool CanClose => _po is not null && _po.Status is "PartiallyReceived";
+    private bool CanReturn => _po is not null && _po.Status is "PartiallyReceived" or "Received" or "Closed";
     private bool HasReceiptQty => _receiptQty.Values.Any(q => q > 0);
     private bool HasReturnQty => _returnQty.Values.Any(q => q > 0);
 
@@ -361,6 +404,7 @@ else
         _receiving = true;
         _returning = false;
         _showCancelForm = false;
+        _showCloseForm = false;
         _receiptQty.Clear();
         foreach (var line in _po!.Lines)
         {
@@ -400,6 +444,7 @@ else
         _returning = true;
         _receiving = false;
         _showCancelForm = false;
+        _showCloseForm = false;
         _returnReason = "";
         _returnQty.Clear();
         foreach (var line in _po!.Lines)
@@ -440,9 +485,28 @@ else
         await LoadAsync();
     }
 
+    private void ToggleCloseForm()
+    {
+        _showCloseForm = !_showCloseForm;
+        _showCancelForm = false;
+        _closeReason = "";
+    }
+
+    private async Task HandleClose()
+    {
+        _saving = true; _error = null;
+        var error = await PoApi.CloseAsync(Id, _closeReason);
+        _saving = false;
+        if (error is not null) { _error = error; return; }
+        _showCloseForm = false;
+        _notice = "PO berhasil diselesaikan. Sisa item yang belum dikirim ditutup.";
+        await LoadAsync();
+    }
+
     private void ToggleCancelForm()
     {
         _showCancelForm = !_showCancelForm;
+        _showCloseForm = false;
         _cancelReason = "";
     }
 
@@ -491,6 +555,7 @@ else
         "Confirmed"         => (MarkupString)"<span class='badge bg-primary'>Dikonfirmasi</span>",
         "PartiallyReceived" => (MarkupString)"<span class='badge bg-info text-dark'>Diterima Sebagian</span>",
         "Received"          => (MarkupString)"<span class='badge bg-success'>Diterima</span>",
+        "Closed"            => (MarkupString)"<span class='badge text-bg-dark'>Selesai</span>",
         "Cancelled"         => (MarkupString)"<span class='badge bg-danger'>Dibatalkan</span>",
         _                   => (MarkupString)$"<span class='badge bg-secondary'>{status}</span>",
     };

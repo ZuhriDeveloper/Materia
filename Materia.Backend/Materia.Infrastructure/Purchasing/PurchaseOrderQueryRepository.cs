@@ -39,7 +39,8 @@ public class PurchaseOrderQueryRepository(AppDbContext context) : IPurchaseOrder
             row.SupplierName,
             row.Status,
             lines.Select(l => new PurchaseOrderLineDto(
-                l.ProductId, null, l.OrderedQty, l.ReceivedQty, l.ReturnedQty, l.UnitCost, l.Unit))
+                l.ProductId, null, l.OrderedQty, l.ReceivedQty, l.ReturnedQty, l.UnitCost, l.Unit,
+                l.ListUnitCost ?? l.UnitCost, l.Discounts ?? []))
                 .ToList(),
             row.CreatedBy,
             row.CreatedAt,
@@ -55,5 +56,7 @@ public class PurchaseOrderQueryRepository(AppDbContext context) : IPurchaseOrder
         decimal ReceivedQty,
         decimal ReturnedQty,
         decimal UnitCost,
-        string Unit);
+        string Unit,
+        decimal? ListUnitCost = null,
+        IReadOnlyList<decimal>? Discounts = null);
 }

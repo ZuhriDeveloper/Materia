@@ -73,6 +73,7 @@ public static class EventTypeRegistry
         [nameof(PurchaseOrderConfirmed)] = typeof(PurchaseOrderConfirmed),
         [nameof(PurchaseOrderReceived)]  = typeof(PurchaseOrderReceived),
         [nameof(PurchaseOrderReturned)]  = typeof(PurchaseOrderReturned),
+        [nameof(PurchaseOrderClosed)]    = typeof(PurchaseOrderClosed),
         [nameof(PurchaseOrderCancelled)] = typeof(PurchaseOrderCancelled),
 
         // Sale events
