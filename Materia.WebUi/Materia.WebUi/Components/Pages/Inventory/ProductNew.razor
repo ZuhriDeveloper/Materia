@@ -38,7 +38,7 @@
             <div class="row g-3 mb-3">
                 <div class="col-sm-6">
                     <label class="form-label">Harga Jual (Rp)</label>
-                    <InputNumber class="form-control" @bind-Value="_form.SalePrice" min="0" step="100" />
+                    <InputNumber class="form-control" @bind-Value="_form.SalePrice" min="1" step="any" />
                     <div class="form-text">Harga default saat produk dipilih di kasir.</div>
                     <ValidationMessage For="() => _form.SalePrice" class="small text-danger" />
                 </div>
@@ -181,7 +181,7 @@
         [System.ComponentModel.DataAnnotations.MaxLength(50)]
         public string BaseUnit { get; set; } = string.Empty;
 
-        [System.ComponentModel.DataAnnotations.Range(0, double.MaxValue, ErrorMessage = "Harga jual tidak boleh negatif.")]
+        [System.ComponentModel.DataAnnotations.Range(0.01, double.MaxValue, ErrorMessage = "Harga jual harus lebih dari 0.")]
         public decimal SalePrice { get; set; }
 
         [System.ComponentModel.DataAnnotations.MaxLength(100)]
