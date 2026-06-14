@@ -131,7 +131,7 @@ public class PurchaseOrdersController(
     {
         var command = new CreatePurchaseOrderCommand(
             request.SupplierId, request.Lines, CurrentUser,
-            request.PaymentTermValue, request.PaymentTermUnit);
+            request.PaymentTermValue, request.PaymentTermUnit, request.UpdateCatalogOnReceipt);
 
         var validation = await createValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
@@ -209,7 +209,8 @@ public record CreatePurchaseOrderRequest(
     Guid SupplierId,
     IReadOnlyList<CreatePurchaseOrderLineInput> Lines,
     int? PaymentTermValue = null,
-    string? PaymentTermUnit = null);
+    string? PaymentTermUnit = null,
+    bool UpdateCatalogOnReceipt = false);
 
 public record ReceivePurchaseOrderRequest(
     IReadOnlyList<ReceivePurchaseOrderLineInput> Lines);

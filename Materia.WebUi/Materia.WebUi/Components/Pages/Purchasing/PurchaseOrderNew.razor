@@ -75,14 +75,7 @@
                         @if (_lineProductId != Guid.Empty)
                         {
                             <div class="col-12">
-                                <div class="d-flex flex-wrap gap-3 small">
-                                    <span>
-                                        Harga list:
-                                        <span class="fw-semibold">
-                                            Rp @_lineUnitCost.ToString("N0")
-                                        </span>
-                                        <span class="text-muted">/ @_lineUnit</span>
-                                    </span>
+                                <div class="d-flex flex-wrap gap-3 small align-items-center">
                                     @if (_lineDiscounts.Count > 0)
                                     {
                                         <span>
@@ -90,6 +83,7 @@
                                             <span class="fw-semibold text-success">
                                                 Rp @DiscountInput.ComputeNet(_lineUnitCost, _lineDiscounts).ToString("N0")
                                             </span>
+                                            <span class="text-muted">/ @_lineUnit</span>
                                         </span>
                                     }
                                     @if (_lineStock is not null)
@@ -111,11 +105,16 @@
                                 </div>
                             </div>
                             <div class="col-md-4">
+                                <label class="form-label small">Harga list (Rp) / @_lineUnit</label>
+                                <input type="number" class="form-control form-control-sm"
+                                       @bind="_lineUnitCost" @bind:event="oninput" min="0" step="100" placeholder="0" />
+                            </div>
+                            <div class="col-md-4">
                                 <label class="form-label small">Kuantitas (@_lineUnit)</label>
                                 <input type="number" class="form-control form-control-sm"
                                        @bind="_lineQty" min="0.001" step="0.001" placeholder="0" />
                             </div>
-                            <div class="col-md-5">
+                            <div class="col-md-4">
                                 <label class="form-label small">
                                     Diskon bertingkat (%)
                                     <i class="bi bi-info-circle text-muted" title="mis. 12,5+7+5"></i>
@@ -124,10 +123,10 @@
                                        @bind="_lineDiscountText" @bind:event="oninput"
                                        placeholder="mis. 12,5+7+5" />
                             </div>
-                            <div class="col-md-3 d-flex align-items-end">
-                                <button class="btn btn-sm btn-primary w-100"
+                            <div class="col-12 d-flex justify-content-end">
+                                <button class="btn btn-sm btn-primary"
                                         @onclick="AddLine"
-                                        disabled="@(_lineQty <= 0 || HasLine(_lineProductId))">
+                                        disabled="@(_lineQty <= 0 || _lineUnitCost <= 0 || HasLine(_lineProductId))">
                                     <i class="bi bi-plus me-1"></i> Tambah
                                 </button>
                             </div>
@@ -214,8 +213,20 @@
                 </table>
 
                 <p class="small text-muted">
-                    Harga beli dikunci dari harga katalog terkini pemasok saat order dibuat.
+                    Harga list terisi otomatis dari katalog pemasok dan bisa diubah saat order dibuat.
                 </p>
+
+                @* ── Sinkron harga katalog ── *@
+                <div class="form-check form-switch mb-3">
+                    <input class="form-check-input" type="checkbox" id="syncCatalog"
+                           @bind="_updateCatalogOnReceipt" />
+                    <label class="form-check-label small" for="syncCatalog">
+                        Perbarui harga katalog saat barang diterima
+                    </label>
+                    <div class="small text-muted">
+                        Harga list pemasok diperbarui ke harga di order ini ketika barang diterima.
+                    </div>
+                </div>
 
                 @* ── Termin pembayaran (tempo) ── *@
                 <div class="border-top pt-3 mb-3">
@@ -288,6 +299,9 @@
     private List<decimal> _lineDiscounts => DiscountInput.Parse(_lineDiscountText);
 
     private readonly List<PoLine> _lines = [];
+
+    // Sync the (possibly edited) list price back to the supplier catalog on receipt.
+    private bool _updateCatalogOnReceipt = true;
 
     // Payment tenor (tempo). Cash = no tempo.
     private bool            _isCash   = true;
@@ -377,12 +391,15 @@
 
         var inputs = _lines
             .Select(l => new CreatePoLineInput(
-                l.ProductId, l.Qty, l.Discounts.Count > 0 ? l.Discounts : null))
+                l.ProductId, l.Qty,
+                l.Discounts.Count > 0 ? l.Discounts : null,
+                l.ListUnitCost))
             .ToList();
 
         int?            termValue = _isCash ? null : _termValue;
         PaymentTermUnit? termUnit = _isCash ? null : _termUnit;
-        var (id, error) = await PoApi.CreateAsync(_selectedSupplier.Id, inputs, termValue, termUnit);
+        var (id, error) = await PoApi.CreateAsync(
+            _selectedSupplier.Id, inputs, termValue, termUnit, _updateCatalogOnReceipt);
 
         _processing = false;
         if (error is not null) { _error = error; return; }

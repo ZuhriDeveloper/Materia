@@ -70,6 +70,8 @@ public record PurchaseOrderDto(
 // ── Request payloads ───────────────────────────────────────────────────────
 
 public record CreatePoLineInput(
-    Guid ProductId, decimal Qty, IReadOnlyList<decimal>? Discounts = null);
+    Guid ProductId, decimal Qty,
+    IReadOnlyList<decimal>? Discounts = null,
+    decimal? ListUnitCost = null);
 public record ReceivePoLineInput(Guid ProductId, decimal ReceivedQty);
 public record ReturnPoLineInput(Guid ProductId, decimal ReturnedQty);

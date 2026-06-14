@@ -8,7 +8,8 @@ namespace Materia.Application.Commands.Purchasing.ReceivePurchaseOrder;
 
 public sealed class ReceivePurchaseOrderCommandHandler(
     IPurchaseOrderRepository poRepository,
-    IStockRepository stockRepository)
+    IStockRepository stockRepository,
+    ISupplierRepository supplierRepository)
 {
     public async Task HandleAsync(ReceivePurchaseOrderCommand command, CancellationToken ct = default)
     {
@@ -23,6 +24,9 @@ public sealed class ReceivePurchaseOrderCommandHandler(
         await poRepository.SaveAsync(po, ct);
 
         await ReconcileStocksAsync(po, command, ct);
+
+        if (po.UpdateCatalogOnReceipt)
+            await SyncCatalogPricesAsync(po, command, ct);
     }
 
     private async Task ReconcileStocksAsync(
@@ -47,5 +51,40 @@ public sealed class ReceivePurchaseOrderCommandHandler(
 
             await stockRepository.SaveAsync(stock, ct);
         }
+    }
+
+    /// <summary>
+    /// Writes each received line's list price back to the supplier catalog so the next PO starts
+    /// from the latest price. Best-effort: skipped for an inactive/missing supplier, and only
+    /// written when the price actually differs from the current catalog price.
+    /// </summary>
+    private async Task SyncCatalogPricesAsync(
+        PurchaseOrder po,
+        ReceivePurchaseOrderCommand command,
+        CancellationToken ct)
+    {
+        var supplier = await supplierRepository.GetByIdAsync(po.SupplierId, ct);
+        if (supplier is null || !supplier.IsActive)
+            return;
+
+        foreach (var input in command.Lines)
+        {
+            var productId = ProductId.From(input.ProductId);
+            var line = po.Lines.First(l => l.ProductId == productId);
+
+            var latest = supplier.Catalog.TryGetValue(productId.Value, out var entry)
+                ? entry.LatestPrice
+                : null;
+
+            if (latest is not null && latest.Amount == line.ListUnitCost)
+                continue;   // no change — don't add a duplicate price-history entry
+
+            supplier.SetPurchasePrice(
+                productId,
+                new PurchasePrice(line.ListUnitCost, latest?.Currency ?? "IDR", line.Unit, DateTime.UtcNow),
+                command.ReceivedBy);
+        }
+
+        await supplierRepository.SaveAsync(supplier, ct);
     }
 }

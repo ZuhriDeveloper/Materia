@@ -27,6 +27,12 @@ public sealed class CreatePurchaseOrderCommandValidator : AbstractValidator<Crea
                 .InclusiveBetween(0m, 99.999999m)
                 .WithMessage("Each discount must be between 0 and 100 percent.")
                 .When(l => l.Discounts is not null);
+
+            // Optional list-price override: must be positive when provided.
+            line.RuleFor(l => l.ListUnitCost!.Value)
+                .GreaterThan(0)
+                .WithMessage("Buy price must be greater than 0.")
+                .When(l => l.ListUnitCost is not null);
         });
 
         // Payment tenor is optional (null = cash); when supplied it must be valid and complete.

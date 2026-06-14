@@ -11,7 +11,10 @@ public record PurchaseOrderCreated(
     // Payment tenor (tempo). Null = cash / no tempo. Appended after the original
     // shape — legacy stored events deserialise these as null.
     int? PaymentTermValue = null,
-    string? PaymentTermUnit = null) : IDomainEvent;
+    string? PaymentTermUnit = null,
+    // When true, receiving goods writes the line's list price back to the supplier
+    // catalog. Appended optional — legacy events deserialise as false.
+    bool UpdateCatalogOnReceipt = false) : IDomainEvent;
 
 public record PurchaseOrderLineData(
     Guid ProductId,

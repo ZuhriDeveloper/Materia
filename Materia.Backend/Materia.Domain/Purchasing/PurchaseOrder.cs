@@ -41,6 +41,9 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
     /// <summary>Term of payment (tempo). Null = cash / no tempo.</summary>
     public PaymentTerm? PaymentTerm { get; private set; }
 
+    /// <summary>When true, receiving goods updates the supplier catalog list price for each product.</summary>
+    public bool UpdateCatalogOnReceipt { get; private set; }
+
     private readonly List<PurchaseOrderLine> _lines = [];
     public IReadOnlyList<PurchaseOrderLine> Lines => _lines.AsReadOnly();
 
@@ -52,20 +55,23 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
         SupplierId supplierId,
         IReadOnlyList<(ProductId ProductId, decimal Qty, decimal UnitCost, string Unit)> lines,
         string createdBy,
-        PaymentTerm? paymentTerm = null)
+        PaymentTerm? paymentTerm = null,
+        bool updateCatalogOnReceipt = false)
         => Create(
             supplierId,
             lines.Select(l =>
                 (l.ProductId, l.Qty, l.UnitCost, (IReadOnlyList<decimal>)[], l.Unit)).ToList(),
             createdBy,
-            paymentTerm);
+            paymentTerm,
+            updateCatalogOnReceipt);
 
     public static PurchaseOrder Create(
         SupplierId supplierId,
         IReadOnlyList<(ProductId ProductId, decimal Qty, decimal ListUnitCost,
                        IReadOnlyList<decimal> Discounts, string Unit)> lines,
         string createdBy,
-        PaymentTerm? paymentTerm = null)
+        PaymentTerm? paymentTerm = null,
+        bool updateCatalogOnReceipt = false)
     {
         if (lines.Count == 0)
             throw new DomainException("Purchase order must have at least one line.");
@@ -92,7 +98,8 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
             createdBy,
             DateTime.UtcNow,
             paymentTerm?.Value,
-            paymentTerm?.Unit.ToString()));
+            paymentTerm?.Unit.ToString(),
+            updateCatalogOnReceipt));
         return po;
     }
 
@@ -207,6 +214,7 @@ public sealed class PurchaseOrder : AggregateRoot<PurchaseOrderId>
                 Status = PurchaseOrderStatus.Draft;
                 CreatedAt = e.OccurredAt;
                 PaymentTerm = PaymentTerm.FromRaw(e.PaymentTermValue, e.PaymentTermUnit);
+                UpdateCatalogOnReceipt = e.UpdateCatalogOnReceipt;
                 _lines.AddRange(e.Lines.Select(l => new PurchaseOrderLine
                 {
                     ProductId = ProductId.From(l.ProductId),

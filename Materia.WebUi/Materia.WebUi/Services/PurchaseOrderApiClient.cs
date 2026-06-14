@@ -13,10 +13,12 @@ public class PurchaseOrderApiClient(HttpClient http)
     public async Task<(Guid? Id, string? Error)> CreateAsync(
         Guid supplierId, IReadOnlyList<CreatePoLineInput> lines,
         int? paymentTermValue = null, PaymentTermUnit? paymentTermUnit = null,
+        bool updateCatalogOnReceipt = false,
         CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync("api/purchase-orders",
-            new { supplierId, lines, paymentTermValue, paymentTermUnit = paymentTermUnit?.ToString() }, ct);
+            new { supplierId, lines, paymentTermValue, paymentTermUnit = paymentTermUnit?.ToString(),
+                  updateCatalogOnReceipt }, ct);
         if (!response.IsSuccessStatusCode)
             return (null, await ReadErrorAsync(response));
         var result = await response.Content.ReadFromJsonAsync<IdResponse>(cancellationToken: ct);

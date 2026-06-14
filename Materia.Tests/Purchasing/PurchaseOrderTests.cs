@@ -180,6 +180,41 @@ public class PurchaseOrderTests
     }
 
     [Fact]
+    public void Create_WithEditedListUnitCost_UsesItForNet()
+    {
+        var productId = AnyProduct;
+        var po = PurchaseOrder.Create(
+            AnySupplier,
+            [(productId, 5m, 110_000m, (IReadOnlyList<decimal>)[], "pcs")],
+            "user1");
+
+        po.Lines[0].ListUnitCost.Should().Be(110_000m);
+        po.Lines[0].UnitCost.Should().Be(110_000m);   // no discount → net == list
+    }
+
+    // ── Update-catalog-on-receipt flag ────────────────────────────────────────
+
+    [Fact]
+    public void Create_WithUpdateCatalogOnReceipt_StoresFlagAndRaisesItOnEvent()
+    {
+        var po = PurchaseOrder.Create(
+            AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1",
+            paymentTerm: null, updateCatalogOnReceipt: true);
+
+        po.UpdateCatalogOnReceipt.Should().BeTrue();
+        po.DomainEvents.Should().ContainSingle()
+            .Which.Should().BeOfType<PurchaseOrderCreated>()
+            .Which.UpdateCatalogOnReceipt.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Create_DefaultsUpdateCatalogOnReceiptToFalse()
+    {
+        var po = PurchaseOrder.Create(AnySupplier, [(AnyProduct, 10m, 50_000m, "pcs")], "user1");
+        po.UpdateCatalogOnReceipt.Should().BeFalse();
+    }
+
+    [Fact]
     public void Create_WithDiscountOutOfRange_ThrowsDomainException()
     {
         Action act = () => PurchaseOrder.Create(
