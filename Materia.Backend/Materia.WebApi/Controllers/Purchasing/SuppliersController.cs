@@ -18,7 +18,7 @@ public class SuppliersController(
     UpdateSupplierCommandHandler          updateHandler,
     SetSupplierStatusCommandHandler       statusHandler,
     SetPurchasePriceCommandHandler        priceHandler,
-    GetSuppliersQueryHandler              getSuppliersHandler,
+    GetSuppliersPagedQueryHandler         getSuppliersPagedHandler,
     GetSupplierByIdQueryHandler           getByIdHandler,
     IValidator<RegisterSupplierCommand>   registerValidator,
     IValidator<UpdateSupplierCommand>     updateValidator,
@@ -33,10 +33,14 @@ public class SuppliersController(
 
     [HttpGet]
     public async Task<IActionResult> GetAll(
-        [FromQuery] bool activeOnly = false,
+        [FromQuery] string? search     = null,
+        [FromQuery] bool    activeOnly = false,
+        [FromQuery] int     page       = 1,
+        [FromQuery] int     pageSize   = 20,
         CancellationToken ct = default)
     {
-        var result = await getSuppliersHandler.HandleAsync(activeOnly, ct);
+        var result = await getSuppliersPagedHandler.HandleAsync(
+            new GetSuppliersPagedQuery(search, activeOnly, page, pageSize), ct);
         return Ok(result);
     }
 

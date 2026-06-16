@@ -1,3 +1,5 @@
+using Materia.Application.DTOs.Inventory;
+
 namespace Materia.Application.Contracts.Purchasing;
 
 public interface ISupplierQueryRepository
@@ -5,6 +7,8 @@ public interface ISupplierQueryRepository
     Task<IReadOnlyList<SupplierDto>> GetAllAsync(bool activeOnly, CancellationToken ct = default);
     Task<SupplierDto?> GetByIdAsync(Guid supplierId, CancellationToken ct = default);
     Task<SupplierBestPriceResult?> GetBestPriceForProductAsync(Guid productId, CancellationToken ct = default);
+    Task<PagedResult<SupplierDto>> SearchAsync(
+        string? search, bool activeOnly, int page, int pageSize, CancellationToken ct = default);
 }
 
 public record SupplierDto(

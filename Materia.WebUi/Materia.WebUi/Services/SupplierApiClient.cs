@@ -4,8 +4,18 @@ namespace Materia.WebUi.Services;
 
 public class SupplierApiClient(HttpClient http)
 {
-    public Task<List<SupplierDto>?> GetSuppliersAsync(bool activeOnly = false, CancellationToken ct = default)
-        => http.GetFromJsonAsync<List<SupplierDto>>($"api/suppliers?activeOnly={activeOnly}", ct);
+    public Task<PagedResult<SupplierDto>?> GetSuppliersAsync(
+        string? search     = null,
+        bool    activeOnly = false,
+        int     page       = 1,
+        int     pageSize   = 20,
+        CancellationToken ct = default)
+    {
+        var url = $"api/suppliers?activeOnly={activeOnly}&page={page}&pageSize={pageSize}";
+        if (!string.IsNullOrWhiteSpace(search))
+            url += $"&search={Uri.EscapeDataString(search)}";
+        return http.GetFromJsonAsync<PagedResult<SupplierDto>>(url, ct);
+    }
 
     public Task<SupplierDto?> GetSupplierByIdAsync(Guid id, CancellationToken ct = default)
         => http.GetFromJsonAsync<SupplierDto>($"api/suppliers/{id}", ct);

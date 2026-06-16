@@ -326,7 +326,7 @@
     protected override async Task OnInitializedAsync()
     {
         var productsTask  = InventoryApi.GetProductsAsync(pageSize: 500, isActive: true);
-        _suppliers = await SupplierApi.GetSuppliersAsync(activeOnly: true) ?? [];
+        _suppliers = (await SupplierApi.GetSuppliersAsync(activeOnly: true, pageSize: 500))?.Items ?? [];
         _products  = (await productsTask)?.Items ?? [];
     }
 

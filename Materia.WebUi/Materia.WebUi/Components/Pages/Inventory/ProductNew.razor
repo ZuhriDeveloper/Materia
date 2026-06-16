@@ -196,7 +196,7 @@
     {
         var categoriesTask = Api.GetCategoriesAsync();
         var unitsTask = Api.GetUnitsAsync();
-        var suppliersTask = SupplierApi.GetSuppliersAsync(activeOnly: true);
+        var suppliersTask = SupplierApi.GetSuppliersAsync(activeOnly: true, pageSize: 500);
 
         _categories = (await categoriesTask)
             ?.Where(c => c.IsActive)
@@ -208,7 +208,7 @@
             .OrderBy(u => u.Name)
             .ToList() ?? [];
 
-        _suppliers = (await suppliersTask) ?? [];
+        _suppliers = (await suppliersTask)?.Items ?? [];
     }
 
     private void ToggleCategory(Guid id, bool selected)
