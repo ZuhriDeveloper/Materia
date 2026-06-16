@@ -3,6 +3,7 @@
 @rendermode InteractiveServer
 @using Materia.WebUi.Services
 @inject SupplierApiClient Api
+@implements IDisposable
 
 <PageTitle>Pemasok — Materia</PageTitle>
 
@@ -15,9 +16,13 @@
 
 <div class="card mb-3">
     <div class="card-body py-2">
-        <div class="d-flex gap-2 align-items-center">
+        <div class="d-flex gap-2 align-items-center flex-wrap">
+            <input class="form-control form-control-sm" style="max-width:260px"
+                   placeholder="Cari nama atau telepon…"
+                   value="@_searchInput"
+                   @oninput="OnSearchInput" />
             <select class="form-select form-select-sm" style="width:auto"
-                    @bind="_activeFilter" @bind:after="LoadAsync">
+                    @bind="_activeFilter" @bind:after="ResetAndLoad">
                 <option value="">Semua Status</option>
                 <option value="true">Aktif</option>
             </select>
@@ -25,11 +30,11 @@
     </div>
 </div>
 
-@if (_suppliers is null)
+@if (_result is null)
 {
     <div class="text-muted"><span class="spinner-border spinner-border-sm me-1"></span> Memuat…</div>
 }
-else if (_suppliers.Count == 0)
+else if (_result.Items.Count == 0)
 {
     <div class="alert alert-info">Belum ada pemasok.</div>
 }
@@ -50,7 +55,7 @@ else
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach (var s in _suppliers)
+                    @foreach (var s in _result.Items)
                     {
                         <tr>
                             <td class="fw-semibold">@s.Name</td>
@@ -104,14 +109,88 @@ else
             </table>
         </div>
     </div>
+
+    <div class="d-flex justify-content-between align-items-center mt-3">
+        <small class="text-muted">
+            @{
+                var from = (_currentPage - 1) * _pageSize + 1;
+                var to   = Math.Min(_currentPage * _pageSize, _result.TotalCount);
+            }
+            Menampilkan @from–@to dari @_result.TotalCount pemasok
+        </small>
+        <nav>
+            <ul class="pagination pagination-sm mb-0">
+                <li class="page-item @(_currentPage <= 1 ? "disabled" : "")">
+                    <button class="page-link" @onclick="PrevPage" disabled="@(_currentPage <= 1)">
+                        &laquo;
+                    </button>
+                </li>
+                @for (var p = 1; p <= _result.TotalPages; p++)
+                {
+                    var pageNum = p;
+                    <li class="page-item @(pageNum == _currentPage ? "active" : "")">
+                        <button class="page-link" @onclick="() => GoToPage(pageNum)">@pageNum</button>
+                    </li>
+                }
+                <li class="page-item @(_currentPage >= _result.TotalPages ? "disabled" : "")">
+                    <button class="page-link" @onclick="NextPage" disabled="@(_currentPage >= _result.TotalPages)">
+                        &raquo;
+                    </button>
+                </li>
+            </ul>
+        </nav>
+    </div>
 }
 
 @code {
-    private List<SupplierDto>? _suppliers;
+    private PagedResult<SupplierDto>? _result;
     private string _activeFilter = "";
+    private string _searchInput  = "";
+    private int    _currentPage  = 1;
+    private const int _pageSize  = 20;
+
+    private Timer? _debounce;
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
+    private void OnSearchInput(ChangeEventArgs e)
+    {
+        _searchInput = e.Value?.ToString() ?? "";
+        _debounce?.Dispose();
+        _debounce = new Timer(_ => InvokeAsync(ResetAndLoad), null, 300, Timeout.Infinite);
+    }
+
+    private async Task ResetAndLoad()
+    {
+        _currentPage = 1;
+        await LoadAsync();
+        StateHasChanged();
+    }
+
     private async Task LoadAsync()
-        => _suppliers = await Api.GetSuppliersAsync(activeOnly: _activeFilter == "true");
+    {
+        _result = await Api.GetSuppliersAsync(
+            search:     string.IsNullOrWhiteSpace(_searchInput) ? null : _searchInput.Trim(),
+            activeOnly: _activeFilter == "true",
+            page:       _currentPage,
+            pageSize:   _pageSize);
+    }
+
+    private async Task PrevPage()
+    {
+        if (_currentPage > 1) { _currentPage--; await LoadAsync(); }
+    }
+
+    private async Task NextPage()
+    {
+        if (_result is not null && _currentPage < _result.TotalPages) { _currentPage++; await LoadAsync(); }
+    }
+
+    private async Task GoToPage(int page)
+    {
+        _currentPage = page;
+        await LoadAsync();
+    }
+
+    public void Dispose() => _debounce?.Dispose();
 }

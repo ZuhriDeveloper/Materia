@@ -484,12 +484,12 @@
 
     private async Task LoadLookupsAsync()
     {
-        var suppliersTask  = SupplierApi.GetSuppliersAsync(activeOnly: true);
+        var suppliersTask  = SupplierApi.GetSuppliersAsync(activeOnly: true, pageSize: 500);
         var productsTask   = InventoryApi.GetProductsAsync(pageSize: 500, isActive: true);
         var unitsTask      = InventoryApi.GetUnitsAsync();
         var categoriesTask = InventoryApi.GetCategoriesAsync();
 
-        _allSuppliers = (await suppliersTask)?.OrderBy(s => s.Name).ToList() ?? [];
+        _allSuppliers = (await suppliersTask)?.Items.OrderBy(s => s.Name).ToList() ?? [];
         _allProducts  = (await productsTask)?.Items.OrderBy(p => p.Name).ToList() ?? [];
         _units        = (await unitsTask)?.Where(u => u.IsActive).OrderBy(u => u.Name).ToList() ?? [];
         _categories   = (await categoriesTask)?.Where(c => c.IsActive).OrderBy(c => c.Name).ToList() ?? [];
@@ -550,7 +550,7 @@
         _supplier.MatchedName = _supplier.CreateName.Trim();
         _supplier.Mode        = "";
 
-        _allSuppliers = (await SupplierApi.GetSuppliersAsync(activeOnly: true))?.OrderBy(s => s.Name).ToList() ?? _allSuppliers;
+        _allSuppliers = (await SupplierApi.GetSuppliersAsync(activeOnly: true, pageSize: 500))?.Items.OrderBy(s => s.Name).ToList() ?? _allSuppliers;
     }
 
     // ── Line (product) actions ──────────────────────────────────────────────

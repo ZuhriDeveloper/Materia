@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Materia.Application.Contracts.Purchasing;
+using Materia.Application.DTOs.Inventory;
 using Materia.Infrastructure.Persistence;
 using Materia.Infrastructure.Persistence.Projections;
 using Microsoft.EntityFrameworkCore;
@@ -15,6 +16,30 @@ public class SupplierQueryRepository(AppDbContext context) : ISupplierQueryRepos
 
         var rows = await query.OrderBy(s => s.Name).ToListAsync(ct);
         return rows.Select(MapToDto).ToList();
+    }
+
+    public async Task<PagedResult<SupplierDto>> SearchAsync(
+        string? search, bool activeOnly, int page, int pageSize, CancellationToken ct = default)
+    {
+        var query = context.SupplierReadModels.AsNoTracking();
+
+        if (activeOnly)
+            query = query.Where(s => s.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(search))
+            query = query.Where(s =>
+                EF.Functions.ILike(s.Name, $"%{search}%") ||
+                (s.ContactPhone != null && EF.Functions.ILike(s.ContactPhone, $"%{search}%")));
+
+        var total = await query.CountAsync(ct);
+
+        var rows = await query
+            .OrderBy(s => s.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync(ct);
+
+        return new PagedResult<SupplierDto>(rows.Select(MapToDto).ToList(), total, page, pageSize);
     }
 
     public async Task<SupplierDto?> GetByIdAsync(Guid supplierId, CancellationToken ct = default)

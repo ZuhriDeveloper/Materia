@@ -9,7 +9,7 @@ var pgPassword = builder.AddParameter("postgres-password", "YYYjzk}ppk*CUP.65!X}
 
 var postgres = builder.AddPostgres("postgres", password: pgPassword)
     .WithDataVolume()
-    .WithHostPort(54049)
+    .WithHostPort(54050)
     .WithLifetime(ContainerLifetime.Persistent);
 
 var materiadb = postgres.AddDatabase("materiadb");

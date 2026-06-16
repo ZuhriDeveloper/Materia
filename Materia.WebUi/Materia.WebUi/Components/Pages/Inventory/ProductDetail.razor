@@ -669,7 +669,7 @@ else
         _availableCategories = allCats.Where(c => c.IsActive && !assignedIds.Contains(c.Id)).ToList();
 
         _stock = await Api.GetStockByProductIdAsync(Id);
-        _suppliers = await SupplierApi.GetSuppliersAsync(activeOnly: true) ?? [];
+        _suppliers = (await SupplierApi.GetSuppliersAsync(activeOnly: true, pageSize: 500))?.Items ?? [];
 
         // Units available for new conversions: active units, excluding the base unit
         // and any unit already used in an existing conversion
