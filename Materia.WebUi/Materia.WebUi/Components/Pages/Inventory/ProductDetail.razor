@@ -43,9 +43,57 @@ else
             <div class="card h-100">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <span class="fw-semibold">Informasi Dasar</span>
-                    <small class="text-muted">Satuan dasar: <strong>@_product.BaseUnit</strong></small>
+                    @if (!_editingBaseUnit)
+                    {
+                        <small class="text-muted d-flex align-items-center gap-1">
+                            Satuan dasar: <strong>@_product.BaseUnit</strong>
+                            @if (CanEditBaseUnit)
+                            {
+                                <button type="button" class="btn btn-link btn-sm p-0 ms-1"
+                                        title="Ubah satuan dasar" @onclick="BeginEditBaseUnit">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <i class="bi bi-lock text-muted ms-1"
+                                   title="Satuan dasar terkunci setelah ada konversi satuan, variasi warna, stok, atau transaksi."></i>
+                            }
+                        </small>
+                    }
+                    else
+                    {
+                        <div class="d-flex align-items-center gap-1">
+                            @if (_activeUnits.Count > 0)
+                            {
+                                <select class="form-select form-select-sm" style="width:auto" @bind="_baseUnitInput">
+                                    @foreach (var u in _activeUnits.Where(u => u.Name != _product.BaseUnit))
+                                    {
+                                        <option value="@u.Name">@u.Name@(u.Symbol is not null ? $" ({u.Symbol})" : "")</option>
+                                    }
+                                </select>
+                            }
+                            else
+                            {
+                                <input class="form-control form-control-sm" style="width:auto"
+                                       @bind="_baseUnitInput" placeholder="Satuan dasar" />
+                            }
+                            <button type="button" class="btn btn-sm btn-primary" title="Simpan"
+                                    @onclick="HandleChangeBaseUnit" disabled="@_baseUnitBusy">
+                                <i class="bi bi-check-lg"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary" title="Batal"
+                                    @onclick="CancelEditBaseUnit" disabled="@_baseUnitBusy">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                    }
                 </div>
                 <div class="card-body">
+                    @if (!string.IsNullOrEmpty(_baseUnitError))
+                    {
+                        <div class="alert alert-danger py-2 small">@_baseUnitError</div>
+                    }
                     <EditForm Model="_editForm" OnValidSubmit="HandleEdit" FormName="edit-info" method="post">
                         <DataAnnotationsValidator />
                         <div class="mb-3">
@@ -622,9 +670,26 @@ else
     private StockDto? _stock;
     private List<CategoryDto> _availableCategories = [];
     private List<UnitDto> _availableConvUnits = [];
+    private List<UnitDto> _activeUnits = [];
     private string? _error;
     private string? _stockError;
     private string? _notice;
+
+    // Base-unit inline editing (only while the product is pristine).
+    private bool    _editingBaseUnit;
+    private string  _baseUnitInput = "";
+    private string? _baseUnitError;
+    private bool    _baseUnitBusy;
+
+    /// <summary>
+    /// Client-side eligibility: the base unit can only be changed while the product is active
+    /// and has no unit conversions or color variants. The remaining guards (no stock movements,
+    /// no sales, no purchases) are enforced by the server and surfaced as an error on submit.
+    /// </summary>
+    private bool CanEditBaseUnit =>
+        _product is { IsActive: true } &&
+        _product.UnitConversions.Count == 0 &&
+        Variants.Count == 0;
 
     // Harga beli (per-supplier catalog price) form.
     private List<SupplierDto> _suppliers = [];
@@ -676,9 +741,9 @@ else
         var alreadyUsed = _product.UnitConversions.Select(c => c.ToUnit).ToHashSet();
         alreadyUsed.Add(_product.BaseUnit);
         var allUnits = await Api.GetUnitsAsync() ?? [];
-        _availableConvUnits = allUnits
-            .Where(u => u.IsActive && !alreadyUsed.Contains(u.Name))
-            .OrderBy(u => u.Name)
+        _activeUnits = allUnits.Where(u => u.IsActive).OrderBy(u => u.Name).ToList();
+        _availableConvUnits = _activeUnits
+            .Where(u => !alreadyUsed.Contains(u.Name))
             .ToList();
     }
 
@@ -695,6 +760,45 @@ else
     {
         _error = await Api.SetProductStatusAsync(Id, !_product!.IsActive);
         if (_error is null) Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
+    }
+
+    // ── Base unit (satuan dasar) ──────────────────────────────────────────────
+
+    private void BeginEditBaseUnit()
+    {
+        _baseUnitError = null;
+        _baseUnitInput = _activeUnits.FirstOrDefault(u => u.Name != _product!.BaseUnit)?.Name ?? "";
+        _editingBaseUnit = true;
+    }
+
+    private void CancelEditBaseUnit()
+    {
+        _editingBaseUnit = false;
+        _baseUnitError = null;
+    }
+
+    private async Task HandleChangeBaseUnit()
+    {
+        if (_product is null) return;
+
+        var newUnit = _baseUnitInput?.Trim();
+        if (string.IsNullOrWhiteSpace(newUnit))
+        {
+            _baseUnitError = "Satuan dasar wajib dipilih.";
+            return;
+        }
+        if (string.Equals(newUnit, _product.BaseUnit, StringComparison.OrdinalIgnoreCase))
+        {
+            _baseUnitError = "Pilih satuan yang berbeda dari satuan saat ini.";
+            return;
+        }
+
+        _baseUnitBusy = true;
+        _baseUnitError = await Api.ChangeBaseUnitAsync(Id, newUnit);
+        _baseUnitBusy = false;
+
+        if (_baseUnitError is null)
+            Navigation.NavigateTo($"/products/{Id}", forceLoad: true);
     }
 
     private async Task HandleAssignCategory()

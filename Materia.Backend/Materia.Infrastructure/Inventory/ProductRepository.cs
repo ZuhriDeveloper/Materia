@@ -83,6 +83,7 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
         // Always reflect latest aggregate state
         projection.Name = product.Name;
         projection.Description = product.Description;
+        projection.BaseUnit = product.BaseUnit.Value;
         projection.SalePrice = product.SalePrice;
         projection.Barcode = product.Barcode;
         projection.IsActive = product.IsActive;
@@ -112,6 +113,7 @@ public class ProductRepository(AppDbContext context, IProductSearchCache searchC
                 ProductColorVariantRemoved e => e.UpdatedBy,
                 ProductColorVariantDeactivated e => e.UpdatedBy,
                 ProductColorVariantActivated e => e.UpdatedBy,
+                ProductBaseUnitChanged e => e.ChangedBy,
                 _ => projection.UpdatedBy,
             };
             projection.UpdatedAt = newEvents.Last().OccurredAt;

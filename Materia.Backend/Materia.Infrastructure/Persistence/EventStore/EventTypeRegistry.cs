@@ -29,6 +29,7 @@ public static class EventTypeRegistry
         [nameof(ProductColorVariantRemoved)]   = typeof(ProductColorVariantRemoved),
         [nameof(ProductColorVariantDeactivated)] = typeof(ProductColorVariantDeactivated),
         [nameof(ProductColorVariantActivated)] = typeof(ProductColorVariantActivated),
+        [nameof(ProductBaseUnitChanged)]       = typeof(ProductBaseUnitChanged),
 
         // Category events
         [nameof(CategoryCreated)]            = typeof(CategoryCreated),
@@ -48,6 +49,7 @@ public static class EventTypeRegistry
         [nameof(StockAdjusted)]               = typeof(StockAdjusted),
         [nameof(StockReconciledFromPurchase)] = typeof(StockReconciledFromPurchase),
         [nameof(StockReducedFromPurchaseReturn)] = typeof(StockReducedFromPurchaseReturn),
+        [nameof(StockUnitCorrected)]          = typeof(StockUnitCorrected),
 
         // Customer events
         [nameof(CustomerCreated)]               = typeof(CustomerCreated),

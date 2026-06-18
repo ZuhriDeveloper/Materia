@@ -4,6 +4,7 @@ using Materia.Application.Commands.Inventory.AddColorVariant;
 using Materia.Application.Commands.Inventory.AddUnitConversion;
 using Materia.Application.Commands.Inventory.AdjustStock;
 using Materia.Application.Commands.Inventory.AssignCategory;
+using Materia.Application.Commands.Inventory.ChangeProductBaseUnit;
 using Materia.Application.Commands.Inventory.CreateProduct;
 using Materia.Application.Commands.Inventory.RemoveCategory;
 using Materia.Application.Commands.Inventory.RemoveColorVariant;
@@ -36,6 +37,7 @@ public class ProductsController(
     RemoveColorVariantCommandHandler removeColorVariantHandler,
     SetColorVariantStatusCommandHandler setColorVariantStatusHandler,
     AdjustStockCommandHandler adjustStockHandler,
+    ChangeProductBaseUnitCommandHandler changeBaseUnitHandler,
     GetProductByIdQueryHandler getByIdHandler,
     GetProductsQueryHandler getPagedHandler,
     ExportProductsQueryHandler exportHandler,
@@ -46,7 +48,8 @@ public class ProductsController(
     IValidator<AddUnitConversionCommand> addConversionValidator,
     IValidator<AddColorVariantCommand> addColorVariantValidator,
     IValidator<UpdateColorVariantCommand> updateColorVariantValidator,
-    IValidator<AdjustStockCommand> adjustStockValidator) : ControllerBase
+    IValidator<AdjustStockCommand> adjustStockValidator,
+    IValidator<ChangeProductBaseUnitCommand> changeBaseUnitValidator) : ControllerBase
 {
     private string CurrentUser =>
         User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
@@ -121,6 +124,19 @@ public class ProductsController(
             return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
 
         await updateHandler.HandleAsync(command, ct);
+        return NoContent();
+    }
+
+    [HttpPut("{id:guid}/base-unit")]
+    public async Task<IActionResult> ChangeBaseUnit(
+        Guid id, [FromBody] ChangeBaseUnitRequest request, CancellationToken ct)
+    {
+        var command = new ChangeProductBaseUnitCommand(id, request.BaseUnit, CurrentUser);
+        var validation = await changeBaseUnitValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        await changeBaseUnitHandler.HandleAsync(command, ct);
         return NoContent();
     }
 
@@ -264,3 +280,4 @@ public record UpdateColorVariantRequest(
     string ColorName, string? ColorCode = null, string? Barcode = null, decimal? PriceOverride = null);
 public record SyncCategoriesRequest(List<Guid> CategoryIds);
 public record AdjustStockRequest(decimal Delta, string? Reason, Guid? VariantId = null);
+public record ChangeBaseUnitRequest(string BaseUnit);

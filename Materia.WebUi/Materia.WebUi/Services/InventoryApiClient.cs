@@ -85,6 +85,18 @@ public class InventoryApiClient(HttpClient http)
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 
+    /// <summary>
+    /// Changes the product's base unit. Only succeeds while the product is "pristine"
+    /// (no unit conversions, no color variants, no stock movements, no sales/purchases);
+    /// otherwise the server returns the specific reason as an error message.
+    /// </summary>
+    public async Task<string?> ChangeBaseUnitAsync(Guid id, string baseUnit, CancellationToken ct = default)
+    {
+        var response = await http.PutAsJsonAsync($"api/products/{id}/base-unit",
+            new { baseUnit }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
+    }
+
     public async Task<string?> SetProductStatusAsync(Guid id, bool isActive, CancellationToken ct = default)
     {
         var response = await http.PatchAsJsonAsync($"api/products/{id}/status",

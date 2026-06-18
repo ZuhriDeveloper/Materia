@@ -14,6 +14,8 @@ public class Stock : AggregateRoot<StockId>
     public decimal Quantity { get; private set; }
     public string Unit { get; private set; } = default!;
 
+    private bool _hasMovements;
+
     private Stock() { }
 
     // ── Factory ───────────────────────────────────────────────────────────────
@@ -79,6 +81,16 @@ public class Stock : AggregateRoot<StockId>
             purchaseOrderId, unitCost, unit, reducedBy, DateTime.UtcNow));
     }
 
+    public void CorrectUnit(string newUnit, string correctedBy)
+    {
+        if (_hasMovements)
+            throw new DomainException("Cannot change the unit of stock that has had movements.");
+        if (string.IsNullOrWhiteSpace(newUnit))
+            throw new DomainException("Stock unit cannot be empty.");
+
+        Raise(new StockUnitCorrected(Id, ProductId, newUnit.Trim(), correctedBy, DateTime.UtcNow));
+    }
+
     // ── Event Application ─────────────────────────────────────────────────────
 
     protected override void Apply(IDomainEvent domainEvent)
@@ -95,14 +107,21 @@ public class Stock : AggregateRoot<StockId>
 
             case StockAdjusted e:
                 Quantity = e.NewQuantity;
+                _hasMovements = true;
                 break;
 
             case StockReconciledFromPurchase e:
                 Quantity = e.NewQuantity;
+                _hasMovements = true;
                 break;
 
             case StockReducedFromPurchaseReturn e:
                 Quantity = e.NewQuantity;
+                _hasMovements = true;
+                break;
+
+            case StockUnitCorrected e:
+                Unit = e.Unit;
                 break;
         }
     }

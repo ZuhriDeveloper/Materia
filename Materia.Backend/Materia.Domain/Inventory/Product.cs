@@ -81,6 +81,20 @@ public class Product : AggregateRoot<ProductId>
             Raise(new ProductBarcodeChanged(Id, normalizedBarcode, updatedBy, DateTime.UtcNow));
     }
 
+    public void ChangeBaseUnit(UnitName newBaseUnit, string changedBy)
+    {
+        if (!IsActive)
+            throw new DomainException("Cannot change the base unit of an inactive product.");
+        if (_unitConversions.Count > 0)
+            throw new DomainException("Cannot change the base unit while unit conversions exist.");
+        if (_colorVariants.Count > 0)
+            throw new DomainException("Cannot change the base unit while color variants exist.");
+        if (newBaseUnit == BaseUnit)
+            throw new DomainException("New base unit must differ from the current base unit.");
+
+        Raise(new ProductBaseUnitChanged(Id, newBaseUnit.Value, changedBy, DateTime.UtcNow));
+    }
+
     public void Deactivate(string deactivatedBy)
     {
         if (!IsActive)
@@ -205,6 +219,10 @@ public class Product : AggregateRoot<ProductId>
                 SalePrice = e.SalePrice;
                 Barcode = e.Barcode;
                 IsActive = true;
+                break;
+
+            case ProductBaseUnitChanged e:
+                BaseUnit = new UnitName(e.BaseUnit);
                 break;
 
             case ProductNameUpdated e:

@@ -25,6 +25,7 @@ using Materia.Application.Commands.Inventory.RemoveColorVariant;
 using Materia.Application.Commands.Inventory.RemoveUnitConversion;
 using Materia.Application.Commands.Inventory.SetColorVariantStatus;
 using Materia.Application.Commands.Inventory.SetProductStatus;
+using Materia.Application.Commands.Inventory.ChangeProductBaseUnit;
 using Materia.Application.Commands.Inventory.SyncProductCategories;
 using Materia.Application.Commands.Inventory.UpdateColorVariant;
 using Materia.Application.Commands.Inventory.UpdateProduct;
@@ -75,6 +76,7 @@ public static class DependencyInjection
         services.AddScoped<UpdateColorVariantCommandHandler>();
         services.AddScoped<RemoveColorVariantCommandHandler>();
         services.AddScoped<SetColorVariantStatusCommandHandler>();
+        services.AddScoped<ChangeProductBaseUnitCommandHandler>();
 
         // Inventory — category commands
         services.AddScoped<CreateCategoryCommandHandler>();

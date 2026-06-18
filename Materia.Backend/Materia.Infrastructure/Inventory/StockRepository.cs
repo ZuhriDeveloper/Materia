@@ -90,6 +90,7 @@ public class StockRepository(AppDbContext context, ICurrentStore currentStore) :
         }
 
         projection.Quantity = stock.Quantity;
+        projection.Unit = stock.Unit;
 
         var lastAdjust = newEvents.OfType<StockAdjusted>().LastOrDefault();
         if (lastAdjust is not null)
