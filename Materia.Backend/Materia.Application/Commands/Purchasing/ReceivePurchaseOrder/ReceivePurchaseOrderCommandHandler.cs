@@ -37,12 +37,23 @@ public sealed class ReceivePurchaseOrderCommandHandler(
         foreach (var input in command.Lines)
         {
             var productId = ProductId.From(input.ProductId);
+            var variantId = input.VariantId is { } v ? VariantId.From(v) : null;
             var line = po.Lines.First(l => l.ProductId == productId);
 
-            // A product received for the first time may not have a stock record yet —
-            // initialise it at zero, then reconcile the received quantity onto it.
-            var stock = await stockRepository.GetAsync(productId, ct: ct)
-                ?? Stock.Initialize(productId, line.Unit, command.ReceivedBy);
+            // Received goods land in the matching stock bucket: a specific color variant's
+            // stock when a variant is given, otherwise the product-level stock.
+            var stock = await stockRepository.GetAsync(productId, variantId, ct);
+            if (stock is null)
+            {
+                // A variant's stock is seeded when the color is created, so a missing variant
+                // bucket means the variant doesn't exist. Product-level stock, by contrast, is
+                // initialised on demand for a product received for the first time.
+                if (variantId is not null)
+                    throw new DomainException(
+                        $"No stock record for variant {variantId.Value} of product {productId.Value}. " +
+                        "The color variant may not exist.");
+                stock = Stock.Initialize(productId, line.Unit, command.ReceivedBy);
+            }
 
             stock.ReconcileFromPurchase(
                 input.ReceivedQty, po.Id,

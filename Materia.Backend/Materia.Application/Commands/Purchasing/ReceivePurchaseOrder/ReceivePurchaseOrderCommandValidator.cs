@@ -13,6 +13,10 @@ public sealed class ReceivePurchaseOrderCommandValidator : AbstractValidator<Rec
         {
             line.RuleFor(l => l.ProductId).NotEmpty();
             line.RuleFor(l => l.ReceivedQty).GreaterThan(0);
+            line.RuleFor(l => l.VariantId!.Value)
+                .NotEmpty()
+                .When(l => l.VariantId.HasValue)
+                .WithMessage("VariantId must not be an empty GUID when provided.");
         });
     }
 }

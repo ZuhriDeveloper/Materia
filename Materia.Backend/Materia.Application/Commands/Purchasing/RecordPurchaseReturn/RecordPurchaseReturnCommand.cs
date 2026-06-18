@@ -6,4 +6,4 @@ public record RecordPurchaseReturnCommand(
     string Reason,
     string ReturnedBy);
 
-public record ReturnPurchaseOrderLineInput(Guid ProductId, decimal ReturnedQty);
+public record ReturnPurchaseOrderLineInput(Guid ProductId, decimal ReturnedQty, Guid? VariantId = null);

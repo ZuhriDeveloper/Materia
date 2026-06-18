@@ -38,10 +38,20 @@ public sealed class RecordPurchaseReturnCommandHandler(
         foreach (var input in command.Lines)
         {
             var productId = ProductId.From(input.ProductId);
+            var variantId = input.VariantId is { } v ? VariantId.From(v) : null;
             var line = po.Lines.First(l => l.ProductId == productId);
 
-            var stock = await stockRepository.GetAsync(productId, ct: ct)
-                ?? Stock.Initialize(productId, line.Unit, command.ReturnedBy);
+            // Reduce the same bucket the goods were received into: the color variant's stock
+            // when a variant is given, otherwise the product-level stock.
+            var stock = await stockRepository.GetAsync(productId, variantId, ct);
+            if (stock is null)
+            {
+                if (variantId is not null)
+                    throw new DomainException(
+                        $"No stock record for variant {variantId.Value} of product {productId.Value}. " +
+                        "The color variant may not exist.");
+                stock = Stock.Initialize(productId, line.Unit, command.ReturnedBy);
+            }
 
             stock.ReduceFromPurchaseReturn(
                 input.ReturnedQty, po.Id,

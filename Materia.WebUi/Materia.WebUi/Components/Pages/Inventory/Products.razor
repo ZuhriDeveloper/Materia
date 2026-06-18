@@ -271,7 +271,11 @@
                             <td class="small text-muted">
                                 @((p.UpdatedAt ?? p.CreatedAt).ToLocalTime().ToString("dd MMM yyyy"))
                             </td>
-                            <td class="text-end">
+                            <td class="text-end text-nowrap">
+                                <button type="button" class="btn btn-sm btn-outline-secondary me-1"
+                                        @onclick="() => OpenStockModal(p)" title="Atur stok">
+                                    <i class="bi bi-box-seam me-1"></i>Stok
+                                </button>
                                 <a href="/products/@p.Id" class="btn btn-sm btn-outline-primary">
                                     <i class="bi bi-pencil me-1"></i>Kelola
                                 </a>
@@ -371,6 +375,67 @@
     </div>
 </div>
 
+@* ── Quick stock-edit modal ───────────────────────────────────────────────────── *@
+@if (_stockModalOpen && _stockProduct is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Atur Stok</h5>
+                    <button type="button" class="btn-close"
+                            @onclick="CloseStockModal" disabled="@_stockSaving"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1 fw-semibold">@_stockProduct.Name</p>
+                    <p class="small text-muted mb-3">
+                        Stok saat ini:
+                        <strong>@($"{_stockProduct.StockQuantity:0.##} {_stockProduct.BaseUnit}")</strong>
+                    </p>
+
+                    @if (!string.IsNullOrEmpty(_stockError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">@_stockError</div>
+                    }
+
+                    <div class="mb-3">
+                        <label class="form-label small text-muted mb-1">Jumlah stok baru</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" step="any" min="0" class="form-control"
+                                   @bind="_stockNewQty" />
+                            <span class="input-group-text">@_stockProduct.BaseUnit</span>
+                        </div>
+                        <div class="form-text">
+                            Masukkan jumlah fisik di gudang — sistem mencatat selisihnya.
+                        </div>
+                    </div>
+
+                    <div class="mb-1">
+                        <label class="form-label small text-muted mb-1">Alasan (opsional)</label>
+                        <input type="text" class="form-control form-control-sm" maxlength="500"
+                               placeholder="mis. stok awal, hasil opname…" @bind="_stockReason" />
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            @onclick="CloseStockModal" disabled="@_stockSaving">
+                        Batal
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary"
+                            @onclick="SaveStock" disabled="@_stockSaving">
+                        @if (_stockSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
     // ── Constants ──────────────────────────────────────────────────────────────
     private const int PageSize = 20;
@@ -389,6 +454,14 @@
     private string  _appliedSearch  = "";  // tracks last committed search term
     private string  _categoryFilter = "";  // empty = all categories
     private bool?   _statusFilter;         // null = all statuses
+
+    // Quick stock-edit modal state. Adjusts product-level stock only (no supplier/PO needed).
+    private bool        _stockModalOpen;
+    private ProductDto? _stockProduct;
+    private decimal     _stockNewQty;
+    private string?     _stockReason;
+    private string?     _stockError;
+    private bool        _stockSaving;
 
     private bool HasActiveFilters =>
         !string.IsNullOrEmpty(_appliedSearch) ||
@@ -524,6 +597,67 @@
     {
         _page = page;
         await LoadAsync();
+    }
+
+    // ── Quick stock edit ────────────────────────────────────────────────────────
+    /// Opens the modal pre-filled with the product's current product-level stock.
+    private void OpenStockModal(ProductDto p)
+    {
+        _stockProduct   = p;
+        _stockNewQty    = p.StockQuantity;
+        _stockReason    = null;
+        _stockError     = null;
+        _stockModalOpen = true;
+    }
+
+    private void CloseStockModal()
+    {
+        _stockModalOpen = false;
+        _stockProduct   = null;
+    }
+
+    /// Records the difference between the entered count and the current stock as a manual
+    /// adjustment — no supplier or purchase order required (auto-initialises stock if absent).
+    private async Task SaveStock()
+    {
+        if (_stockProduct is null) return;
+
+        _stockError = null;
+
+        if (_stockNewQty < 0)
+        {
+            _stockError = "Jumlah stok tidak boleh negatif.";
+            return;
+        }
+
+        var delta = _stockNewQty - _stockProduct.StockQuantity;
+        if (delta == 0)
+        {
+            _stockError = "Jumlah stok tidak berubah.";
+            return;
+        }
+
+        _stockSaving = true;
+        StateHasChanged();
+
+        var reason = string.IsNullOrWhiteSpace(_stockReason)
+            ? (_stockProduct.StockQuantity == 0 ? "Stok awal" : "Penyesuaian stok manual")
+            : _stockReason!.Trim();
+
+        var error = await Api.AdjustStockAsync(_stockProduct.Id, delta, reason);
+        _stockSaving = false;
+
+        if (error is not null)
+        {
+            _stockError = error;
+            return;
+        }
+
+        var name = _stockProduct.Name;
+        _stockModalOpen = false;
+        _stockProduct   = null;
+        _notice = $"Stok \"{name}\" berhasil diperbarui.";
+        await LoadAsync();   // refresh the Stok column and the "perlu perhatian" flag
     }
 
     // ── Attention marker ────────────────────────────────────────────────────────

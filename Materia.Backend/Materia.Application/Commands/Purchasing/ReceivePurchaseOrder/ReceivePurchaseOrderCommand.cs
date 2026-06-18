@@ -5,4 +5,4 @@ public record ReceivePurchaseOrderCommand(
     IReadOnlyList<ReceivePurchaseOrderLineInput> Lines,
     string ReceivedBy);
 
-public record ReceivePurchaseOrderLineInput(Guid ProductId, decimal ReceivedQty);
+public record ReceivePurchaseOrderLineInput(Guid ProductId, decimal ReceivedQty, Guid? VariantId = null);

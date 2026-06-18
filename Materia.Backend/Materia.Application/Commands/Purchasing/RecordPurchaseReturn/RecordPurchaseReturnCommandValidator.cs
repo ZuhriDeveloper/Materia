@@ -14,6 +14,10 @@ public sealed class RecordPurchaseReturnCommandValidator : AbstractValidator<Rec
         {
             line.RuleFor(l => l.ProductId).NotEmpty();
             line.RuleFor(l => l.ReturnedQty).GreaterThan(0);
+            line.RuleFor(l => l.VariantId!.Value)
+                .NotEmpty()
+                .When(l => l.VariantId.HasValue)
+                .WithMessage("VariantId must not be an empty GUID when provided.");
         });
     }
 }
