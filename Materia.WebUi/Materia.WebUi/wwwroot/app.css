@@ -436,6 +436,106 @@ html.sidebar-collapsed .main-wrapper {
     color: #1e293b;
 }
 
+/* ---- User menu (CSS-only dropdown) ---- */
+/* The app bar / layout renders statically, so the user menu can't rely on a Blazor
+   click handler. It opens on hover and on keyboard focus (:focus-within) instead. */
+
+.materia-user-menu {
+    position: relative;
+    display: inline-flex;
+}
+
+.materia-user-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: transparent;
+    border: none;
+    color: inherit;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font: inherit;
+}
+
+.materia-user-trigger:hover {
+    background: rgba(255, 255, 255, .12);
+}
+
+.materia-user-name {
+    font-size: .875rem;
+    white-space: nowrap;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.materia-user-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    min-width: 220px;
+    background: var(--mud-palette-surface, #fff);
+    color: var(--mud-palette-text-primary, #212529);
+    border: 1px solid var(--mud-palette-divider, rgba(0, 0, 0, .12));
+    border-radius: 8px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+    padding: 6px;
+    z-index: 1400;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(-4px);
+    transition: opacity .12s ease, transform .12s ease;
+}
+
+/* Transparent bridge so moving the cursor from the trigger to the menu
+   doesn't cross a dead gap and close it. */
+.materia-user-dropdown::before {
+    content: "";
+    position: absolute;
+    top: -6px;
+    left: 0;
+    right: 0;
+    height: 6px;
+}
+
+.materia-user-menu:hover .materia-user-dropdown,
+.materia-user-menu:focus-within .materia-user-dropdown {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.materia-user-dropdown-header {
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: .8rem;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--mud-palette-divider, rgba(0, 0, 0, .08));
+    margin-bottom: 4px;
+}
+
+.materia-user-item {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 8px 12px;
+    font-size: .875rem;
+    text-align: left;
+    background: transparent;
+    border: none;
+    color: inherit;
+    text-decoration: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font: inherit;
+}
+
+.materia-user-item:hover {
+    background: var(--mud-palette-action-default-hover, rgba(0, 0, 0, .06));
+    color: inherit;
+}
+
 /* ---- Page content ---- */
 
 .page-content {

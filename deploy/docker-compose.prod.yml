@@ -47,6 +47,16 @@ services:
       Jwt__Issuer: Materia.WebApi
       Jwt__Audience: Materia.WebUi
       WebUi__BaseUrl: https://${APP_DOMAIN}
+      # ── Email (Brevo SMTP) ──────────────────────────────────────────────
+      # FromAddress must be a sender/domain you've verified in Brevo, or mail
+      # is rejected. Secrets (login/key) live in .env, never in this file.
+      Email__Host: smtp-relay.brevo.com
+      Email__Port: "587"
+      Email__UseStartTls: "true"
+      Email__User: ${BREVO_SMTP_LOGIN}
+      Email__Password: ${BREVO_SMTP_KEY}
+      Email__FromAddress: ${MAIL_FROM_ADDRESS}
+      Email__FromName: Materia POS
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:

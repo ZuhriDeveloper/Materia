@@ -1,0 +1,77 @@
+@page "/confirm-email"
+@layout LoginLayout
+@rendermode InteractiveServer
+@using Materia.WebUi.Services
+@inject AuthService Auth
+
+<PageTitle>Konfirmasi Email — Materia</PageTitle>
+
+<div class="d-flex align-items-center justify-content-center min-vh-100 bg-light">
+    <div class="card shadow-sm" style="width: 100%; max-width: 420px;">
+        <div class="card-body p-4 text-center">
+            <h4 class="card-title mb-3 fw-bold">Konfirmasi Email</h4>
+
+            @if (_state == State.Working)
+            {
+                <div class="text-muted">
+                    <span class="spinner-border spinner-border-sm me-1"></span> Memproses konfirmasi…
+                </div>
+            }
+            else if (_state == State.Success)
+            {
+                <div class="alert alert-success py-2 small" role="alert">@_message</div>
+                <a href="/login" class="btn btn-primary w-100">Masuk</a>
+            }
+            else
+            {
+                <div class="alert alert-danger py-2 small" role="alert">
+                    @foreach (var e in _errors) { <div>@e</div> }
+                </div>
+                <a href="/login" class="btn btn-outline-secondary w-100">Kembali ke Masuk</a>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    [SupplyParameterFromQuery(Name = "userId")]
+    public string? UserId { get; set; }
+
+    [SupplyParameterFromQuery(Name = "token")]
+    public string? Token { get; set; }
+
+    private enum State { Working, Success, Failed }
+    private State _state = State.Working;
+    private string? _message;
+    private readonly List<string> _errors = [];
+
+    // Confirm once, on the first interactive render only (avoids running during prerender).
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        if (string.IsNullOrWhiteSpace(UserId) || string.IsNullOrWhiteSpace(Token))
+        {
+            _errors.Add("Tautan konfirmasi tidak valid atau sudah kedaluwarsa.");
+            _state = State.Failed;
+            StateHasChanged();
+            return;
+        }
+
+        var result = await Auth.ConfirmEmailAsync(UserId, Token);
+        if (result.Ok)
+        {
+            _message = result.Message ?? "Email berhasil dikonfirmasi.";
+            _state = State.Success;
+        }
+        else
+        {
+            _errors.AddRange(result.Errors.Count > 0
+                ? result.Errors
+                : ["Tautan konfirmasi tidak valid atau sudah kedaluwarsa."]);
+            _state = State.Failed;
+        }
+
+        StateHasChanged();
+    }
+}

@@ -2,6 +2,7 @@ using Materia.Application;
 using Materia.Domain.Common;
 using Materia.Infrastructure;
 using Materia.Infrastructure.Persistence;
+using Materia.WebApi.RateLimiting;
 using Microsoft.AspNetCore.Http.Features;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -18,6 +19,7 @@ builder.Services.Configure<FormOptions>(o =>
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+builder.Services.AddAuthRateLimiting();
 
 builder.Services.AddCors(options =>
 {
@@ -39,6 +41,7 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
 app.UseCors();
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 

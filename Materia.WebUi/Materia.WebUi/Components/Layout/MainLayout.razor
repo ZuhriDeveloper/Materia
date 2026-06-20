@@ -39,23 +39,34 @@
                            OnClick="ToggleDarkMode" />
         </MudTooltip>
 
-        <AuthorizeView>
+        @* CSS-only dropdown: this layout renders statically (no Blazor interactivity),
+           so the user menu uses :hover / :focus-within instead of an @@onclick handler.
+           Change-password is a plain link; logout keeps its form POST (+ antiforgery). *@
+        <AuthorizeView Context="auth">
             <Authorized>
-                <MudTooltip Text="@context.User.Identity?.Name" Placement="Placement.Bottom">
-                    <MudAvatar Color="Color.Primary" Size="Size.Small" Class="mr-1"
-                               Style="font-size:.75rem;cursor:default">
-                        @(context.User.Identity?.Name?[..1].ToUpperInvariant() ?? "?")
-                    </MudAvatar>
-                </MudTooltip>
-                <form method="post" action="/account/logout">
-                    <AntiforgeryToken />
-                    <MudTooltip Text="Keluar" Placement="Placement.Bottom">
-                        <MudIconButton Icon="@Icons.Material.Filled.Logout"
-                                       Color="Color.Inherit"
-                                       ButtonType="ButtonType.Submit"
-                                       Size="Size.Small" />
-                    </MudTooltip>
-                </form>
+                <div class="materia-user-menu">
+                    <button type="button" class="materia-user-trigger">
+                        <MudAvatar Color="Color.Primary" Size="Size.Small" Style="font-size:.75rem">
+                            @(auth.User.Identity?.Name?[..1].ToUpperInvariant() ?? "?")
+                        </MudAvatar>
+                        <span class="materia-user-name d-none d-sm-inline">
+                            @auth.User.Identity?.Name
+                        </span>
+                        <i class="bi bi-chevron-down"></i>
+                    </button>
+                    <div class="materia-user-dropdown">
+                        <div class="materia-user-dropdown-header">@auth.User.Identity?.Name</div>
+                        <a class="materia-user-item" href="/account/change-password">
+                            <i class="bi bi-key me-2"></i>Ubah Kata Sandi
+                        </a>
+                        <form method="post" action="/account/logout" class="m-0">
+                            <AntiforgeryToken />
+                            <button type="submit" class="materia-user-item">
+                                <i class="bi bi-box-arrow-right me-2"></i>Keluar
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </Authorized>
         </AuthorizeView>
 

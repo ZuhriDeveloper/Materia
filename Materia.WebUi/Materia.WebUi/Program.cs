@@ -99,6 +99,10 @@ builder.Services.AddHttpClient<StoreSettingsApiClient>(client =>
     client.BaseAddress = new Uri(apiBaseUrl))
     .AddHttpMessageHandler<BearerTokenHandler>();
 
+builder.Services.AddHttpClient<AccountApiClient>(client =>
+    client.BaseAddress = new Uri(apiBaseUrl))
+    .AddHttpMessageHandler<BearerTokenHandler>();
+
 var app = builder.Build();
 
 // MUST be the first middleware so everything downstream (HSTS, the auth-cookie Secure
