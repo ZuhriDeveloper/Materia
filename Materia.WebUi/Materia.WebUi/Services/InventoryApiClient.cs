@@ -197,6 +197,25 @@ public class InventoryApiClient(HttpClient http)
     }
 
     /// <summary>
+    /// The stock flow (kartu stok) for a product across all buckets, newest first. The optional
+    /// <paramref name="from"/>/<paramref name="to"/> window is sent as UTC and is inclusive.
+    /// </summary>
+    public async Task<List<StockMovementDto>> GetStockMovementsAsync(
+        Guid productId, DateTime? from = null, DateTime? to = null, CancellationToken ct = default)
+    {
+        var query = new List<string>();
+        if (from.HasValue)
+            query.Add($"from={Uri.EscapeDataString(from.Value.ToUniversalTime().ToString("o"))}");
+        if (to.HasValue)
+            query.Add($"to={Uri.EscapeDataString(to.Value.ToUniversalTime().ToString("o"))}");
+
+        var url = $"api/products/{productId}/stock/movements"
+                  + (query.Count > 0 ? "?" + string.Join("&", query) : "");
+        var result = await http.GetFromJsonAsync<List<StockMovementDto>>(url, ct);
+        return result ?? [];
+    }
+
+    /// <summary>
     /// Records a stock adjustment. When <paramref name="variantId"/> is supplied the delta is
     /// applied to that color variant's bucket; otherwise it adjusts the product-level bucket.
     /// </summary>

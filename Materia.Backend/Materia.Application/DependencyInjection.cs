@@ -99,6 +99,7 @@ public static class DependencyInjection
         services.AddScoped<GetUnitsQueryHandler>();
         services.AddScoped<GetStockByProductIdQueryHandler>();
         services.AddScoped<GetProductStocksQueryHandler>();
+        services.AddScoped<GetStockMovementsQueryHandler>();
 
         // Customer commands
         services.AddScoped<CreateCustomerCommandHandler>();

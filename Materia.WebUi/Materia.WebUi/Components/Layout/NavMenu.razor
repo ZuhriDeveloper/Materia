@@ -101,13 +101,13 @@
 
     <AuthorizeView Roles="Admin">
 
-        @* Section: Keuangan *@
+        @* Section: Laporan *@
         @if (_drawerOpen)
         {
             <MudText Typo="Typo.overline" Class="px-4 pt-3 pb-0 d-block"
                      Style="font-size:.6rem;letter-spacing:.1em;
                             color:var(--mud-palette-drawer-text);opacity:.5">
-                Keuangan
+                Laporan
             </MudText>
         }
         else
@@ -117,6 +117,9 @@
 
         <MudNavLink Href="financials" Icon="@Icons.Material.Filled.BarChart">
             Laporan Keuangan
+        </MudNavLink>
+        <MudNavLink Href="stock-report" Icon="@Icons.Material.Filled.Assessment">
+            Laporan Stok
         </MudNavLink>
 
         @* Section: Inventaris *@

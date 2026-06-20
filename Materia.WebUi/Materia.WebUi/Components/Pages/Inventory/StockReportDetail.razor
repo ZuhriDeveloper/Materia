@@ -1,0 +1,206 @@
+@page "/stock-report/{ProductId:guid}"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@using Materia.WebUi.Services
+@inject InventoryApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Detail Stok — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <a href="/stock-report" class="btn btn-sm btn-outline-secondary mb-2">
+            <i class="bi bi-arrow-left me-1"></i> Kembali
+        </a>
+        <h4 class="mb-0 fw-bold">
+            Kartu Stok@(_product is null ? "" : $" — {_product.Name}")
+        </h4>
+    </div>
+</div>
+
+@if (_product is not null)
+{
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">Stok saat ini</div>
+                    <div class="fs-5 fw-bold @(_product.HasStock ? "" : "text-danger")">
+                        @($"{_product.StockQuantity:0.##} {_product.BaseUnit}")
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100">
+                <div class="card-body py-2">
+                    <div class="small text-muted">Nilai stok (COGS)</div>
+                    <div class="fs-5 fw-bold">
+                        @(_product.StockValue > 0 ? $"Rp {_product.StockValue:N0}" : "—")
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@* ── Date-range filter ────────────────────────────────────────────────────────── *@
+<div class="card mb-3">
+    <div class="card-body pb-2">
+        <div class="row g-2 align-items-end">
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Dari tanggal</label>
+                <input type="date" class="form-control form-control-sm" @bind="_from" />
+            </div>
+            <div class="col-auto">
+                <label class="form-label small text-muted mb-1">Sampai tanggal</label>
+                <input type="date" class="form-control form-control-sm" @bind="_to" />
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-primary btn-sm" @onclick="LoadMovements"
+                        disabled="@_loading">
+                    <i class="bi bi-funnel me-1"></i>Terapkan
+                </button>
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-outline-secondary btn-sm" @onclick="ShowAll"
+                        disabled="@_loading">
+                    Semua
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@* ── Movements table ──────────────────────────────────────────────────────────── *@
+<div class="card">
+    <div class="card-body p-0">
+        @if (_loading)
+        {
+            <div class="p-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Memuat…
+            </div>
+        }
+        else if (_movements.Count == 0)
+        {
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+                <p class="mb-1">Tidak ada pergerakan stok pada rentang ini.</p>
+            </div>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover table-sm mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Tanggal</th>
+                            <th>Jenis</th>
+                            <th>Warna</th>
+                            <th class="text-end">Masuk/Keluar</th>
+                            <th class="text-end">Saldo</th>
+                            <th class="text-end">Harga Pokok</th>
+                            <th class="text-end">Nilai Saldo</th>
+                            <th>Referensi</th>
+                            <th>Oleh</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var m in _movements)
+                        {
+                            <tr>
+                                <td class="small text-nowrap">
+                                    @m.OccurredAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")
+                                </td>
+                                <td>
+                                    <span class="badge @BadgeClass(m.Type)">@TypeLabel(m.Type)</span>
+                                </td>
+                                <td class="small">@(m.ColorName ?? "Umum")</td>
+                                <td class="text-end fw-semibold @(m.Delta < 0 ? "text-danger" : m.Delta > 0 ? "text-success" : "text-muted")">
+                                    @(m.Delta > 0 ? "+" : "")@($"{m.Delta:0.##}")
+                                </td>
+                                <td class="text-end">@($"{m.BalanceAfter:0.##} {m.Unit}")</td>
+                                <td class="text-end small">
+                                    @(m.RunningAverageCost > 0 ? $"Rp {m.RunningAverageCost:N0}" : "—")
+                                </td>
+                                <td class="text-end small">
+                                    @(m.BalanceValue > 0 ? $"Rp {m.BalanceValue:N0}" : "—")
+                                </td>
+                                <td class="small text-muted">@FormatReference(m)</td>
+                                <td class="small text-muted">@m.PerformedBy</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter] public Guid ProductId { get; set; }
+
+    private ProductDto?           _product;
+    private List<StockMovementDto> _movements = [];
+    private bool                  _loading = true;
+
+    // Default window: the last 30 days, in the user's local calendar.
+    private DateTime? _from = DateTime.Today.AddDays(-30);
+    private DateTime? _to   = DateTime.Today;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _product = await Api.GetProductByIdAsync(ProductId);
+        await LoadMovements();
+    }
+
+    private async Task LoadMovements()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        // Treat the picked dates as inclusive local-day boundaries, sent to the API as UTC.
+        DateTime? from = _from?.Date;
+        DateTime? to   = _to?.Date.AddDays(1).AddTicks(-1);
+
+        _movements = await Api.GetStockMovementsAsync(ProductId, from, to);
+        _loading = false;
+    }
+
+    private async Task ShowAll()
+    {
+        _from = null;
+        _to   = null;
+        await LoadMovements();
+    }
+
+    private static string TypeLabel(StockMovementType type) => type switch
+    {
+        StockMovementType.Initial         => "Stok Awal",
+        StockMovementType.Adjustment      => "Penyesuaian",
+        StockMovementType.Sale            => "Penjualan",
+        StockMovementType.PurchaseReceipt => "Pembelian",
+        StockMovementType.PurchaseReturn  => "Retur Beli",
+        StockMovementType.UnitCorrection  => "Koreksi Satuan",
+        _                                 => type.ToString(),
+    };
+
+    private static string BadgeClass(StockMovementType type) => type switch
+    {
+        StockMovementType.Initial         => "bg-secondary",
+        StockMovementType.Adjustment      => "bg-warning text-dark",
+        StockMovementType.Sale            => "bg-primary",
+        StockMovementType.PurchaseReceipt => "bg-success",
+        StockMovementType.PurchaseReturn  => "bg-danger",
+        StockMovementType.UnitCorrection  => "bg-info text-dark",
+        _                                 => "bg-light text-dark",
+    };
+
+    /// Purchase references are PO ids (GUIDs) — show a short prefix; sale references pass through.
+    private static string FormatReference(StockMovementDto m)
+    {
+        if (string.IsNullOrEmpty(m.Reference)) return "—";
+        return Guid.TryParse(m.Reference, out _) ? m.Reference[..8] + "…" : m.Reference;
+    }
+}

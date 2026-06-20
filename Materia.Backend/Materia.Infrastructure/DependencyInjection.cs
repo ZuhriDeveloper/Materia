@@ -102,6 +102,8 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Inventory.IUnitQueryRepository, Inventory.UnitQueryRepository>();
         services.AddScoped<Application.Contracts.Inventory.IStockRepository, Inventory.StockRepository>();
         services.AddScoped<Application.Contracts.Inventory.IStockQueryRepository, Inventory.StockQueryRepository>();
+        services.AddScoped<Application.Contracts.Inventory.IStockMovementQueryRepository, Inventory.StockMovementQueryRepository>();
+        services.AddScoped<Application.Contracts.Inventory.IStockCostBackfill, Inventory.StockCostBackfill>();
         services.AddSingleton<Application.Contracts.Inventory.IProductExcelExporter, Inventory.ClosedXmlProductExcelExporter>();
 
         // Customer repositories

@@ -17,6 +17,8 @@ public record ProductDto(
     IReadOnlyList<ColorVariantDto> ColorVariants,
     // Total on-hand stock across all buckets (product-level + every color variant). 0 when none.
     decimal StockQuantity = 0m,
+    // On-hand stock value across all buckets, valued at each bucket's moving-average cost (COGS).
+    decimal StockValue = 0m,
     // Most recent purchase price (harga beli) across supplier catalogs; null when none is recorded.
     decimal? LatestPurchasePrice = null,
     // True when at least one supplier catalogs this product.

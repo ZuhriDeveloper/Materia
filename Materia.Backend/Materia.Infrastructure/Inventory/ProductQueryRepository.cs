@@ -23,15 +23,23 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
         var variants = variantRows.Select(v => ToVariantDto(v, p.SalePrice)).ToList();
 
         // Total on-hand across all buckets: the product-level row plus every color-variant row.
+        // Value each bucket at its own moving-average cost so the total never blends unrelated costs.
         var stock = await context.StockReadModels
             .Where(s => s.ProductId == id)
-            .SumAsync(s => (decimal?)s.Quantity, ct);
+            .GroupBy(_ => 1)
+            .Select(g => new
+            {
+                Quantity = g.Sum(s => s.Quantity),
+                Value = g.Sum(s => s.Quantity * s.AverageCost),
+            })
+            .FirstOrDefaultAsync(ct);
         var purchaseInfo = await BuildPurchaseInfoAsync([id], ct);
         var (latestPrice, hasSupplier) = purchaseInfo.GetValueOrDefault(id);
 
         return Map(p, categories, variants) with
         {
-            StockQuantity = stock ?? 0m,
+            StockQuantity = stock?.Quantity ?? 0m,
+            StockValue = stock?.Value ?? 0m,
             LatestPurchasePrice = latestPrice,
             HasSupplier = hasSupplier,
         };
@@ -115,13 +123,19 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             .ToDictionary(g => g.Key, g => g.OrderBy(v => v.ColorName).ToList());
 
         // Total on-hand across all buckets: the product-level row plus every color-variant row.
-        // Each physical unit lives in exactly one bucket, so summing never double-counts.
+        // Each physical unit lives in exactly one bucket, so summing never double-counts. Each
+        // bucket is valued at its own moving-average cost (COGS) for the stock-value total.
         var stockByProduct = (await context.StockReadModels
                 .Where(s => productIds.Contains(s.ProductId))
                 .GroupBy(s => s.ProductId)
-                .Select(g => new { ProductId = g.Key, Total = g.Sum(s => s.Quantity) })
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    Total = g.Sum(s => s.Quantity),
+                    Value = g.Sum(s => s.Quantity * s.AverageCost),
+                })
                 .ToListAsync(ct))
-            .ToDictionary(x => x.ProductId, x => x.Total);
+            .ToDictionary(x => x.ProductId, x => (x.Total, x.Value));
 
         // Latest purchase price (harga beli) and supplier presence, from supplier catalogs.
         var purchaseInfo = await BuildPurchaseInfoAsync(productIds, ct);
@@ -134,9 +148,11 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
                 (variantsByProduct.TryGetValue(p.Id, out var vs) ? vs : [])
                     .Select(v => ToVariantDto(v, p.SalePrice)).ToList());
             var (latestPrice, hasSupplier) = purchaseInfo.GetValueOrDefault(p.Id);
+            var (stockQty, stockValue) = stockByProduct.GetValueOrDefault(p.Id);
             return dto with
             {
-                StockQuantity = stockByProduct.GetValueOrDefault(p.Id),
+                StockQuantity = stockQty,
+                StockValue = stockValue,
                 LatestPurchasePrice = latestPrice,
                 HasSupplier = hasSupplier,
             };

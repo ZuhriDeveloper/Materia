@@ -11,6 +11,10 @@ public class StockReadModel
 
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = default!;
+
+    /// <summary>Weighted moving-average unit cost (COGS basis), recomputed on each purchase receipt.</summary>
+    public decimal AverageCost { get; set; }
+
     public DateTime? LastAdjustedAt { get; set; }
     public string? LastAdjustedBy { get; set; }
 }

@@ -14,6 +14,7 @@ using Materia.Application.Commands.Inventory.SetProductStatus;
 using Materia.Application.Commands.Inventory.SyncProductCategories;
 using Materia.Application.Commands.Inventory.UpdateColorVariant;
 using Materia.Application.Commands.Inventory.UpdateProduct;
+using Materia.Application.Contracts.Inventory;
 using Materia.Application.Queries.Inventory;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -43,6 +44,8 @@ public class ProductsController(
     ExportProductsQueryHandler exportHandler,
     GetStockByProductIdQueryHandler getStockHandler,
     GetProductStocksQueryHandler getProductStocksHandler,
+    GetStockMovementsQueryHandler getStockMovementsHandler,
+    IStockCostBackfill stockCostBackfill,
     IValidator<CreateProductCommand> createValidator,
     IValidator<UpdateProductCommand> updateValidator,
     IValidator<AddUnitConversionCommand> addConversionValidator,
@@ -251,6 +254,27 @@ public class ProductsController(
     {
         var result = await getProductStocksHandler.HandleAsync(new GetProductStocksQuery(id), ct);
         return Ok(result);
+    }
+
+    /// <summary>The stock flow (kartu stok) for the product, newest first, optionally within [from, to] (UTC).</summary>
+    [HttpGet("{id:guid}/stock/movements")]
+    public async Task<IActionResult> GetStockMovements(
+        Guid id,
+        [FromQuery] DateTime? from = null,
+        [FromQuery] DateTime? to = null,
+        CancellationToken ct = default)
+    {
+        var result = await getStockMovementsHandler.HandleAsync(
+            new GetStockMovementsQuery(id, from, to), ct);
+        return Ok(result);
+    }
+
+    /// <summary>One-time maintenance: recompute moving-average stock cost for existing buckets.</summary>
+    [HttpPost("stock/rebuild-cost")]
+    public async Task<IActionResult> RebuildStockCost(CancellationToken ct)
+    {
+        var updated = await stockCostBackfill.RunAsync(ct);
+        return Ok(new { updated });
     }
 
     [HttpPost("{id:guid}/stock/adjust")]

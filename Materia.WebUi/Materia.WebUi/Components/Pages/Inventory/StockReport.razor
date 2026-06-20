@@ -1,0 +1,290 @@
+@page "/stock-report"
+@rendermode InteractiveServer
+@attribute [Authorize(Roles = "Admin")]
+@using Materia.WebUi.Services
+@inject InventoryApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Laporan Stok — Materia</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0 fw-bold">Laporan Stok</h4>
+</div>
+
+@* ── Filter card ──────────────────────────────────────────────────────────────── *@
+<div class="card mb-3">
+    <div class="card-body pb-2">
+        <div class="row g-2 align-items-end">
+
+            @* Search text *@
+            <div class="col-md-4">
+                <label class="form-label small text-muted mb-1">
+                    <i class="bi bi-search me-1"></i>Cari
+                </label>
+                <div class="input-group input-group-sm">
+                    <input type="text"
+                           class="form-control"
+                           placeholder="Nama produk atau barcode…"
+                           @bind="_searchInput"
+                           @bind:event="oninput"
+                           @onkeydown="OnSearchKeyDown" />
+                    @if (!string.IsNullOrEmpty(_searchInput))
+                    {
+                        <button class="btn btn-outline-secondary" type="button"
+                                @onclick="ClearSearch" title="Hapus pencarian">
+                            <i class="bi bi-x"></i>
+                        </button>
+                    }
+                </div>
+            </div>
+
+            @* Category dropdown *@
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">
+                    <i class="bi bi-tag me-1"></i>Kategori
+                </label>
+                <select class="form-select form-select-sm"
+                        value="@_categoryFilter"
+                        @onchange="OnCategoryChanged"
+                        disabled="@(_categories.Count == 0)">
+                    <option value="">Semua Kategori</option>
+                    @foreach (var cat in _categories)
+                    {
+                        <option value="@cat.Id">@cat.Name</option>
+                    }
+                </select>
+            </div>
+
+            @* Status toggle *@
+            <div class="col-md-3">
+                <label class="form-label small text-muted mb-1">
+                    <i class="bi bi-toggle-on me-1"></i>Status
+                </label>
+                <div class="btn-group btn-group-sm d-flex" role="group">
+                    <button type="button"
+                            class="btn @(_statusFilter == true ? "btn-success" : "btn-outline-secondary")"
+                            @onclick="() => SetStatusFilter(true)">
+                        Aktif
+                    </button>
+                    <button type="button"
+                            class="btn @(_statusFilter == null ? "btn-dark" : "btn-outline-secondary")"
+                            @onclick="() => SetStatusFilter(null)">
+                        Semua
+                    </button>
+                </div>
+            </div>
+
+            @* Search button *@
+            <div class="col-md-2 d-grid">
+                <button type="button" class="btn btn-primary btn-sm" @onclick="ApplySearch"
+                        disabled="@_loading">
+                    @if (_loading)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    else
+                    {
+                        <i class="bi bi-search me-1"></i>
+                    }
+                    Cari
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+@* ── Results table ────────────────────────────────────────────────────────────── *@
+<div class="card">
+    <div class="card-body p-0">
+
+        @if (_loading)
+        {
+            <div class="p-4 text-center text-muted">
+                <div class="spinner-border spinner-border-sm me-2" role="status"></div>
+                Memuat…
+            </div>
+        }
+        else if (_products is null || _products.Items.Count == 0)
+        {
+            <div class="p-5 text-center text-muted">
+                <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+                <p class="mb-1">Tidak ada produk ditemukan.</p>
+            </div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nama</th>
+                        <th>Satuan</th>
+                        <th class="text-end">Stok</th>
+                        <th class="text-end">Nilai Stok</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var p in _products.Items)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@p.Name</td>
+                            <td><span class="badge bg-light text-dark border">@p.BaseUnit</span></td>
+                            <td class="text-end @(p.HasStock ? "" : "text-danger fw-semibold")">
+                                @($"{p.StockQuantity:0.##} {p.BaseUnit}")
+                            </td>
+                            <td class="text-end">
+                                @(p.StockValue > 0 ? $"Rp {p.StockValue:N0}" : "—")
+                            </td>
+                            <td>
+                                @if (p.IsActive)
+                                {
+                                    <span class="badge bg-success">Aktif</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary">Tidak Aktif</span>
+                                }
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a href="/stock-report/@p.Id" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-list-columns-reverse me-1"></i>Detail
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="3" class="text-end fw-semibold">Total nilai (halaman ini)</td>
+                        <td class="text-end fw-bold">Rp @($"{_products.Items.Sum(p => p.StockValue):N0}")</td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+
+            @* ── Pagination ── *@
+            <div class="d-flex justify-content-between align-items-center px-3 py-2 border-top flex-wrap gap-2">
+                <small class="text-muted">
+                    Menampilkan
+                    <strong>@((_page - 1) * PageSize + 1)</strong>–<strong>@(Math.Min(_page * PageSize, _products.TotalCount))</strong>
+                    dari <strong>@_products.TotalCount</strong> produk
+                </small>
+
+                @if (_products.TotalPages > 1)
+                {
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item @(_page <= 1 ? "disabled" : "")">
+                                <button type="button" class="page-link"
+                                        disabled="@(_page <= 1 || _loading)"
+                                        @onclick="() => SetPage(_page - 1)">‹</button>
+                            </li>
+                            @{
+                                var start = Math.Max(1, _page - 2);
+                                var end   = Math.Min(_products.TotalPages, _page + 2);
+                            }
+                            @for (int i = start; i <= end; i++)
+                            {
+                                var pg = i;
+                                <li class="page-item @(pg == _page ? "active" : "")">
+                                    <button type="button" class="page-link"
+                                            disabled="@_loading"
+                                            @onclick="() => SetPage(pg)">@pg</button>
+                                </li>
+                            }
+                            <li class="page-item @(_page >= _products.TotalPages ? "disabled" : "")">
+                                <button type="button" class="page-link"
+                                        disabled="@(_page >= _products.TotalPages || _loading)"
+                                        @onclick="() => SetPage(_page + 1)">›</button>
+                            </li>
+                        </ul>
+                    </nav>
+                }
+            </div>
+        }
+
+    </div>
+</div>
+
+@code {
+    private const int PageSize = 20;
+
+    private PagedProductsDto?  _products;
+    private List<CategoryDto>  _categories = [];
+    private bool               _loading    = true;
+    private int                _page       = 1;
+
+    private string  _searchInput    = "";
+    private string  _appliedSearch  = "";
+    private string  _categoryFilter = "";
+    private bool?   _statusFilter   = true;   // default to active products
+
+    protected override async Task OnInitializedAsync()
+    {
+        var catsTask = Api.GetCategoriesAsync();
+        await LoadAsync();
+        _categories = (await catsTask)?
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
+            .ToList() ?? [];
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        StateHasChanged();
+
+        Guid? catId = Guid.TryParse(_categoryFilter, out var g) ? g : null;
+        string? searchArg = string.IsNullOrWhiteSpace(_appliedSearch) ? null : _appliedSearch.Trim();
+
+        _products = await Api.GetProductsAsync(
+            page: _page, pageSize: PageSize,
+            isActive: _statusFilter,
+            search: searchArg,
+            categoryId: catId);
+
+        _loading = false;
+    }
+
+    private async Task ApplySearch()
+    {
+        _appliedSearch = _searchInput;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await ApplySearch();
+    }
+
+    private async Task ClearSearch()
+    {
+        _searchInput   = "";
+        _appliedSearch = "";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task OnCategoryChanged(ChangeEventArgs e)
+    {
+        _categoryFilter = e.Value?.ToString() ?? "";
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task SetStatusFilter(bool? value)
+    {
+        _statusFilter = value;
+        _page = 1;
+        await LoadAsync();
+    }
+
+    private async Task SetPage(int page)
+    {
+        _page = page;
+        await LoadAsync();
+    }
+}

@@ -1,5 +1,6 @@
 using Materia.Application.Contracts.Inventory;
 using Materia.Application.Contracts.Stores;
+using Materia.Application.Services;
 using Materia.Domain.Inventory;
 using Materia.Domain.Inventory.Events;
 using Materia.Domain.Purchasing;
@@ -91,6 +92,16 @@ public class StockRepository(AppDbContext context, ICurrentStore currentStore) :
 
         projection.Quantity = stock.Quantity;
         projection.Unit = stock.Unit;
+
+        // Recompute the weighted moving-average cost for any goods received in this batch.
+        // prevQty comes from the event itself (NewQuantity - ReceivedQty), so interleaved
+        // sales/returns don't affect correctness; only receipts move the average.
+        foreach (var receipt in newEvents.OfType<StockReconciledFromPurchase>())
+        {
+            var prevQty = receipt.NewQuantity - receipt.ReceivedQty;
+            projection.AverageCost = MovingAverageCost.AfterReceipt(
+                prevQty, projection.AverageCost, receipt.ReceivedQty, receipt.UnitCost);
+        }
 
         var lastAdjust = newEvents.OfType<StockAdjusted>().LastOrDefault();
         if (lastAdjust is not null)

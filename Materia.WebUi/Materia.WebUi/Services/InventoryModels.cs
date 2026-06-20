@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Materia.WebUi.Services;
 
 public record ProductDto(
@@ -16,6 +18,7 @@ public record ProductDto(
     List<CategoryRefDto> Categories,
     List<ColorVariantDto>? ColorVariants = null,
     decimal StockQuantity = 0m,
+    decimal StockValue = 0m,
     decimal? LatestPurchasePrice = null,
     bool HasSupplier = false)
 {
@@ -77,6 +80,33 @@ public record StockDto(
     DateTime? LastAdjustedAt,
     string? LastAdjustedBy,
     // Set for a color-variant stock bucket; null for the product-level ("umum") bucket.
+    Guid? VariantId = null,
+    string? ColorName = null);
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum StockMovementType
+{
+    Initial,
+    Adjustment,
+    Sale,
+    PurchaseReceipt,
+    PurchaseReturn,
+    UnitCorrection,
+}
+
+/// <summary>One line of the stock flow (kartu stok). Mirrors the API's StockMovementDto.</summary>
+public record StockMovementDto(
+    DateTime OccurredAt,
+    StockMovementType Type,
+    decimal Delta,
+    decimal BalanceAfter,
+    string Unit,
+    string? Reason,
+    string? Reference,
+    string PerformedBy,
+    decimal? UnitCost,
+    decimal RunningAverageCost,
+    decimal BalanceValue,
     Guid? VariantId = null,
     string? ColorName = null);
 
