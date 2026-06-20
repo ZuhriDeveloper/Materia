@@ -17,4 +17,6 @@ public class AccountLinkBuilder(IConfiguration configuration) : IAccountLinkBuil
 
     public string BuildPasswordResetLink(string email, string encodedToken) =>
         $"{_baseUrl}/reset-password?email={Uri.EscapeDataString(email)}&token={Uri.EscapeDataString(encodedToken)}";
+
+    public string BuildChangePasswordLink() => $"{_baseUrl}/account/change-password";
 }

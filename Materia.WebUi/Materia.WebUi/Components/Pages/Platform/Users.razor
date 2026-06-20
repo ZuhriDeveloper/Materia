@@ -7,13 +7,12 @@
 <PageTitle>Pengguna — Materia Platform</PageTitle>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4 class="mb-0 fw-bold">Daftarkan Pengguna</h4>
+    <h4 class="mb-0 fw-bold">Pengguna</h4>
 </div>
 
 @if (_errors.Count > 0)
 {
     <div class="alert alert-danger alert-dismissible">
-        <strong>Pendaftaran gagal:</strong>
         <ul class="mb-0 mt-1 ps-3">
             @foreach (var e in _errors)
             {
@@ -31,9 +30,10 @@
     </div>
 }
 
-<div class="card" style="max-width:680px">
+@* ── Create user ──────────────────────────────────────────────────────────────── *@
+<div class="card mb-4" style="max-width:680px">
     <div class="card-header fw-semibold">
-        <i class="bi bi-person-plus me-1"></i> Pengguna Baru
+        <i class="bi bi-person-plus me-1"></i> Daftarkan Pengguna Baru
     </div>
     <div class="card-body">
         @if (_stores is null)
@@ -75,19 +75,19 @@
                         <label class="form-label">Role <span class="text-danger">*</span></label>
                         <InputSelect class="form-select" @bind-Value="_form.Role">
                             <option value="">— pilih role —</option>
-                            <option value="Admin">Admin</option>
-                            <option value="Cashier">Kasir</option>
-                            <option value="Gudang">Gudang</option>
-                            <option value="Helper">Helper</option>
+                            @foreach (var (value, label) in AssignableRoles)
+                            {
+                                <option value="@value">@label</option>
+                            }
                         </InputSelect>
                         <ValidationMessage For="() => _form.Role" class="small text-danger" />
                     </div>
                     <div class="col-12">
                         <label class="form-label">Toko <span class="text-danger">*</span></label>
-                        @if (_stores.Count == 0)
+                        @if (!_stores.Any(s => s.IsActive))
                         {
                             <div class="alert alert-warning py-2 small mb-0">
-                                Belum ada toko terdaftar.
+                                Belum ada toko aktif.
                                 <a href="/platform/stores">Daftarkan toko</a> terlebih dahulu.
                             </div>
                         }
@@ -95,7 +95,7 @@
                         {
                             <InputSelect class="form-select" @bind-Value="_form.StoreId">
                                 <option value="@Guid.Empty">— pilih toko —</option>
-                                @foreach (var s in _stores)
+                                @foreach (var s in _stores.Where(s => s.IsActive))
                                 {
                                     <option value="@s.Id">@s.Name (@s.Code)</option>
                                 }
@@ -108,7 +108,7 @@
                 <div class="mt-4 d-flex gap-2">
                     <button type="submit"
                             class="btn btn-primary"
-                            disabled="@(_saving || _stores.Count == 0)">
+                            disabled="@(_saving || !_stores.Any(s => s.IsActive))">
                         @if (_saving)
                         {
                             <span class="spinner-border spinner-border-sm me-1"></span>
@@ -129,7 +129,202 @@
     </div>
 </div>
 
+@* ── Manage users ─────────────────────────────────────────────────────────────── *@
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="fw-semibold"><i class="bi bi-people me-1"></i> Daftar Pengguna</span>
+        <div class="d-flex align-items-center gap-2">
+            <label class="small text-muted mb-0">Toko:</label>
+            <select class="form-select form-select-sm" style="min-width:220px"
+                    value="@(_filterStoreId?.ToString() ?? "")" @onchange="OnFilterChanged"
+                    disabled="@(_stores is null)">
+                <option value="">— Semua Toko —</option>
+                @if (_stores is not null)
+                {
+                    @foreach (var s in _stores)
+                    {
+                        <option value="@s.Id">@s.Name (@s.Code)</option>
+                    }
+                }
+            </select>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        @if (_users is null)
+        {
+            <div class="p-3 text-muted">
+                <span class="spinner-border spinner-border-sm me-1"></span> Memuat…
+            </div>
+        }
+        else if (_users.Count == 0)
+        {
+            <div class="p-3 text-muted">Tidak ada pengguna untuk filter ini.</div>
+        }
+        else
+        {
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Email</th>
+                        <th>Nama</th>
+                        <th>Role</th>
+                        <th>Toko</th>
+                        <th>Verifikasi</th>
+                        <th class="text-end">Aksi</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var user in _users)
+                    {
+                        <tr>
+                            <td class="fw-semibold">@user.Email</td>
+                            <td>@user.FullName</td>
+                            <td>
+                                @if (user.Roles.Count == 0)
+                                {
+                                    <span class="text-muted small">—</span>
+                                }
+                                else
+                                {
+                                    @foreach (var r in user.Roles)
+                                    {
+                                        <span class="badge text-bg-info me-1">@RoleLabel(r)</span>
+                                    }
+                                }
+                            </td>
+                            <td class="small text-muted">@StoreName(user.StoreId)</td>
+                            <td>
+                                @if (user.EmailConfirmed)
+                                {
+                                    <span class="badge bg-success">Terkonfirmasi</span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-warning text-dark">Belum</span>
+                                }
+                            </td>
+                            <td class="text-end">
+                                <div class="d-flex gap-1 justify-content-end">
+                                    <button class="btn btn-sm btn-outline-secondary"
+                                            title="Ubah Role" @onclick="() => OpenRoleEdit(user)">
+                                        <i class="bi bi-person-gear"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning"
+                                            title="Reset Kata Sandi" @onclick="() => OpenReset(user)">
+                                        <i class="bi bi-key"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+@* ── Edit-roles modal ─────────────────────────────────────────────────────────── *@
+@if (_roleEditUser is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Ubah Role</h5>
+                    <button type="button" class="btn-close"
+                            @onclick="CloseRoleEdit" disabled="@_roleSaving"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1 fw-semibold">@_roleEditUser.Email</p>
+                    <p class="small text-muted mb-3">Pilih satu atau beberapa role.</p>
+
+                    @if (!string.IsNullOrEmpty(_roleError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">@_roleError</div>
+                    }
+
+                    @foreach (var (value, label) in AssignableRoles)
+                    {
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="role-@value"
+                                   checked="@_roleSelection.Contains(value)"
+                                   @onchange="e => ToggleRole(value, (bool)(e.Value ?? false))" />
+                            <label class="form-check-label" for="role-@value">@label</label>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            @onclick="CloseRoleEdit" disabled="@_roleSaving">
+                        Batal
+                    </button>
+                    <button type="button" class="btn btn-sm btn-primary"
+                            @onclick="SaveRoles" disabled="@_roleSaving">
+                        @if (_roleSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Simpan
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
+@* ── Force-reset confirm modal ────────────────────────────────────────────────── *@
+@if (_resetUser is not null)
+{
+    <div class="modal fade show d-block" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Reset Kata Sandi</h5>
+                    <button type="button" class="btn-close"
+                            @onclick="CloseReset" disabled="@_resetSaving"></button>
+                </div>
+                <div class="modal-body">
+                    @if (!string.IsNullOrEmpty(_resetError))
+                    {
+                        <div class="alert alert-danger py-2 small mb-3">@_resetError</div>
+                    }
+                    <p class="mb-0">
+                        Kata sandi sementara akan dibuat untuk
+                        <strong>@_resetUser.Email</strong> dan dikirim ke email tersebut.
+                        Pengguna akan diminta menggantinya setelah masuk.
+                    </p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-sm btn-outline-secondary"
+                            @onclick="CloseReset" disabled="@_resetSaving">
+                        Batal
+                    </button>
+                    <button type="button" class="btn btn-sm btn-warning"
+                            @onclick="ConfirmReset" disabled="@_resetSaving">
+                        @if (_resetSaving)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                        }
+                        Reset & Kirim Email
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="modal-backdrop fade show"></div>
+}
+
 @code {
+    // Store roles a SuperAdmin may grant (mirrors RoleNames.AssignableStoreRoles on the API).
+    private static readonly (string Value, string Label)[] AssignableRoles =
+    [
+        ("Admin",   "Admin"),
+        ("Cashier", "Kasir"),
+        ("Gudang",  "Gudang"),
+        ("Helper",  "Helper"),
+    ];
+
     private List<StoreDto>? _stores;
     private string?         _notice;
     private bool            _saving;
@@ -137,11 +332,44 @@
     private readonly List<string> _errors = [];
     private UserCreateForm _form = new();
 
+    // Management list
+    private Guid?           _filterStoreId;
+    private List<UserDto>?  _users;
+
+    // Edit-roles modal
+    private UserDto?        _roleEditUser;
+    private HashSet<string> _roleSelection = new(StringComparer.OrdinalIgnoreCase);
+    private bool            _roleSaving;
+    private string?         _roleError;
+
+    // Reset-password modal
+    private UserDto?        _resetUser;
+    private bool            _resetSaving;
+    private string?         _resetError;
+
     protected override async Task OnInitializedAsync()
-        => _stores = (await Api.GetStoresAsync() ?? [])
-            .Where(s => s.IsActive)
+    {
+        _stores = (await Api.GetStoresAsync() ?? [])
             .OrderBy(s => s.Name)
             .ToList();
+        await LoadUsersAsync();
+    }
+
+    private async Task LoadUsersAsync()
+    {
+        _users = null;
+        StateHasChanged();
+        _users = (await Api.GetUsersAsync(_filterStoreId) ?? [])
+            .OrderBy(u => u.Email)
+            .ToList();
+    }
+
+    private async Task OnFilterChanged(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString();
+        _filterStoreId = Guid.TryParse(raw, out var id) ? id : null;
+        await LoadUsersAsync();
+    }
 
     private async Task HandleCreate()
     {
@@ -174,8 +402,9 @@
 
         if (errors is not null) { _errors.AddRange(errors); return; }
 
-        _notice = $"Pengguna '{_form.FullName}' berhasil didaftarkan (ID: {userId}).";
+        _notice = $"Pengguna '{_form.FullName}' berhasil didaftarkan.";
         _form   = new();
+        await LoadUsersAsync();
     }
 
     private void ResetForm()
@@ -183,6 +412,95 @@
         _form   = new();
         _errors.Clear();
         _notice = null;
+    }
+
+    // ── Edit roles ───────────────────────────────────────────────────────────────
+
+    private void OpenRoleEdit(UserDto user)
+    {
+        _roleEditUser  = user;
+        _roleError     = null;
+        // Pre-select only assignable roles the user currently holds.
+        _roleSelection = new HashSet<string>(
+            user.Roles.Where(r => AssignableRoles.Any(a => string.Equals(a.Value, r, StringComparison.OrdinalIgnoreCase))),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private void ToggleRole(string role, bool isChecked)
+    {
+        if (isChecked) _roleSelection.Add(role);
+        else _roleSelection.Remove(role);
+    }
+
+    private async Task SaveRoles()
+    {
+        if (_roleEditUser is null) return;
+
+        _roleError = null;
+        if (_roleSelection.Count == 0)
+        {
+            _roleError = "Pilih setidaknya satu role.";
+            return;
+        }
+
+        _roleSaving = true;
+        var errors = await Api.UpdateUserRolesAsync(_roleEditUser.Id, _roleSelection.ToList());
+        _roleSaving = false;
+
+        if (errors is not null) { _roleError = string.Join(" ", errors); return; }
+
+        _notice = $"Role untuk '{_roleEditUser.Email}' berhasil diperbarui.";
+        CloseRoleEdit();
+        await LoadUsersAsync();
+    }
+
+    private void CloseRoleEdit()
+    {
+        _roleEditUser = null;
+        _roleSelection.Clear();
+        _roleError = null;
+    }
+
+    // ── Force reset ──────────────────────────────────────────────────────────────
+
+    private void OpenReset(UserDto user)
+    {
+        _resetUser  = user;
+        _resetError = null;
+    }
+
+    private async Task ConfirmReset()
+    {
+        if (_resetUser is null) return;
+
+        _resetError  = null;
+        _resetSaving = true;
+        var errors = await Api.ForceResetPasswordAsync(_resetUser.Id);
+        _resetSaving = false;
+
+        if (errors is not null) { _resetError = string.Join(" ", errors); return; }
+
+        _notice = $"Email berisi kata sandi sementara telah dikirim ke '{_resetUser.Email}'.";
+        CloseReset();
+    }
+
+    private void CloseReset() => _resetUser = null;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────────
+
+    private string StoreName(Guid? storeId)
+    {
+        if (storeId is not Guid id) return "—";
+        var store = _stores?.FirstOrDefault(s => s.Id == id);
+        return store is null ? "—" : $"{store.Name} ({store.Code})";
+    }
+
+    private static string RoleLabel(string role)
+    {
+        foreach (var (value, label) in AssignableRoles)
+            if (string.Equals(value, role, StringComparison.OrdinalIgnoreCase))
+                return label;
+        return role;
     }
 
     private static List<string> ValidatePassword(string? pwd)

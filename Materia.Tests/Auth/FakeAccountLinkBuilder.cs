@@ -9,4 +9,6 @@ public class FakeAccountLinkBuilder : IAccountLinkBuilder
 
     public string BuildPasswordResetLink(string email, string encodedToken) =>
         $"https://test/reset-password?email={email}&token={encodedToken}";
+
+    public string BuildChangePasswordLink() => "https://test/account/change-password";
 }

@@ -66,6 +66,8 @@ public static class DependencyInjection
         services.AddScoped<ForgotPasswordCommandHandler>();
         services.AddScoped<ResetPasswordCommandHandler>();
         services.AddScoped<ConfirmEmailCommandHandler>();
+        services.AddScoped<UpdateUserRolesCommandHandler>();
+        services.AddScoped<AdminResetPasswordCommandHandler>();
 
         // Inventory — product commands
         services.AddScoped<CreateProductCommandHandler>();

@@ -24,6 +24,29 @@ public static class AccountEmailTemplates
         return (subject, body);
     }
 
+    public static (string Subject, string HtmlBody) TemporaryPassword(
+        string? fullName, string temporaryPassword, string changePasswordLink)
+    {
+        const string subject = "Kata Sandi Sementara — Materia";
+        var body = Wrap($"""
+            <h2 style="margin:0 0 16px">Kata Sandi Sementara</h2>
+            <p>Halo {Greeting(fullName)},</p>
+            <p>Administrator telah mengatur ulang kata sandi akun Materia Anda. Gunakan kata sandi
+               sementara berikut untuk masuk:</p>
+            <p style="margin:24px 0;text-align:center">
+              <span style="display:inline-block;font-family:Consolas,'Courier New',monospace;
+                           font-size:20px;font-weight:700;letter-spacing:2px;background:#f1f3f5;
+                           color:#212529;padding:12px 20px;border-radius:6px">{WebUtility.HtmlEncode(temporaryPassword)}</span>
+            </p>
+            <p><strong>Demi keamanan, segera ganti kata sandi ini setelah Anda masuk.</strong></p>
+            {Button("Ganti Kata Sandi", changePasswordLink)}
+            <p style="color:#6c757d;font-size:13px">Jika Anda tidak mengenali permintaan ini,
+               segera hubungi administrator Anda.</p>
+            {FallbackLink(changePasswordLink)}
+            """);
+        return (subject, body);
+    }
+
     public static (string Subject, string HtmlBody) EmailConfirmation(string? fullName, string confirmLink)
     {
         const string subject = "Konfirmasi Alamat Email — Materia";

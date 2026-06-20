@@ -56,6 +56,25 @@ public class PlatformApiClient(HttpClient http)
         return (result?.Id, null);
     }
 
+    public Task<List<UserDto>?> GetUsersAsync(Guid? storeId, CancellationToken ct = default)
+        => http.GetFromJsonAsync<List<UserDto>>(
+            storeId is Guid id ? $"api/platform/users?storeId={id}" : "api/platform/users", ct);
+
+    public async Task<List<string>?> UpdateUserRolesAsync(
+        string userId, IReadOnlyList<string> roles, CancellationToken ct = default)
+    {
+        var response = await http.PutAsJsonAsync(
+            $"api/platform/users/{Uri.EscapeDataString(userId)}/roles", new { roles }, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorsAsync(response);
+    }
+
+    public async Task<List<string>?> ForceResetPasswordAsync(string userId, CancellationToken ct = default)
+    {
+        var response = await http.PostAsync(
+            $"api/platform/users/{Uri.EscapeDataString(userId)}/reset-password", null, ct);
+        return response.IsSuccessStatusCode ? null : await ReadErrorsAsync(response);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static async Task<List<string>> ReadErrorsAsync(HttpResponseMessage r)

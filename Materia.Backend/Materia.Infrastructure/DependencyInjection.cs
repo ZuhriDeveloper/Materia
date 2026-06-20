@@ -82,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<ITokenService, JwtTokenService>();
         services.AddScoped<IUserProvisioningService, UserProvisioningService>();
         services.AddScoped<IUserAccountService, UserAccountService>();
+        services.AddScoped<IUserAdminService, UserAdminService>();
         services.AddScoped<IAccountLinkBuilder, AccountLinkBuilder>();
         services.AddScoped<Application.Contracts.Email.IEmailSender, Email.SmtpEmailSender>();
         services.AddScoped<DatabaseInitializer>();

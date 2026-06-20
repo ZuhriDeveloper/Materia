@@ -8,4 +8,7 @@ public interface IAccountLinkBuilder
 {
     string BuildEmailConfirmationLink(string userId, string encodedToken);
     string BuildPasswordResetLink(string email, string encodedToken);
+
+    /// <summary>Link to the Web UI Change Password page (used in the temporary-password email).</summary>
+    string BuildChangePasswordLink();
 }
