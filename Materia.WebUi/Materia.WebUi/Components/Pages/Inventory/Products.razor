@@ -388,33 +388,92 @@
                 </div>
                 <div class="modal-body">
                     <p class="mb-1 fw-semibold">@_stockProduct.Name</p>
-                    <p class="small text-muted mb-3">
-                        Stok saat ini:
-                        <strong>@($"{_stockProduct.StockQuantity:0.##} {_stockProduct.BaseUnit}")</strong>
-                    </p>
 
                     @if (!string.IsNullOrEmpty(_stockError))
                     {
                         <div class="alert alert-danger py-2 small mb-3">@_stockError</div>
                     }
 
-                    <div class="mb-3">
-                        <label class="form-label small text-muted mb-1">Jumlah stok baru</label>
-                        <div class="input-group input-group-sm">
-                            <input type="number" step="any" min="0" class="form-control"
-                                   @bind="_stockNewQty" />
-                            <span class="input-group-text">@_stockProduct.BaseUnit</span>
+                    @if (_stockLoading)
+                    {
+                        <div class="text-center text-muted py-3">
+                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                            Memuat stok per warna…
                         </div>
-                        <div class="form-text">
-                            Masukkan jumlah fisik di gudang — sistem mencatat selisihnya.
+                    }
+                    else if (_variantStockRows is not null)
+                    {
+                        @* ── Per-color editor (products with color variants) ── *@
+                        <p class="small text-muted mb-2">
+                            Masukkan jumlah fisik di gudang untuk tiap warna — sistem mencatat selisihnya.
+                        </p>
+                        <div class="table-responsive mb-2">
+                            <table class="table table-sm align-middle mb-1">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Warna</th>
+                                        <th class="text-end">Stok saat ini</th>
+                                        <th style="width:9rem">Jumlah baru</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var row in _variantStockRows)
+                                    {
+                                        <tr class="@(row.IsActive ? "" : "opacity-50")">
+                                            <td class="fw-semibold">
+                                                @if (IsHexColor(row.ColorCode))
+                                                {
+                                                    <span class="d-inline-block rounded-circle border align-middle me-2"
+                                                          style="width:14px;height:14px;background-color:@row.ColorCode"></span>
+                                                }
+                                                @row.Label
+                                                @if (!row.IsActive)
+                                                {
+                                                    <span class="badge bg-secondary ms-1">Nonaktif</span>
+                                                }
+                                            </td>
+                                            <td class="text-end text-muted">@($"{row.CurrentQty:0.##}")</td>
+                                            <td>
+                                                <input type="number" step="any" min="0"
+                                                       class="form-control form-control-sm text-end"
+                                                       @bind="row.NewQty" />
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
                         </div>
-                    </div>
+                        <div class="form-text mb-3">Satuan: @_stockProduct.BaseUnit</div>
+                    }
+                    else
+                    {
+                        @* ── Single-bucket editor (products without color variants) ── *@
+                        <p class="small text-muted mb-3">
+                            Stok saat ini:
+                            <strong>@($"{_stockProduct.StockQuantity:0.##} {_stockProduct.BaseUnit}")</strong>
+                        </p>
 
-                    <div class="mb-1">
-                        <label class="form-label small text-muted mb-1">Alasan (opsional)</label>
-                        <input type="text" class="form-control form-control-sm" maxlength="500"
-                               placeholder="mis. stok awal, hasil opname…" @bind="_stockReason" />
-                    </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted mb-1">Jumlah stok baru</label>
+                            <div class="input-group input-group-sm">
+                                <input type="number" step="any" min="0" class="form-control"
+                                       @bind="_stockNewQty" />
+                                <span class="input-group-text">@_stockProduct.BaseUnit</span>
+                            </div>
+                            <div class="form-text">
+                                Masukkan jumlah fisik di gudang — sistem mencatat selisihnya.
+                            </div>
+                        </div>
+                    }
+
+                    @if (!_stockLoading)
+                    {
+                        <div class="mb-1">
+                            <label class="form-label small text-muted mb-1">Alasan (opsional)</label>
+                            <input type="text" class="form-control form-control-sm" maxlength="500"
+                                   placeholder="mis. stok awal, hasil opname…" @bind="_stockReason" />
+                        </div>
+                    }
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-sm btn-outline-secondary"
@@ -422,7 +481,7 @@
                         Batal
                     </button>
                     <button type="button" class="btn btn-sm btn-primary"
-                            @onclick="SaveStock" disabled="@_stockSaving">
+                            @onclick="SaveStock" disabled="@(_stockSaving || _stockLoading)">
                         @if (_stockSaving)
                         {
                             <span class="spinner-border spinner-border-sm me-1" role="status"></span>
@@ -455,13 +514,17 @@
     private string  _categoryFilter = "";  // empty = all categories
     private bool?   _statusFilter;         // null = all statuses
 
-    // Quick stock-edit modal state. Adjusts product-level stock only (no supplier/PO needed).
+    // Quick stock-edit modal state (no supplier/PO needed). Products without color variants
+    // adjust the single product-level bucket via _stockNewQty; products with variants adjust
+    // one bucket per color via _variantStockRows.
     private bool        _stockModalOpen;
     private ProductDto? _stockProduct;
     private decimal     _stockNewQty;
     private string?     _stockReason;
     private string?     _stockError;
     private bool        _stockSaving;
+    private bool        _stockLoading;
+    private List<VariantStockRow>? _variantStockRows;
 
     private bool HasActiveFilters =>
         !string.IsNullOrEmpty(_appliedSearch) ||
@@ -600,20 +663,75 @@
     }
 
     // ── Quick stock edit ────────────────────────────────────────────────────────
-    /// Opens the modal pre-filled with the product's current product-level stock.
-    private void OpenStockModal(ProductDto p)
+    /// Opens the modal. For a product with color variants it loads one editable bucket per
+    /// color; otherwise it pre-fills the single product-level stock field.
+    private async Task OpenStockModal(ProductDto p)
     {
-        _stockProduct   = p;
-        _stockNewQty    = p.StockQuantity;
-        _stockReason    = null;
-        _stockError     = null;
-        _stockModalOpen = true;
+        _stockProduct     = p;
+        _stockNewQty      = p.StockQuantity;
+        _stockReason      = null;
+        _stockError       = null;
+        _variantStockRows = null;
+        _stockModalOpen   = true;
+
+        if (HasVariants(p))
+        {
+            _stockLoading = true;
+            StateHasChanged();
+
+            var stocks = await Api.GetProductStocksAsync(p.Id);
+            _variantStockRows = BuildVariantStockRows(p, stocks);
+            _stockLoading = false;
+        }
     }
 
     private void CloseStockModal()
     {
-        _stockModalOpen = false;
-        _stockProduct   = null;
+        _stockModalOpen   = false;
+        _stockProduct     = null;
+        _variantStockRows = null;
+    }
+
+    private static bool HasVariants(ProductDto p) => p.ColorVariants is { Count: > 0 };
+
+    /// Builds an editable row per color variant, plus the product-level ("umum") bucket when it
+    /// still holds stock — matching each color to its current on-hand quantity (0 when no record).
+    private static List<VariantStockRow> BuildVariantStockRows(ProductDto p, List<StockDto> stocks)
+    {
+        decimal QtyFor(Guid? variantId) =>
+            stocks.FirstOrDefault(s => s.VariantId == variantId)?.Quantity ?? 0m;
+
+        var rows = (p.ColorVariants ?? [])
+            .Select(v =>
+            {
+                var qty = QtyFor(v.Id);
+                return new VariantStockRow
+                {
+                    VariantId  = v.Id,
+                    Label      = v.ColorName,
+                    ColorCode  = v.ColorCode,
+                    IsActive   = v.IsActive,
+                    CurrentQty = qty,
+                    NewQty     = qty,
+                };
+            })
+            .ToList();
+
+        // Surface the product-level bucket only when it carries stock, so leftover "no-color"
+        // quantity stays manageable without cluttering the common per-color case.
+        var umum = QtyFor(null);
+        if (umum > 0m)
+        {
+            rows.Add(new VariantStockRow
+            {
+                VariantId  = null,
+                Label      = "Umum (tanpa warna)",
+                CurrentQty = umum,
+                NewQty     = umum,
+            });
+        }
+
+        return rows;
     }
 
     /// Records the difference between the entered count and the current stock as a manual
@@ -623,6 +741,12 @@
         if (_stockProduct is null) return;
 
         _stockError = null;
+
+        if (_variantStockRows is not null)
+        {
+            await SaveVariantStock();
+            return;
+        }
 
         if (_stockNewQty < 0)
         {
@@ -660,6 +784,64 @@
         await LoadAsync();   // refresh the Stok column and the "perlu perhatian" flag
     }
 
+    /// Applies a per-color adjustment for each row whose entered quantity changed. Each color is
+    /// a separate stock bucket, so adjustments are recorded one event per changed color.
+    private async Task SaveVariantStock()
+    {
+        var rows = _variantStockRows!;
+
+        if (rows.Any(r => r.NewQty < 0))
+        {
+            _stockError = "Jumlah stok tidak boleh negatif.";
+            return;
+        }
+
+        var changed = rows.Where(r => r.NewQty != r.CurrentQty).ToList();
+        if (changed.Count == 0)
+        {
+            _stockError = "Jumlah stok tidak berubah.";
+            return;
+        }
+
+        _stockSaving = true;
+        StateHasChanged();
+
+        var userReason = string.IsNullOrWhiteSpace(_stockReason) ? null : _stockReason!.Trim();
+        var errors = new List<string>();
+
+        foreach (var r in changed)
+        {
+            var delta  = r.NewQty - r.CurrentQty;
+            var reason = userReason ?? (r.CurrentQty == 0 ? "Stok awal" : "Penyesuaian stok manual");
+            var error  = await Api.AdjustStockAsync(_stockProduct!.Id, delta, reason, r.VariantId);
+            if (error is not null)
+                errors.Add($"{r.Label}: {error}");
+        }
+
+        _stockSaving = false;
+
+        if (errors.Count > 0)
+        {
+            // Some colors may have saved; reload buckets so the form reflects reality.
+            _stockError = string.Join(" ", errors);
+            var stocks = await Api.GetProductStocksAsync(_stockProduct!.Id);
+            _variantStockRows = BuildVariantStockRows(_stockProduct, stocks);
+            return;
+        }
+
+        var name = _stockProduct!.Name;
+        _stockModalOpen   = false;
+        _stockProduct     = null;
+        _variantStockRows = null;
+        _notice = $"Stok \"{name}\" berhasil diperbarui.";
+        await LoadAsync();
+    }
+
+    /// True when the code looks like a CSS hex color (#rgb or #rrggbb) so a swatch can be shown.
+    private static bool IsHexColor(string? code) =>
+        !string.IsNullOrWhiteSpace(code) &&
+        System.Text.RegularExpressions.Regex.IsMatch(code, "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$");
+
     // ── Attention marker ────────────────────────────────────────────────────────
     /// Human-readable list of the master-data gaps that make a product need attention.
     private static string AttentionReason(ProductDto p)
@@ -670,5 +852,17 @@
         if (!p.HasPurchasePrice) missing.Add("harga beli");
         if (!p.HasSalePrice)     missing.Add("harga jual");
         return missing.Count == 0 ? "" : "Belum ada: " + string.Join(", ", missing);
+    }
+
+    /// One editable stock bucket in the per-color stock modal. <see cref="VariantId"/> is null for
+    /// the product-level ("umum") bucket and set for a specific color variant.
+    private sealed class VariantStockRow
+    {
+        public Guid?   VariantId  { get; init; }
+        public string  Label      { get; init; } = "";
+        public string? ColorCode  { get; init; }
+        public bool    IsActive   { get; init; } = true;
+        public decimal CurrentQty { get; init; }
+        public decimal NewQty     { get; set; }
     }
 }

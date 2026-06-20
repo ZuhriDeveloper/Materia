@@ -185,11 +185,27 @@ public class InventoryApiClient(HttpClient http)
         return await response.Content.ReadFromJsonAsync<StockDto>(cancellationToken: ct);
     }
 
+    /// <summary>
+    /// All stock buckets for a product: the product-level ("umum") row plus one per color variant.
+    /// Buckets with no stock record yet are simply absent from the list.
+    /// </summary>
+    public async Task<List<StockDto>> GetProductStocksAsync(Guid productId, CancellationToken ct = default)
+    {
+        var result = await http.GetFromJsonAsync<List<StockDto>>(
+            $"api/products/{productId}/variant-stock", ct);
+        return result ?? [];
+    }
+
+    /// <summary>
+    /// Records a stock adjustment. When <paramref name="variantId"/> is supplied the delta is
+    /// applied to that color variant's bucket; otherwise it adjusts the product-level bucket.
+    /// </summary>
     public async Task<string?> AdjustStockAsync(
-        Guid productId, decimal delta, string? reason = null, CancellationToken ct = default)
+        Guid productId, decimal delta, string? reason = null,
+        Guid? variantId = null, CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync(
-            $"api/products/{productId}/stock/adjust", new { delta, reason }, ct);
+            $"api/products/{productId}/stock/adjust", new { delta, reason, variantId }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

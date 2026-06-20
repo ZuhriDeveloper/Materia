@@ -15,7 +15,7 @@ public record ProductDto(
     IReadOnlyList<UnitConversionDto> UnitConversions,
     IReadOnlyList<CategorySummaryDto> Categories,
     IReadOnlyList<ColorVariantDto> ColorVariants,
-    // On-hand product-level stock (variant stock excluded — deferred). 0 when no stock record exists.
+    // Total on-hand stock across all buckets (product-level + every color variant). 0 when none.
     decimal StockQuantity = 0m,
     // Most recent purchase price (harga beli) across supplier catalogs; null when none is recorded.
     decimal? LatestPurchasePrice = null,

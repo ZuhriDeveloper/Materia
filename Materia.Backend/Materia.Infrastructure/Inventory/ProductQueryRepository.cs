@@ -22,10 +22,10 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             .ToListAsync(ct);
         var variants = variantRows.Select(v => ToVariantDto(v, p.SalePrice)).ToList();
 
+        // Total on-hand across all buckets: the product-level row plus every color-variant row.
         var stock = await context.StockReadModels
-            .Where(s => s.ProductId == id && s.VariantId == null)
-            .Select(s => (decimal?)s.Quantity)
-            .FirstOrDefaultAsync(ct);
+            .Where(s => s.ProductId == id)
+            .SumAsync(s => (decimal?)s.Quantity, ct);
         var purchaseInfo = await BuildPurchaseInfoAsync([id], ct);
         var (latestPrice, hasSupplier) = purchaseInfo.GetValueOrDefault(id);
 
@@ -114,10 +114,14 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             .GroupBy(v => v.ProductId)
             .ToDictionary(g => g.Key, g => g.OrderBy(v => v.ColorName).ToList());
 
-        // Product-level stock (variant rows excluded — variant stock is deferred).
-        var stockByProduct = await context.StockReadModels
-            .Where(s => productIds.Contains(s.ProductId) && s.VariantId == null)
-            .ToDictionaryAsync(s => s.ProductId, s => s.Quantity, ct);
+        // Total on-hand across all buckets: the product-level row plus every color-variant row.
+        // Each physical unit lives in exactly one bucket, so summing never double-counts.
+        var stockByProduct = (await context.StockReadModels
+                .Where(s => productIds.Contains(s.ProductId))
+                .GroupBy(s => s.ProductId)
+                .Select(g => new { ProductId = g.Key, Total = g.Sum(s => s.Quantity) })
+                .ToListAsync(ct))
+            .ToDictionary(x => x.ProductId, x => x.Total);
 
         // Latest purchase price (harga beli) and supplier presence, from supplier catalogs.
         var purchaseInfo = await BuildPurchaseInfoAsync(productIds, ct);

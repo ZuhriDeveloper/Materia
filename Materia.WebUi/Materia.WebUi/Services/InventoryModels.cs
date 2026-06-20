@@ -75,7 +75,10 @@ public record StockDto(
     decimal Quantity,
     string Unit,
     DateTime? LastAdjustedAt,
-    string? LastAdjustedBy);
+    string? LastAdjustedBy,
+    // Set for a color-variant stock bucket; null for the product-level ("umum") bucket.
+    Guid? VariantId = null,
+    string? ColorName = null);
 
 public record ProductSearchDto(
     Guid    Id,
