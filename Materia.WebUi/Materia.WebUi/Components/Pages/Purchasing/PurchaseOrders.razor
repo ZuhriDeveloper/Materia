@@ -1,5 +1,5 @@
 @page "/purchase-orders"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Gudang")]
 @rendermode InteractiveServer
 @using Materia.WebUi.Services
 @inject PurchaseOrderApiClient Api

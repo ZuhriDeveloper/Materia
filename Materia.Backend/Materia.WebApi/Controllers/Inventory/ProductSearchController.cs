@@ -9,7 +9,7 @@ namespace Materia.WebApi.Controllers.Inventory;
 /// (cache-aside), and accessible to cashiers — unlike the Admin-only ProductsController.
 /// </summary>
 [ApiController]
-[Authorize(Roles = "Admin,Cashier")]
+[Authorize(Roles = "Admin,Cashier,Gudang")]
 [Route("api/products/search")]
 public class ProductSearchController(IProductSearchCache searchCache) : ControllerBase
 {

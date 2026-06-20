@@ -14,7 +14,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Materia.WebApi.Controllers.Purchasing;
 
 [ApiController]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Gudang")]
 [Route("api/purchase-orders")]
 public class PurchaseOrdersController(
     CreatePurchaseOrderCommandHandler        createHandler,

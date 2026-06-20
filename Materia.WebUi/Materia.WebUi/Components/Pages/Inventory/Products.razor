@@ -1,6 +1,6 @@
 @page "/products"
 @rendermode InteractiveServer
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Gudang")]
 @using Materia.WebUi.Services
 @inject InventoryApiClient Api
 @inject NavigationManager Navigation

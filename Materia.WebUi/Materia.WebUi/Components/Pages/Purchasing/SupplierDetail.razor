@@ -1,5 +1,5 @@
 @page "/suppliers/{id:guid}"
-@attribute [Authorize(Roles = "Admin")]
+@attribute [Authorize(Roles = "Admin,Gudang")]
 @rendermode InteractiveServer
 @using System.ComponentModel.DataAnnotations
 @using Materia.WebUi.Services

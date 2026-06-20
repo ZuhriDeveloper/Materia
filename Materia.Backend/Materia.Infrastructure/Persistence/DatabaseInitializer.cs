@@ -17,6 +17,7 @@ public class DatabaseInitializer(
     [
         new("admin@materia.local",    "Admin",    "Admin Materia",   "Admin@1234"),
         new("cashier@materia.local",  "Cashier",  "Cashier Materia", "Cashier@1234"),
+        new("gudang@materia.local",   "Gudang",   "Gudang Materia",  "Gudang@1234"),
         new("helper@materia.local",   "Helper",   "Helper Materia",  "Helper@1234"),
     ];
 

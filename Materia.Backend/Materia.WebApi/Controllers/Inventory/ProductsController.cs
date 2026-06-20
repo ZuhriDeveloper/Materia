@@ -22,7 +22,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Materia.WebApi.Controllers.Inventory;
 
 [ApiController]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,Gudang")]
 [Route("api/[controller]")]
 public class ProductsController(
     CreateProductCommandHandler createHandler,
