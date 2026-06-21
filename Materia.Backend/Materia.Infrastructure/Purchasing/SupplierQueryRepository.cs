@@ -27,9 +27,15 @@ public class SupplierQueryRepository(AppDbContext context) : ISupplierQueryRepos
             query = query.Where(s => s.IsActive);
 
         if (!string.IsNullOrWhiteSpace(search))
+        {
+            var pattern = $"%{search}%";
             query = query.Where(s =>
-                EF.Functions.ILike(s.Name, $"%{search}%") ||
-                (s.ContactPhone != null && EF.Functions.ILike(s.ContactPhone, $"%{search}%")));
+                EF.Functions.ILike(s.Name, pattern) ||
+                (s.ContactPhone  != null && EF.Functions.ILike(s.ContactPhone, pattern)) ||
+                (s.SalesmanName  != null && EF.Functions.ILike(s.SalesmanName, pattern)) ||
+                (s.SalesmanPhone != null && EF.Functions.ILike(s.SalesmanPhone, pattern)) ||
+                (s.Description   != null && EF.Functions.ILike(s.Description, pattern)));
+        }
 
         var total = await query.CountAsync(ct);
 

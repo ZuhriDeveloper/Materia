@@ -28,7 +28,10 @@ public class GetSuppliersPagedQueryHandlerTests
             if (!string.IsNullOrWhiteSpace(search))
                 q = q.Where(s =>
                     s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                    (s.ContactPhone != null && s.ContactPhone.Contains(search, StringComparison.OrdinalIgnoreCase)));
+                    (s.ContactPhone  != null && s.ContactPhone.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (s.SalesmanName  != null && s.SalesmanName.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (s.SalesmanPhone != null && s.SalesmanPhone.Contains(search, StringComparison.OrdinalIgnoreCase)) ||
+                    (s.Description   != null && s.Description.Contains(search, StringComparison.OrdinalIgnoreCase)));
 
             var ordered = q.OrderBy(s => s.Name).ToList();
             var total   = ordered.Count;
@@ -51,8 +54,10 @@ public class GetSuppliersPagedQueryHandlerTests
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static SupplierDto MakeSupplier(string name, string? phone = null, bool active = true)
-        => new(Guid.NewGuid(), name, phone, null, null, null, active, []);
+    private static SupplierDto MakeSupplier(
+        string name, string? phone = null, bool active = true,
+        string? description = null, string? salesmanName = null, string? salesmanPhone = null)
+        => new(Guid.NewGuid(), name, phone, description, salesmanName, salesmanPhone, active, []);
 
     private static GetSuppliersPagedQueryHandler MakeHandler(IEnumerable<SupplierDto>? data = null)
         => new(new FakeSupplierQueryRepository(data));
@@ -99,6 +104,54 @@ public class GetSuppliersPagedQueryHandlerTests
         var handler = MakeHandler(data);
 
         var result = await handler.HandleAsync(new GetSuppliersPagedQuery("0812"), default);
+
+        result.Items.Should().HaveCount(1);
+        result.Items[0].Name.Should().Be("PT Jaya Bahan");
+    }
+
+    [Fact]
+    public async Task Search_BySalesmanName_ReturnsMatchingSuppliers()
+    {
+        var data = new[]
+        {
+            MakeSupplier("PT Jaya Bahan", salesmanName: "Budi Santoso"),
+            MakeSupplier("CV Maju Abadi", salesmanName: "Andi Wijaya"),
+        };
+        var handler = MakeHandler(data);
+
+        var result = await handler.HandleAsync(new GetSuppliersPagedQuery("budi"), default);
+
+        result.Items.Should().HaveCount(1);
+        result.Items[0].Name.Should().Be("PT Jaya Bahan");
+    }
+
+    [Fact]
+    public async Task Search_BySalesmanPhone_ReturnsMatchingSuppliers()
+    {
+        var data = new[]
+        {
+            MakeSupplier("PT Jaya Bahan", salesmanPhone: "0855111222"),
+            MakeSupplier("CV Maju Abadi", salesmanPhone: "0866333444"),
+        };
+        var handler = MakeHandler(data);
+
+        var result = await handler.HandleAsync(new GetSuppliersPagedQuery("0855"), default);
+
+        result.Items.Should().HaveCount(1);
+        result.Items[0].Name.Should().Be("PT Jaya Bahan");
+    }
+
+    [Fact]
+    public async Task Search_ByDescription_ReturnsMatchingSuppliers()
+    {
+        var data = new[]
+        {
+            MakeSupplier("PT Jaya Bahan", description: "Pemasok semen dan pasir"),
+            MakeSupplier("CV Maju Abadi", description: "Pemasok cat tembok"),
+        };
+        var handler = MakeHandler(data);
+
+        var result = await handler.HandleAsync(new GetSuppliersPagedQuery("pasir"), default);
 
         result.Items.Should().HaveCount(1);
         result.Items[0].Name.Should().Be("PT Jaya Bahan");
