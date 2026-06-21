@@ -17,7 +17,13 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
             .Include(x => x.Items)
             .FirstOrDefaultAsync(x => x.Id == id, ct);
 
-        return s is null ? null : Map(s);
+        if (s is null) return null;
+
+        var returnedAmount = await context.SaleReturnReadModels
+            .Where(r => r.OriginalSaleId == id)
+            .SumAsync(r => (decimal?)r.TotalRefundAmount, ct) ?? 0m;
+
+        return Map(s, returnedAmount);
     }
 
     public async Task<PagedResult<SaleDto>> GetPagedAsync(
@@ -45,10 +51,20 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
             .Take(pageSize)
             .ToListAsync(ct);
 
-        return new PagedResult<SaleDto>(items.Select(Map).ToList(), total, page, pageSize);
+        // Returned amount per sale, scoped to just this page's ids (single grouped query).
+        var ids = items.Select(i => i.Id).ToList();
+        var returnedBySale = await context.SaleReturnReadModels
+            .Where(r => ids.Contains(r.OriginalSaleId))
+            .GroupBy(r => r.OriginalSaleId)
+            .Select(g => new { SaleId = g.Key, Total = g.Sum(x => x.TotalRefundAmount) })
+            .ToDictionaryAsync(x => x.SaleId, x => x.Total, ct);
+
+        return new PagedResult<SaleDto>(
+            items.Select(s => Map(s, returnedBySale.GetValueOrDefault(s.Id, 0m))).ToList(),
+            total, page, pageSize);
     }
 
-    private static SaleDto Map(SaleReadModel s) => new(
+    private static SaleDto Map(SaleReadModel s, decimal returnedAmount = 0m) => new(
         s.Id, s.ReferenceNo,
         s.CustomerId, s.CustomerName,
         s.CustomerAddressId, s.DeliveryAddress,
@@ -65,5 +81,6 @@ public class SaleQueryRepository(AppDbContext context) : ISaleQueryRepository
         s.Items.Select(i => new SaleItemDto(
             i.Id, i.ProductId, i.ProductName,
             i.UnitName, i.Quantity, i.QuantityInBaseUnit,
-            i.UnitPrice, i.Subtotal, i.VariantId, i.ColorName)).ToList());
+            i.UnitPrice, i.Subtotal, i.VariantId, i.ColorName)).ToList(),
+        returnedAmount);
 }

@@ -24,6 +24,7 @@ public static class EventSerializer
             new CustomerIdConverter(),
             new AddressIdConverter(),
             new SaleIdConverter(),
+            new SaleReturnIdConverter(),
             new SaleItemIdConverter(),
             new SupplierIdConverter(),
             new PurchaseOrderIdConverter(),
@@ -98,6 +99,14 @@ public static class EventSerializer
         public override SaleId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
             => SaleId.From(reader.GetGuid());
         public override void Write(Utf8JsonWriter writer, SaleId value, JsonSerializerOptions o)
+            => writer.WriteStringValue(value.Value);
+    }
+
+    private sealed class SaleReturnIdConverter : JsonConverter<SaleReturnId>
+    {
+        public override SaleReturnId Read(ref Utf8JsonReader reader, Type t, JsonSerializerOptions o)
+            => SaleReturnId.From(reader.GetGuid());
+        public override void Write(Utf8JsonWriter writer, SaleReturnId value, JsonSerializerOptions o)
             => writer.WriteStringValue(value.Value);
     }
 

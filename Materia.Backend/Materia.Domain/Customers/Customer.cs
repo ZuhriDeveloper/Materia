@@ -155,6 +155,19 @@ public sealed class Customer : AggregateRoot<CustomerId>
         return paymentId;
     }
 
+    public void ReduceDebtForReturn(decimal amount, Guid saleReturnId, string reducedBy)
+    {
+        if (amount <= 0)
+            throw new DomainException("Jumlah pengurangan piutang harus lebih dari nol.");
+        if (amount > OutstandingDebt)
+            throw new DomainException("Jumlah pengurangan melebihi sisa piutang pelanggan.");
+
+        Raise(new CustomerDebtReducedForReturn(
+            Id, saleReturnId, amount,
+            OutstandingDebt - amount,
+            reducedBy, DateTime.UtcNow));
+    }
+
     public void Deactivate(string deactivatedBy)
     {
         if (!IsActive) throw new DomainException("Pelanggan sudah tidak aktif.");
@@ -284,6 +297,18 @@ public sealed class Customer : AggregateRoot<CustomerId>
                 {
                     var line = _openReceivables.FirstOrDefault(l => l.SaleId == alloc.SaleId);
                     line?.ApplyPayment(alloc.AppliedAmount);
+                }
+                break;
+
+            case CustomerDebtReducedForReturn e:
+                OutstandingDebt = e.OutstandingDebtAfter;
+                var remaining = e.ReducedAmount;
+                foreach (var line in _openReceivables.OrderBy(l => l.IncurredAt))
+                {
+                    if (remaining <= 0) break;
+                    var applied = Math.Min(remaining, line.RemainingAmount);
+                    line.ApplyPayment(applied);
+                    remaining -= applied;
                 }
                 break;
 

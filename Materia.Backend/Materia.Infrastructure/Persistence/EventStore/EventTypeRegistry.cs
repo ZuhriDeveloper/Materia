@@ -53,6 +53,7 @@ public static class EventTypeRegistry
 
         // Customer events
         [nameof(CustomerCreated)]               = typeof(CustomerCreated),
+        [nameof(CustomerDebtReducedForReturn)]  = typeof(CustomerDebtReducedForReturn),
         [nameof(CustomerUpdated)]               = typeof(CustomerUpdated),
         [nameof(CustomerActivated)]             = typeof(CustomerActivated),
         [nameof(CustomerDeactivated)]           = typeof(CustomerDeactivated),
@@ -77,6 +78,9 @@ public static class EventTypeRegistry
         [nameof(PurchaseOrderReturned)]  = typeof(PurchaseOrderReturned),
         [nameof(PurchaseOrderClosed)]    = typeof(PurchaseOrderClosed),
         [nameof(PurchaseOrderCancelled)] = typeof(PurchaseOrderCancelled),
+
+        // Sale return events
+        [nameof(SaleReturnRecorded)]     = typeof(SaleReturnRecorded),
 
         // Sale events
         [nameof(SaleCreated)]            = typeof(SaleCreated),

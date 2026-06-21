@@ -135,6 +135,8 @@ public static class DependencyInjection
         // Sales
         services.AddScoped<Application.Contracts.Sales.ISaleRepository, Sales.SaleRepository>();
         services.AddScoped<Application.Contracts.Sales.ISaleQueryRepository, Sales.SaleQueryRepository>();
+        services.AddScoped<Application.Contracts.Sales.ISaleReturnRepository, Sales.SaleReturnRepository>();
+        services.AddScoped<Application.Contracts.Sales.ISaleReturnQueryRepository, Sales.SaleReturnQueryRepository>();
         services.AddScoped<Application.Contracts.Sales.IStockDeductionService, Sales.StockDeductionService>();
         services.AddScoped<Application.Contracts.Sales.IReferenceNumberGenerator, Sales.ReferenceNumberGenerator>();
         services.AddScoped<Application.Contracts.Sales.ISaleProductQueryService, Sales.SaleProductQueryService>();

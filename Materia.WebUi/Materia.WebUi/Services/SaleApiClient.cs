@@ -99,6 +99,24 @@ public class SaleApiClient(HttpClient http)
         return (result, null);
     }
 
+    public Task<List<SaleReturnSummaryDto>?> GetReturnsAsync(Guid saleId, CancellationToken ct = default)
+        => http.GetFromJsonAsync<List<SaleReturnSummaryDto>>($"api/sales/{saleId}/returns", ct);
+
+    public async Task<(RecordReturnResult? Result, string? Error)> RecordReturnAsync(
+        Guid saleId,
+        IReadOnlyList<RecordReturnLineDto> lines,
+        string resolution,
+        string reason,
+        CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync($"api/sales/{saleId}/returns",
+            new { lines, resolution, reason }, ct);
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorAsync(response));
+        var result = await response.Content.ReadFromJsonAsync<RecordReturnResult>(cancellationToken: ct);
+        return (result, null);
+    }
+
     private static async Task<string> ReadErrorAsync(HttpResponseMessage r)
     {
         try

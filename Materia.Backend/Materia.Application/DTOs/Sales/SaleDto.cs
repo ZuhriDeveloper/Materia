@@ -41,7 +41,8 @@ public record SaleDto(
     string?         ServedBy,
     DateTime        CreatedAt,
     SalePaymentDto? Payment,
-    IReadOnlyList<SaleItemDto> Items);
+    IReadOnlyList<SaleItemDto> Items,
+    decimal         ReturnedAmount = 0m);
 
 // ── Request DTOs ──────────────────────────────────────────────────────────────
 

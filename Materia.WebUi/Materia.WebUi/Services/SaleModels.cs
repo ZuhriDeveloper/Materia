@@ -45,7 +45,8 @@ public record SaleDto(
     string?         ServedBy,
     DateTime        CreatedAt,
     SalePaymentDto? Payment,
-    List<SaleItemDto> Items);
+    List<SaleItemDto> Items,
+    decimal         ReturnedAmount = 0m);
 
 public record PagedSalesDto(
     List<SaleDto> Items,
@@ -73,3 +74,39 @@ public record FinalizeSaleResult(
     decimal Change,
     decimal OutstandingAmount,
     bool    IsCredit);
+
+// ── Sale Return ──────────────────────────────────────────────────────────────
+
+public enum ReturnResolution { CashRefund, DebtReduction }
+
+public record SaleReturnLineSummaryDto(
+    Guid    ProductId,
+    string  ProductName,
+    Guid?   VariantId,
+    string? ColorName,
+    string  UnitName,
+    decimal Quantity,
+    decimal UnitPrice,
+    decimal Subtotal);
+
+public record SaleReturnSummaryDto(
+    Guid   ReturnId,
+    string OriginalReferenceNo,
+    decimal TotalRefundAmount,
+    string  Resolution,
+    string  Reason,
+    string  ReturnedBy,
+    DateTime ReturnedAt,
+    IReadOnlyList<SaleReturnLineSummaryDto> Lines);
+
+public record RecordReturnLineDto(
+    Guid    ProductId,
+    Guid?   VariantId,
+    string  UnitName,
+    decimal Quantity);
+
+public record RecordReturnResult(
+    Guid    ReturnId,
+    string  OriginalReferenceNo,
+    decimal TotalRefundAmount,
+    string  Resolution);

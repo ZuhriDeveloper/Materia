@@ -6,10 +6,12 @@ public record ProfitAndLossResult(
     DateTime                   From,
     DateTime                   To,
     decimal                    TotalRevenue,
+    decimal                    TotalReturns,
     decimal                    TotalCogs,
     decimal                    GrossProfit,
     decimal                    GrossProfitMarginPct,
     List<PnlLineItemResult>    RevenueLines,
+    List<PnlLineItemResult>    ReturnLines,
     List<PnlLineItemResult>    CogsLines);
 
 public record PnlLineItemResult(

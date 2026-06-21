@@ -1,6 +1,8 @@
 using System.Security.Claims;
 using FluentValidation;
 using Materia.Application.Commands.Sales.FinalizeSale;
+using Materia.Application.Commands.Sales.RecordSaleReturn;
+using Materia.Application.Contracts.Sales;
 using Materia.Application.DTOs.Sales;
 using Materia.Application.Services;
 using Materia.Domain.Sales;
@@ -13,9 +15,12 @@ namespace Materia.WebApi.Controllers.Sales;
 [Authorize(Roles = "Admin,Cashier")]
 [Route("api/[controller]")]
 public class SalesController(
-    SaleService                       saleService,
-    FinalizeSaleCommandHandler        finalizeHandler,
-    IValidator<FinalizeSaleCommand>   finalizeValidator) : ControllerBase
+    SaleService                           saleService,
+    FinalizeSaleCommandHandler            finalizeHandler,
+    IValidator<FinalizeSaleCommand>       finalizeValidator,
+    RecordSaleReturnCommandHandler        recordReturnHandler,
+    IValidator<RecordSaleReturnCommand>   recordReturnValidator,
+    ISaleReturnQueryRepository            saleReturnQueryRepository) : ControllerBase
 {
     private string CurrentUser =>
         User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
@@ -86,6 +91,27 @@ public class SalesController(
         return NoContent();
     }
 
+    // ── Sale returns ────────────────────────────────────────────────────────────
+
+    [HttpPost("{id:guid}/returns")]
+    public async Task<IActionResult> RecordReturn(
+        Guid id, [FromBody] RecordSaleReturnRequest request, CancellationToken ct)
+    {
+        var command = new RecordSaleReturnCommand(id, request.Lines, request.Resolution, request.Reason, CurrentUser);
+        var validation = await recordReturnValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+        var result = await recordReturnHandler.HandleAsync(command, ct);
+        return StatusCode(201, result);
+    }
+
+    [HttpGet("{id:guid}/returns")]
+    public async Task<IActionResult> GetReturns(Guid id, CancellationToken ct)
+    {
+        var returns = await saleReturnQueryRepository.GetBySaleIdAsync(id, ct);
+        return Ok(returns);
+    }
+
     // ── Consumer sale (single-step finalize) ────────────────────────────────────
 
     [HttpPost("finalize")]
@@ -111,6 +137,11 @@ public class SalesController(
         return CreatedAtAction(nameof(GetById), new { id = result.SaleId }, result);
     }
 }
+
+public record RecordSaleReturnRequest(
+    IReadOnlyList<ReturnLineDto> Lines,
+    string Resolution,
+    string Reason);
 
 public record FinalizeSaleRequest(
     Guid?                                CustomerId,

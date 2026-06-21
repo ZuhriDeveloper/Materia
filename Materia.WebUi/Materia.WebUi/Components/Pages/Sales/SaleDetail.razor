@@ -31,6 +31,15 @@ else
             <i class="bi bi-printer me-1"></i>
             @(IsSuratJalan ? "Cetak Surat Jalan" : "Cetak Bon")
         </button>
+
+        @* ── Retur button ── *@
+        @if (CanReturn)
+        {
+            <button class="btn btn-sm btn-outline-warning" @onclick="() => _showReturnForm = !_showReturnForm">
+                <i class="bi bi-arrow-return-left me-1"></i>
+                @(_showReturnForm ? "Tutup Form" : "Retur Barang")
+            </button>
+        }
     </div>
 
     @if (_justFinalized)
@@ -119,6 +128,41 @@ else
                     </div>
                 </div>
             }
+
+            @* ── Riwayat Retur ── *@
+            @if (_returns is { Count: > 0 })
+            {
+                <div class="card mt-3">
+                    <div class="card-header fw-semibold">
+                        <i class="bi bi-arrow-return-left me-1"></i> Riwayat Retur
+                    </div>
+                    @foreach (var ret in _returns)
+                    {
+                        <div class="card-body border-bottom py-2">
+                            <div class="d-flex justify-content-between small mb-1">
+                                <span class="text-muted">@ret.ReturnedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span>
+                                <span class="fw-semibold">Rp @ret.TotalRefundAmount.ToString("N0")</span>
+                            </div>
+                            <div class="small mb-1">
+                                <span class="badge text-bg-light border me-1">
+                                    @(ret.Resolution == "DebtReduction" ? "Kurangi Piutang" : "Refund Tunai")
+                                </span>
+                                @ret.ReturnedBy
+                            </div>
+                            <div class="small text-muted">@ret.Reason</div>
+                            <ul class="list-unstyled small mb-0 mt-1">
+                                @foreach (var line in ret.Lines)
+                                {
+                                    <li>— @line.ProductName @(line.ColorName is not null ? $"({line.ColorName})" : "")
+                                        &times; @line.Quantity.ToString("G29") @line.UnitName
+                                        &#64; Rp @line.UnitPrice.ToString("N0")
+                                    </li>
+                                }
+                            </ul>
+                        </div>
+                    }
+                </div>
+            }
         </div>
 
         @* ── Info + actions ── *@
@@ -195,6 +239,12 @@ else
         </div>
 
     </div>
+
+    @* ── Retur Barang inline form ── *@
+    @if (_showReturnForm && _sale is not null)
+    {
+        <ReturnDialog Sale="_sale" OnClose="HandleReturnClosed" />
+    }
 }
 
 @if (_sale is not null)
@@ -217,9 +267,14 @@ else
     private string?          _storeLogo;
     private string?          _custPhone;     // sourced from the customer record for the print
     private string?          _custAddress;
+    private bool             _showReturnForm;
+    private List<SaleReturnSummaryDto>? _returns;
 
     private bool CanCancel => _sale is not null
         && _sale.Status is not SaleStatus.Paid and not SaleStatus.Cancelled;
+
+    private bool CanReturn => _sale is not null
+        && (_sale.Status == SaleStatus.Paid || _sale.Status == SaleStatus.PartiallyPaid);
 
     protected override async Task OnInitializedAsync()
     {
@@ -239,6 +294,9 @@ else
     {
         _sale = await Api.GetSaleByIdAsync(Id);
         if (_sale is null) { Navigation.NavigateTo("/sales"); return; }
+
+        if (_sale is not null)
+            _returns = await Api.GetReturnsAsync(Id);
 
         // Pull the customer's phone + address for the printed Surat Jalan
         // (SaleDto has no phone, and may not carry a delivery address).
@@ -268,6 +326,17 @@ else
         if (error is not null) { _error = error; return; }
         _showCancel = false;
         await LoadAsync();
+    }
+
+    private async Task HandleReturnClosed(bool saved)
+    {
+        _showReturnForm = false;
+        if (saved)
+        {
+            await LoadAsync();
+            _justFinalized = false;
+            _error = null;
+        }
     }
 
     private static MarkupString StatusBadge(SaleStatus status) => status switch

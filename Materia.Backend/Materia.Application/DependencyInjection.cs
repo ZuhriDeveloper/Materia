@@ -43,6 +43,7 @@ using Materia.Application.Queries.Inventory;
 using Materia.Application.Queries.Purchasing;
 using Materia.Application.Commands.Customers.RecordReceivablePayment;
 using Materia.Application.Commands.Sales.FinalizeSale;
+using Materia.Application.Commands.Sales.RecordSaleReturn;
 using Materia.Application.Commands.Financials.RecordPettyCashExpense;
 using Materia.Application.Commands.Financials.RecordChangeFundDeposit;
 using Materia.Application.Commands.Financials.RecordChangeFundWithdrawal;
@@ -149,6 +150,7 @@ public static class DependencyInjection
         // Sales
         services.AddScoped<SaleService>();
         services.AddScoped<FinalizeSaleCommandHandler>();
+        services.AddScoped<RecordSaleReturnCommandHandler>();
 
         // Financials
         services.AddScoped<GetProfitAndLossQueryHandler>();

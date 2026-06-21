@@ -35,12 +35,29 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
             .OrderBy(p => p.ReceivedAt)
             .ToListAsync(ct);
 
+        // Sales returns in the period — contra-revenue (netted off gross sales).
+        // Dated by ReturnedAt: a return reduces revenue in the period it occurs.
+        var returnsRaw = await context.SaleReturnReadModels
+            .AsNoTracking()
+            .Where(r => r.ReturnedAt >= from && r.ReturnedAt <= to)
+            .OrderBy(r => r.ReturnedAt)
+            .Select(r => new { r.OriginalReferenceNo, r.ReturnedAt, r.TotalRefundAmount })
+            .ToListAsync(ct);
+
         var revenueLines = salesRaw
             .Select(s => new PnlLineItemDto(
                 $"Penjualan — {s.CustomerName}",
                 s.CreatedAt,
                 s.ReferenceNo,
                 s.GrandTotal))
+            .ToList();
+
+        var returnLines = returnsRaw
+            .Select(r => new PnlLineItemDto(
+                $"Retur Penjualan — {r.OriginalReferenceNo}",
+                r.ReturnedAt,
+                r.OriginalReferenceNo,
+                r.TotalRefundAmount))
             .ToList();
 
         var cogsLines = new List<PnlLineItemDto>();
@@ -58,16 +75,18 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
         }
 
         var totalRevenue = revenueLines.Sum(l => l.Amount);
+        var totalReturns = returnLines.Sum(l => l.Amount);
         var totalCogs    = cogsLines.Sum(l => l.Amount);
-        var grossProfit  = totalRevenue - totalCogs;
-        var marginPct    = totalRevenue > 0
-                           ? Math.Round(grossProfit / totalRevenue * 100, 1)
+        var netSales     = totalRevenue - totalReturns;
+        var grossProfit  = netSales - totalCogs;
+        var marginPct    = netSales > 0
+                           ? Math.Round(grossProfit / netSales * 100, 1)
                            : 0m;
 
         return new ProfitAndLossDto(
             from, to,
-            totalRevenue, totalCogs, grossProfit, marginPct,
-            revenueLines.AsReadOnly(), cogsLines.AsReadOnly());
+            totalRevenue, totalReturns, totalCogs, grossProfit, marginPct,
+            revenueLines.AsReadOnly(), returnLines.AsReadOnly(), cogsLines.AsReadOnly());
     }
 
     // ── Cash Flow ─────────────────────────────────────────────────────────────
@@ -141,6 +160,24 @@ public sealed class FinancialQueryRepository(AppDbContext context) : IFinancialQ
             e.ReferenceNo,
             e.Amount,
             "Kas Kecil")));
+
+        // Outflows — cash refunds from sales returns. Only CashRefund leaves the drawer;
+        // DebtReduction returns move no cash (they lower the customer's piutang instead).
+        var refundsRaw = await context.SaleReturnReadModels
+            .AsNoTracking()
+            .Where(r => r.Resolution == ReturnResolution.CashRefund
+                     && r.ReturnedAt >= from
+                     && r.ReturnedAt <= to)
+            .OrderBy(r => r.ReturnedAt)
+            .Select(r => new { r.OriginalReferenceNo, r.ReturnedAt, r.TotalRefundAmount })
+            .ToListAsync(ct);
+
+        outflows.AddRange(refundsRaw.Select(r => new CashFlowLineDto(
+            $"Retur Penjualan — {r.OriginalReferenceNo}",
+            r.ReturnedAt,
+            r.OriginalReferenceNo,
+            r.TotalRefundAmount,
+            "Retur Penjualan")));
 
         var totalInflows  = inflows.Sum(i => i.Amount);
         var totalOutflows = outflows.Sum(o => o.Amount);

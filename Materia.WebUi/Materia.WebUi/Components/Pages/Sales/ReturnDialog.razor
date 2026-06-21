@@ -1,0 +1,128 @@
+@using Materia.WebUi.Services
+@inject SaleApiClient Api
+
+<div class="card border-warning mt-3">
+    <div class="card-header fw-semibold text-warning-emphasis bg-warning-subtle">
+        <i class="bi bi-arrow-return-left me-1"></i> Form Retur Barang
+    </div>
+    <div class="card-body">
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger alert-dismissible py-2">
+                @_error
+                <button type="button" class="btn-close" @onclick="() => _error = null"></button>
+            </div>
+        }
+
+        <table class="table table-sm align-middle mb-3">
+            <thead class="table-light">
+                <tr>
+                    <th>Produk</th>
+                    <th class="text-end">Dibeli</th>
+                    <th class="text-end" style="width:140px">Qty Retur</th>
+                    <th class="text-end">Harga</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Sale.Items)
+                {
+                    var qty = _qtyMap.GetValueOrDefault(item.Id, 0m);
+                    <tr>
+                        <td>
+                            <span class="fw-semibold">@item.ProductName</span>
+                            @if (!string.IsNullOrEmpty(item.ColorName))
+                            {
+                                <span class="badge text-bg-light border ms-1 small">@item.ColorName</span>
+                            }
+                            <span class="badge text-bg-light border ms-1 small">@item.UnitName</span>
+                        </td>
+                        <td class="text-end">@item.Quantity.ToString("G29")</td>
+                        <td class="text-end">
+                            <input type="number" class="form-control form-control-sm text-end"
+                                   style="width:110px; margin-left:auto"
+                                   min="0" max="@item.Quantity" step="1"
+                                   value="@qty"
+                                   @onchange="e => SetQty(item.Id, e.Value)" />
+                        </td>
+                        <td class="text-end">Rp @item.UnitPrice.ToString("N0")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Resolusi</label>
+            <select class="form-select" @bind="_resolution">
+                <option value="CashRefund">Refund Tunai</option>
+                @if (Sale.OutstandingAmount > 0)
+                {
+                    <option value="DebtReduction">Kurangi Piutang</option>
+                }
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label fw-semibold">Alasan Retur <span class="text-danger">*</span></label>
+            <textarea class="form-control" rows="2" placeholder="Masukkan alasan retur&hellip;"
+                      @bind="_reason" maxlength="500"></textarea>
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary btn-sm" @onclick="Cancel" disabled="@_saving">
+                Batal
+            </button>
+            <button class="btn btn-warning btn-sm" @onclick="SubmitAsync"
+                    disabled="@(_saving || !CanSubmit)">
+                @if (_saving) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                Simpan Retur
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public SaleDto Sale { get; set; } = default!;
+    [Parameter, EditorRequired] public EventCallback<bool> OnClose { get; set; }
+
+    private Dictionary<Guid, decimal> _qtyMap = [];
+    private string _resolution = "CashRefund";
+    private string _reason = "";
+    private string? _error;
+    private bool _saving;
+
+    protected override void OnParametersSet()
+    {
+        _qtyMap = Sale.Items.ToDictionary(i => i.Id, _ => 0m);
+    }
+
+    private void SetQty(Guid itemId, object? value)
+    {
+        if (decimal.TryParse(value?.ToString(), out var qty))
+            _qtyMap[itemId] = Math.Max(0, Math.Min(qty, Sale.Items.First(i => i.Id == itemId).Quantity));
+    }
+
+    private bool CanSubmit =>
+        !string.IsNullOrWhiteSpace(_reason) &&
+        _qtyMap.Values.Any(q => q > 0);
+
+    private async Task SubmitAsync()
+    {
+        _saving = true;
+        _error = null;
+
+        var lines = Sale.Items
+            .Where(i => _qtyMap.GetValueOrDefault(i.Id, 0m) > 0)
+            .Select(i => new RecordReturnLineDto(
+                i.ProductId, i.VariantId, i.UnitName,
+                _qtyMap[i.Id]))
+            .ToList();
+
+        var (_, error) = await Api.RecordReturnAsync(Sale.Id, lines, _resolution, _reason.Trim());
+        _saving = false;
+
+        if (error is not null) { _error = error; return; }
+        await OnClose.InvokeAsync(true);
+    }
+
+    private void Cancel() => OnClose.InvokeAsync(false);
+}

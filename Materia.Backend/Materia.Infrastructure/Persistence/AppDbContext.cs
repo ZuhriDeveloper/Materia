@@ -30,6 +30,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
     public DbSet<ReceivablePaymentReadModel> ReceivablePaymentReadModels => Set<ReceivablePaymentReadModel>();
     public DbSet<SaleReadModel> SaleReadModels => Set<SaleReadModel>();
     public DbSet<SaleItemReadModel> SaleItemReadModels => Set<SaleItemReadModel>();
+    public DbSet<SaleReturnReadModel> SaleReturnReadModels => Set<SaleReturnReadModel>();
+    public DbSet<SaleReturnLineReadModel> SaleReturnLineReadModels => Set<SaleReturnLineReadModel>();
     public DbSet<SupplierReadModel> SupplierReadModels => Set<SupplierReadModel>();
     public DbSet<PurchaseOrderReadModel> PurchaseOrderReadModels => Set<PurchaseOrderReadModel>();
     public DbSet<PurchaseInvoiceImage> PurchaseInvoiceImages => Set<PurchaseInvoiceImage>();
@@ -158,6 +160,34 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
         builder.ApplyConfiguration(new Configurations.SaleReadModelConfiguration());
         builder.ApplyConfiguration(new Configurations.SaleItemReadModelConfiguration());
 
+        builder.Entity<SaleReturnReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.OriginalSaleId);
+            e.HasIndex(x => x.ReturnedAt);
+            e.Property(x => x.OriginalReferenceNo).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Reason).HasMaxLength(500).IsRequired();
+            e.Property(x => x.ReturnedBy).HasMaxLength(100).IsRequired();
+            e.Property(x => x.TotalRefundAmount).HasColumnType("decimal(18,2)");
+            e.HasMany(x => x.Lines)
+             .WithOne()
+             .HasForeignKey(l => l.SaleReturnId)
+             .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<SaleReturnLineReadModel>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.SaleReturnId);
+            e.Property(x => x.ProductName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.ColorName).HasMaxLength(100);
+            e.Property(x => x.UnitName).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Quantity).HasColumnType("decimal(18,4)");
+            e.Property(x => x.QuantityInBaseUnit).HasColumnType("decimal(18,4)");
+            e.Property(x => x.UnitPrice).HasColumnType("decimal(18,2)");
+            e.Property(x => x.Subtotal).HasColumnType("decimal(18,2)");
+        });
+
         builder.Entity<SupplierReadModel>(e =>
         {
             e.HasKey(x => x.Id);
@@ -252,6 +282,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
         builder.Entity<ReceivablePaymentReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<SaleReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<SaleItemReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<SaleReturnReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
+        builder.Entity<SaleReturnLineReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<SupplierReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<PurchaseOrderReadModel>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);
         builder.Entity<PurchaseInvoiceImage>().HasQueryFilter(x => CurrentStoreId == null || x.StoreId == CurrentStoreId);

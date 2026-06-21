@@ -230,6 +230,57 @@
                 </NoRecordsContent>
             </MudTable>
 
+            @* Returns table (contra-revenue) — only shown when there are returns *@
+            @if ((_pnl?.TotalReturns ?? 0) > 0)
+            {
+                <div class="px-4 py-2 d-flex justify-space-between align-center"
+                     style="background:#fffbeb;border-top:2px solid var(--mud-palette-divider);
+                            border-bottom:1px solid var(--mud-palette-divider)">
+                    <MudText Typo="Typo.subtitle2" Style="color:#b45309">
+                        <MudIcon Icon="@Icons.Material.Filled.AssignmentReturn"
+                                 Size="Size.Small" Class="mr-1" />
+                        Retur Penjualan
+                    </MudText>
+                    <MudText Typo="Typo.subtitle2" Style="color:#b45309;font-weight:700">
+                        − Rp @(_pnl?.TotalReturns.ToString("N0") ?? "—")
+                    </MudText>
+                </div>
+
+                <MudTable T="PnlLineItemResult"
+                          Items="@(_pnl?.ReturnLines ?? [])"
+                          Dense="true" Hover="true" Elevation="0"
+                          FixedHeader="true"
+                          Height="@((_pnl?.ReturnLines.Count ?? 0) > 8 ? "260px" : null)"
+                          Style="background:transparent">
+                    <HeaderContent>
+                        <MudTh Style="padding:5px 12px">Tanggal</MudTh>
+                        <MudTh Style="padding:5px 12px">No. Ref</MudTh>
+                        <MudTh Style="padding:5px 12px">Keterangan</MudTh>
+                        <MudTh Style="padding:5px 12px;text-align:right">Jumlah</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd Style="padding:4px 12px">
+                            <MudText Typo="Typo.caption">
+                                @context.Date.ToLocalTime().ToString("dd/MM/yy HH:mm")
+                            </MudText>
+                        </MudTd>
+                        <MudTd Style="padding:4px 12px">
+                            <MudText Typo="Typo.caption" Style="font-family:monospace">
+                                @context.ReferenceNo
+                            </MudText>
+                        </MudTd>
+                        <MudTd Style="padding:4px 12px">
+                            <MudText Typo="Typo.caption">@context.Description</MudText>
+                        </MudTd>
+                        <MudTd Style="padding:4px 12px;text-align:right">
+                            <MudText Typo="Typo.caption" Style="font-weight:600;color:#b45309">
+                                − Rp @context.Amount.ToString("N0")
+                            </MudText>
+                        </MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
             @* COGS table *@
             <div class="px-4 py-2 d-flex justify-space-between align-center"
                  style="background:#fffbeb;border-top:2px solid var(--mud-palette-divider);
