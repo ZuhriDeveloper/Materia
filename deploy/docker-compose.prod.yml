@@ -1,7 +1,19 @@
+# Materia app stack — pure application services only.
+#
+# Reverse proxy (Caddy/TLS) and auto-deploy (Watchtower) now live in the shared EDGE stack
+# (see the `vps-infra` repo: edge/docker-compose.yml). This stack no longer publishes any
+# ports; the edge Caddy reaches webui/webapi by their network aliases on the external `edge`
+# network. Renovin reaches Materia's API by the `webapi` alias on the external `materia-shared`
+# network (server-to-server, internal, no TLS).
+#
+# Create the shared networks once on the VPS (idempotent, done by vps-infra/scripts/bootstrap.sh):
+#   docker network create edge
+#   docker network create materia-shared
+
 services:
 
   postgres:
-    image: postgres:17-alpine
+    image: pgvector/pgvector:pg17
     restart: unless-stopped
     environment:
       POSTGRES_DB: materiadb
@@ -47,6 +59,8 @@ services:
       Jwt__Issuer: Materia.WebApi
       Jwt__Audience: Materia.WebUi
       WebUi__BaseUrl: https://${APP_DOMAIN}
+      # ── Voyage AI (embeddings for semantic product search) ──────────────
+      Voyage__ApiKey: ${VOYAGE_API_KEY}
       # ── Email (Brevo SMTP) ──────────────────────────────────────────────
       # FromAddress must be a sender/domain you've verified in Brevo, or mail
       # is rejected. Secrets (login/key) live in .env, never in this file.
@@ -60,7 +74,13 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
-      - materia-net
+      materia-net:
+      # Reached by the edge Caddy for the public api.<domain> vhost.
+      edge:
+        aliases: [materia-webapi]
+      # Reached by Renovin's apiservice for /api/catalog/semantic-search (internal, no TLS).
+      materia-shared:
+        aliases: [webapi]
 
   webui:
     image: ${GHCR_PREFIX}/materia-webui:latest
@@ -75,61 +95,23 @@ services:
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
-      - materia-net
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      APP_DOMAIN: ${APP_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - materia-net
-      - edge
-
-  watchtower:
-    image: containrrr/watchtower:latest
-    restart: unless-stopped
-    # Pull-based auto-deploy: polls GHCR and recreates the labeled app
-    # containers (webapi/webui) whenever CI pushes a new image. Outbound only —
-    # no inbound access to the VPS is needed, so the firewall block is irrelevant.
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      # Reuses the `docker login ghcr.io` you ran on the VPS so Watchtower can
-      # pull your PRIVATE images. Must match the user you logged in as:
-      #   logged in as 'deploy' -> keep the line below
-      #   logged in as root     -> change to /root/.docker/config.json
-      #   images are PUBLIC     -> delete the line below
-      - /home/deploy/.docker/config.json:/config.json:ro
-    environment:
-      # The watchtower image defaults to an old Docker API version (1.25) that
-      # modern Docker daemons reject — pin a supported one.
-      DOCKER_API_VERSION: "1.41"
-      WATCHTOWER_CLEANUP: "true"          # remove old images after updating
-      WATCHTOWER_LABEL_ENABLE: "true"     # only watch containers we labeled
-      WATCHTOWER_POLL_INTERVAL: "120"     # check GHCR every 120 seconds
-      WATCHTOWER_ROLLING_RESTART: "true"  # update one container at a time
-    networks:
-      - materia-net
+      materia-net:
+      # Reached by the edge Caddy for the public app.<domain> vhost.
+      edge:
+        aliases: [materia-webui]
 
 volumes:
   postgres_data:
   redis_data:
-  caddy_data:
-  caddy_config:
 
 networks:
+  # Private to this stack: postgres, redis, webapi, webui talk here.
   materia-net:
     driver: bridge
-  # Shared edge network so the separate Renovin stack (renovin-web) is reachable by this
-  # Caddy. Create once on the VPS:  docker network create edge
+  # Shared public bus owned by the edge stack (Caddy). Create once: docker network create edge
   edge:
+    external: true
+  # Private bridge between Materia's webapi and Renovin's apiservice.
+  # Create once: docker network create materia-shared
+  materia-shared:
     external: true
