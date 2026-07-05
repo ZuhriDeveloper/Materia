@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
+using Pgvector.EntityFrameworkCore;
 using StackExchange.Redis;
 
 namespace Materia.Infrastructure;
@@ -24,7 +25,11 @@ public static class DependencyInjection
     {
         services.AddDbContext<AppDbContext>(options =>
             options
-                .UseNpgsql(configuration.GetConnectionString("materiadb"))
+                // UseVector enables the pgvector type handler so the product-embedding
+                // column maps to Pgvector.Vector and the <=> operator is available.
+                .UseNpgsql(
+                    configuration.GetConnectionString("materiadb"),
+                    npgsql => npgsql.UseVector())
                 // Snapshot is maintained manually — suppress the mismatch warning
                 // that EF Core raises when the live model diverges from the snapshot.
                 .ConfigureWarnings(w =>
@@ -101,6 +106,22 @@ public static class DependencyInjection
         services.AddScoped<Application.Contracts.Inventory.IProductRepository, Inventory.ProductRepository>();
         services.AddScoped<Application.Contracts.Inventory.ICategoryRepository, Inventory.CategoryRepository>();
         services.AddScoped<Application.Contracts.Inventory.IProductQueryRepository, Inventory.ProductQueryRepository>();
+        services.AddScoped<Application.Contracts.Inventory.IProductVectorSearch, Inventory.ProductVectorSearchRepository>();
+
+        // ── Semantic search (RAG retrieval for the Renovin assistant) ───────────
+        // Voyage AI embeddings (Claude has no embeddings API). Key is optional at startup:
+        // when absent, the indexer logs and idles and search returns whatever is indexed.
+        services.AddHttpClient<Application.Contracts.Inventory.IEmbeddingGenerator, Inventory.VoyageEmbeddingGenerator>(client =>
+        {
+            client.BaseAddress = new Uri("https://api.voyageai.com/");
+            client.Timeout = TimeSpan.FromSeconds(30);
+            var apiKey = configuration["Voyage:ApiKey"];
+            if (!string.IsNullOrWhiteSpace(apiKey))
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", apiKey);
+        });
+        // Background indexer keeps product embeddings in step with the catalog (and backfills).
+        services.AddHostedService<Inventory.ProductEmbeddingIndexer>();
         services.AddScoped<Application.Contracts.Inventory.ICategoryQueryRepository, Inventory.CategoryQueryRepository>();
         services.AddScoped<Application.Contracts.Inventory.IUnitRepository, Inventory.UnitRepository>();
         services.AddScoped<Application.Contracts.Inventory.IUnitQueryRepository, Inventory.UnitQueryRepository>();

@@ -8,6 +8,9 @@ var builder = DistributedApplication.CreateBuilder(args);
 var pgPassword = builder.AddParameter("postgres-password", "YYYjzk}ppk*CUP.65!X}!~!", secret: true); 
 
 var postgres = builder.AddPostgres("postgres", password: pgPassword)
+    // pgvector/pgvector ships PostgreSQL with the `vector` extension available, which the
+    // semantic product-search index requires. The EF migration runs CREATE EXTENSION vector.
+    .WithImage("pgvector/pgvector", "pg17")
     .WithDataVolume()
     .WithHostPort(54050)
     .WithLifetime(ContainerLifetime.Persistent);

@@ -2,6 +2,7 @@ using Materia.Application.Contracts.Stores;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
 using Microsoft.EntityFrameworkCore.Diagnostics;
+using Pgvector.EntityFrameworkCore;
 
 namespace Materia.Infrastructure.Persistence;
 
@@ -15,7 +16,9 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
     public AppDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql("Host=localhost;Database=materiadb;Username=postgres;Password=postgres")
+            .UseNpgsql(
+                "Host=localhost;Database=materiadb;Username=postgres;Password=postgres",
+                npgsql => npgsql.UseVector())
             .ConfigureWarnings(w => w.Ignore(RelationalEventId.PendingModelChangesWarning))
             .Options;
 

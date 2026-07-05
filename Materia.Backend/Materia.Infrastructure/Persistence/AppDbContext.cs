@@ -21,6 +21,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
     public DbSet<StoredEvent> StoredEvents => Set<StoredEvent>();
     public DbSet<StoreReadModel> StoreReadModels => Set<StoreReadModel>();
     public DbSet<ProductReadModel> ProductReadModels => Set<ProductReadModel>();
+    public DbSet<ProductEmbeddingReadModel> ProductEmbeddingReadModels => Set<ProductEmbeddingReadModel>();
     public DbSet<ProductVariantReadModel> ProductVariantReadModels => Set<ProductVariantReadModel>();
     public DbSet<CategoryReadModel> CategoryReadModels => Set<CategoryReadModel>();
     public DbSet<UnitReadModel> UnitReadModels => Set<UnitReadModel>();
@@ -43,6 +44,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+
+        // pgvector: semantic product search index lives in this extension's column type.
+        builder.HasPostgresExtension("vector");
 
         // ── Event store ─────────────────────────────────────────────────────────
         // NOT store-filtered: the event store is queried directly, and repositories add
@@ -89,6 +93,19 @@ public class AppDbContext(DbContextOptions<AppDbContext> options, ICurrentStore 
             // Unique per barcode WITHIN a store; PostgreSQL treats NULLs as distinct, so
             // products without a barcode are unaffected.
             e.HasIndex(x => new { x.StoreId, x.Barcode }).IsUnique();
+        });
+
+        builder.Entity<ProductEmbeddingReadModel>(e =>
+        {
+            e.HasKey(x => x.ProductId);
+            e.Property(x => x.Embedding)
+             .HasColumnType($"vector({Inventory.EmbeddingModel.Dimensions})");
+            e.Property(x => x.SourceHash).HasMaxLength(64).IsRequired();
+            // Approximate-nearest-neighbour index using cosine distance, matching the
+            // `<=>` operator used by the vector search query.
+            e.HasIndex(x => x.Embedding)
+             .HasMethod("hnsw")
+             .HasOperators("vector_cosine_ops");
         });
 
         builder.Entity<ProductVariantReadModel>(e =>

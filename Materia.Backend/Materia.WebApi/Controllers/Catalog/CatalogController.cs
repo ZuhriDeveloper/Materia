@@ -1,4 +1,5 @@
 using Materia.Application.DTOs.Sales;
+using Materia.Application.Queries.Inventory;
 using Materia.Application.Services;
 using Materia.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authorization;
@@ -15,7 +16,10 @@ namespace Materia.WebApi.Controllers.Catalog;
 /// </summary>
 [ApiController]
 [Route("api/catalog")]
-public class CatalogController(AppDbContext db, SaleService saleService) : ControllerBase
+public class CatalogController(
+    AppDbContext db,
+    SaleService saleService,
+    SemanticProductSearchQueryHandler semanticSearch) : ControllerBase
 {
     // ── GET /api/catalog/search?q=Pipa&q=Lem&q=Karet&top=6 ──────────────────────
     // Accepts multiple q params — one DB roundtrip regardless of keyword count.
@@ -105,6 +109,31 @@ public class CatalogController(AppDbContext db, SaleService saleService) : Contr
         return Ok(results);
     }
 
+    // ── POST /api/catalog/semantic-search ──────────────────────────────────────
+    // Meaning-based product search (RAG retrieval) for the Renovin assistant. Returns the
+    // same shape as /search so callers can use either interchangeably. The query is embedded
+    // and matched against product vectors; only matches clearing the relevance threshold return.
+
+    [HttpPost("semantic-search")]
+    [AllowAnonymous]
+    public async Task<IActionResult> SemanticSearch(
+        [FromBody]        SemanticSearchRequest request,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(request.Query))
+            return Ok(Array.Empty<CatalogSearchResultDto>());
+
+        var matches = await semanticSearch.HandleAsync(
+            new SemanticProductSearchQuery(request.Query, request.TopK, request.MinScore), ct);
+
+        var results = matches
+            .Select(m => new CatalogSearchResultDto(
+                m.Id, m.Name, m.Description ?? "", m.Unit, m.Price, m.Stock, m.Category))
+            .ToList();
+
+        return Ok(results);
+    }
+
     // ── POST /api/catalog/customer-order ──────────────────────────────────────
 
     [HttpPost("customer-order")]
@@ -175,6 +204,11 @@ public record CatalogSearchResultDto(
     decimal Price,
     decimal Stock,
     string  Category);
+
+public record SemanticSearchRequest(
+    string Query,
+    int    TopK     = 6,
+    double MinScore = 0.5);
 
 public record CustomerOrderLineDto(
     Guid    ProductId,
