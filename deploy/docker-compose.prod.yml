@@ -91,7 +91,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       # Forwarded-header handling lives in Program.cs (UseForwardedHeaders). Do not set
       # ASPNETCORE_FORWARDEDHEADERS_ENABLED here — it would register the middleware twice.
-      ApiService__BaseUrl: https://${API_DOMAIN}
+      # Call webapi over the internal materia-net alias (http://webapi:8080), not the public
+      # API_DOMAIN. webui's own login/data calls run server-side (Blazor Interactive Server),
+      # so routing them out through Cloudflare and back to the same VPS is an unnecessary
+      # (and Cloudflare-proxy-fragile) hairpin. The public API_DOMAIN is still used for
+      # user-facing links (e.g. AccountLinkBuilder) and CORS (WebUi:BaseUrl on the API side).
+      ApiService__BaseUrl: http://webapi:8080
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
