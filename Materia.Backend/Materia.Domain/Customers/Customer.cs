@@ -6,6 +6,18 @@ namespace Materia.Domain.Customers;
 
 public sealed class Customer : AggregateRoot<CustomerId>
 {
+    /// <summary>Reference used for an opening receivable entered without a nota number.</summary>
+    public const string OpeningReceivableReference = "SALDO-AWAL";
+
+    /// <summary>
+    /// Upper bound for a single opening receivable (Rp 10 miliar). Guards against typos and
+    /// against overflowing the running balance, which would surface as a 500.
+    /// </summary>
+    public const decimal MaxOpeningReceivableAmount = 10_000_000_000m;
+
+    /// <summary>Earliest original debt date accepted; anything older is treated as a typo.</summary>
+    public static readonly DateTime MinOpeningReceivableDate = new(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
     private readonly List<CustomerAddress> _addresses      = [];
     private readonly List<ReceivableLine>  _openReceivables = [];
 
@@ -19,7 +31,7 @@ public sealed class Customer : AggregateRoot<CustomerId>
 
     /// <summary>
     /// Open (or partially-paid) receivable lines, oldest first.
-    /// Rebuilt by replaying CustomerDebtIncurred and ReceivablePaymentRecorded events.
+    /// Rebuilt by replaying CustomerDebtIncurred, OpeningReceivableRecorded and ReceivablePaymentRecorded events.
     /// </summary>
     public IReadOnlyList<ReceivableLine> OpenReceivables
         => _openReceivables.Where(l => l.RemainingAmount > 0)
@@ -92,6 +104,52 @@ public sealed class Customer : AggregateRoot<CustomerId>
             amount, OutstandingDebt + amount,
             incurredBy, DateTime.UtcNow));
     }
+
+    /// <summary>
+    /// Records a pre-existing debt (saldo awal piutang) that has no sale behind it, e.g. legacy
+    /// bon carried over from before the application went live. The line joins the open
+    /// receivables at its original date, so FIFO repayment settles it in chronological order.
+    ///
+    /// <paramref name="receivableId"/> is generated once per entry by the client; a repeated id
+    /// is rejected so a double-submitted form cannot record the same debt twice.
+    /// </summary>
+    public void RecordOpeningReceivable(
+        Guid receivableId, decimal amount, DateTime incurredAt,
+        string? referenceNo, string? notes, string recordedBy)
+    {
+        if (!IsActive)
+            throw new DomainException("Tidak dapat menambah piutang pada pelanggan yang tidak aktif.");
+        if (receivableId == Guid.Empty)
+            throw new DomainException("Id saldo awal piutang tidak valid.");
+        if (amount <= 0)
+            throw new DomainException("Jumlah piutang harus lebih dari nol.");
+        if (amount > MaxOpeningReceivableAmount)
+            throw new DomainException("Jumlah piutang melebihi batas maksimum.");
+        // Whole rupiah only: a sub-rupiah remainder is invisible in the UI and could never be cleared.
+        if (amount != decimal.Truncate(amount))
+            throw new DomainException("Jumlah piutang harus dalam rupiah bulat.");
+        if (incurredAt.Date < MinOpeningReceivableDate)
+            throw new DomainException("Tanggal piutang terlalu lama.");
+        if (incurredAt.Date > MaxOpeningReceivableDate())
+            throw new DomainException("Tanggal piutang tidak boleh di masa depan.");
+        if (_openReceivables.Any(l => l.SaleId == receivableId))
+            throw new DomainException("Saldo awal piutang ini sudah pernah dicatat.");
+
+        Raise(new OpeningReceivableRecorded(
+            Id, receivableId,
+            string.IsNullOrWhiteSpace(referenceNo) ? OpeningReceivableReference : referenceNo.Trim(),
+            amount,
+            DateTime.SpecifyKind(incurredAt.Date, DateTimeKind.Utc),
+            OutstandingDebt + amount,
+            Normalize(notes),
+            recordedBy, DateTime.UtcNow));
+    }
+
+    /// <summary>
+    /// Latest date accepted for an opening receivable. The date is picked in the store's local
+    /// time zone (ahead of UTC in Indonesia), so "today" may already be tomorrow's UTC date.
+    /// </summary>
+    public static DateTime MaxOpeningReceivableDate() => DateTime.UtcNow.Date.AddDays(1);
 
     /// <summary>
     /// Records a cash collection (pelunasan piutang) against this customer's open receivables.
@@ -289,6 +347,15 @@ public sealed class Customer : AggregateRoot<CustomerId>
                     originalAmount:  e.Amount,
                     remainingAmount: e.Amount,
                     incurredAt:      e.OccurredAt));
+                break;
+
+            case OpeningReceivableRecorded e:
+                OutstandingDebt = e.NewBalance;
+                _openReceivables.Add(new ReceivableLine(
+                    e.ReceivableId, e.ReferenceNo,
+                    originalAmount:  e.Amount,
+                    remainingAmount: e.Amount,
+                    incurredAt:      e.IncurredAt));
                 break;
 
             case ReceivablePaymentRecorded e:

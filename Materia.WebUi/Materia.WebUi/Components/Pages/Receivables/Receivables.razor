@@ -8,6 +8,11 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h4 class="mb-0 fw-bold">Piutang Pelanggan</h4>
+    <AuthorizeView Roles="Admin">
+        <a href="/receivables/opening" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-journal-plus me-1"></i> Saldo Awal Piutang
+        </a>
+    </AuthorizeView>
 </div>
 
 @if (Paid == 1)

@@ -41,6 +41,7 @@ using Materia.Application.Commands.Purchasing.SetSupplierStatus;
 using Materia.Application.Commands.Purchasing.UpdateSupplier;
 using Materia.Application.Queries.Inventory;
 using Materia.Application.Queries.Purchasing;
+using Materia.Application.Commands.Customers.RecordOpeningReceivable;
 using Materia.Application.Commands.Customers.RecordReceivablePayment;
 using Materia.Application.Commands.Sales.FinalizeSale;
 using Materia.Application.Commands.Sales.RecordSaleReturn;
@@ -124,6 +125,7 @@ public static class DependencyInjection
 
         // Customer AR (receivables)
         services.AddScoped<RecordReceivablePaymentCommandHandler>();
+        services.AddScoped<RecordOpeningReceivableCommandHandler>();
 
         // Purchasing — supplier commands
         services.AddScoped<RegisterSupplierCommandHandler>();

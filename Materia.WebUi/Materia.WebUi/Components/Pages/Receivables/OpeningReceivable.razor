@@ -1,0 +1,279 @@
+@page "/receivables/opening"
+@attribute [Authorize(Roles = "Admin")]
+@rendermode InteractiveServer
+@using System.ComponentModel.DataAnnotations
+@using Materia.WebUi.Services
+@inject ReceivableApiClient ReceivableApi
+@inject CustomerApiClient CustomerApi
+
+<PageTitle>Saldo Awal Piutang — Materia</PageTitle>
+
+<div class="d-flex align-items-center gap-2 mb-2">
+    <a href="/receivables" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Kembali
+    </a>
+    <h4 class="mb-0 fw-bold">Saldo Awal Piutang</h4>
+</div>
+<p class="text-muted small mb-4" style="max-width:640px">
+    Catat hutang pelanggan yang sudah ada sebelum aplikasi digunakan, tanpa transaksi penjualan.
+    Catat satu entri per nota/bon lama beserta tanggal aslinya agar pelunasan dialokasikan
+    dari yang paling lama.
+</p>
+
+@if (_success is not null && _selected is not null)
+{
+    <div class="alert alert-success" style="max-width:640px">
+        <i class="bi bi-check-circle me-1"></i>
+        Saldo awal piutang <strong>@_selected.Name</strong> berhasil dicatat.
+        Sisa piutang sekarang <strong>Rp @_success.NewBalance.ToString("N0")</strong>.
+        <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-success" @onclick="AddAnotherForSameCustomer">
+                <i class="bi bi-plus-lg me-1"></i> Tambah entri lagi untuk pelanggan ini
+            </button>
+            <button class="btn btn-sm btn-outline-secondary" @onclick="StartOver">
+                Pelanggan lain
+            </button>
+            <a href="/receivables" class="btn btn-sm btn-outline-secondary">Ke daftar piutang</a>
+        </div>
+    </div>
+}
+else
+{
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-danger" style="max-width:640px">@_error</div>
+    }
+
+    @* ── Step 1: pick the customer ── *@
+    <div class="card mb-3" style="max-width:640px">
+        <div class="card-header fw-semibold">Pelanggan</div>
+        <div class="card-body">
+            @if (_selected is null)
+            {
+                <div class="input-group input-group-sm mb-2">
+                    <input type="text" class="form-control" placeholder="Cari nama atau no. HP…"
+                           @bind="_search" @bind:event="oninput" @onkeydown="OnSearchKeyDown" />
+                    <button class="btn btn-outline-primary" type="button" @onclick="SearchAsync">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
+                @if (_searching)
+                {
+                    <div class="text-muted small"><span class="spinner-border spinner-border-sm me-1"></span> Mencari…</div>
+                }
+                else if (_results is not null && _results.Count == 0)
+                {
+                    <div class="text-muted small">Pelanggan aktif tidak ditemukan.</div>
+                }
+                else if (_results is not null)
+                {
+                    <div class="list-group">
+                        @foreach (var c in _results)
+                        {
+                            <button type="button" class="list-group-item list-group-item-action d-flex justify-content-between"
+                                    @onclick="() => Select(c)">
+                                <span>
+                                    <span class="fw-semibold">@c.Name</span>
+                                    <span class="text-muted small ms-2">@c.Phone</span>
+                                </span>
+                                @if (c.OutstandingDebt > 0)
+                                {
+                                    <span class="small text-danger">Piutang Rp @c.OutstandingDebt.ToString("N0")</span>
+                                }
+                            </button>
+                        }
+                    </div>
+                }
+            }
+            else
+            {
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <div class="fw-semibold fs-5">@_selected.Name</div>
+                        <div class="small text-muted">
+                            @_selected.Phone · Sisa piutang saat ini
+                            <span class="text-danger fw-semibold">Rp @_selected.OutstandingDebt.ToString("N0")</span>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" @onclick="StartOver" disabled="@_saving">
+                        Ganti
+                    </button>
+                </div>
+            }
+        </div>
+    </div>
+
+    @* ── Step 2: the debt entry ── *@
+    @if (_selected is not null)
+    {
+        <div class="card" style="max-width:640px">
+            <div class="card-body">
+                <EditForm Model="_form" OnValidSubmit="HandleSubmit">
+                    <DataAnnotationsValidator />
+
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Jumlah Piutang (Rp) <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <InputNumber class="form-control" @bind-Value="_form.Amount" placeholder="cth. 500000" />
+                            </div>
+                            <ValidationMessage For="() => _form.Amount" class="small text-danger" />
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Tanggal Hutang Asli <span class="text-danger">*</span></label>
+                            <InputDate class="form-control" @bind-Value="_form.IncurredAt" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">No. Nota / Referensi</label>
+                            <InputText class="form-control" @bind-Value="_form.ReferenceNo"
+                                       placeholder="Opsional — kosong = SALDO-AWAL" />
+                            <ValidationMessage For="() => _form.ReferenceNo" class="small text-danger" />
+                        </div>
+
+                        <div class="col-12">
+                            <label class="form-label">Catatan</label>
+                            <InputTextArea class="form-control" rows="2" @bind-Value="_form.Notes"
+                                           placeholder="Opsional (maks. 500 karakter)" />
+                            <ValidationMessage For="() => _form.Notes" class="small text-danger" />
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary" disabled="@_saving">
+                            @if (_saving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1"></span>
+                            }
+                            <i class="bi bi-check-lg me-1"></i> Simpan Saldo Awal
+                        </button>
+                        <a href="/receivables" class="btn btn-outline-secondary">Batal</a>
+                    </div>
+                </EditForm>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private string             _search = string.Empty;
+    private List<CustomerDto>? _results;
+    private bool               _searching;
+    private CustomerDto?       _selected;
+
+    private string?              _error;
+    private bool                 _saving;
+    private RecordOpeningResult? _success;
+
+    // Generated once per entry and reused on every retry, so a double-click or a retried
+    // request is rejected by the server as a duplicate instead of recorded twice.
+    // Only regenerated after a confirmed success.
+    private Guid _receivableId = Guid.NewGuid();
+
+    private OpeningForm _form = new();
+
+    private async Task OnSearchKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await SearchAsync();
+    }
+
+    private async Task SearchAsync()
+    {
+        _error     = null;
+        _searching = true;
+        try
+        {
+            var page = await CustomerApi.GetCustomersAsync(
+                1, 10, string.IsNullOrWhiteSpace(_search) ? null : _search.Trim(), isActive: true);
+            _results = page?.Items ?? [];
+        }
+        catch
+        {
+            _error = "Gagal memuat data pelanggan. Silakan coba lagi.";
+        }
+        finally
+        {
+            _searching = false;
+        }
+    }
+
+    private void Select(CustomerDto customer)
+    {
+        _selected = customer;
+        _error    = null;
+    }
+
+    private void StartOver()
+    {
+        _selected = null;
+        _success  = null;
+        _error    = null;
+        _form     = new OpeningForm();
+    }
+
+    private void AddAnotherForSameCustomer()
+    {
+        _success = null;
+        _form    = new OpeningForm();
+    }
+
+    private async Task HandleSubmit()
+    {
+        _error = null;
+        if (_selected is null || _saving) return;
+
+        // No client-side future-date check: this runs on the server, whose clock may be UTC
+        // while the user picks a local (WIB) date. The API applies a time-zone-tolerant rule.
+        _saving = true;
+
+        RecordOpeningResult? result;
+        string?              error;
+        try
+        {
+            (result, error) = await ReceivableApi.RecordOpeningAsync(
+                _selected.Id,
+                _receivableId,
+                _form.Amount,
+                _form.IncurredAt.Date,
+                string.IsNullOrWhiteSpace(_form.ReferenceNo) ? null : _form.ReferenceNo.Trim(),
+                string.IsNullOrWhiteSpace(_form.Notes) ? null : _form.Notes.Trim());
+        }
+        catch
+        {
+            // Keep the same ReceivableId: if the request actually landed, a retry is
+            // rejected as a duplicate rather than recording the debt twice.
+            _error = "Gagal menghubungi server. Periksa daftar piutang sebelum mencoba lagi.";
+            return;
+        }
+        finally
+        {
+            _saving = false;
+        }
+
+        if (error is not null)
+        {
+            _error = error;
+            return;
+        }
+
+        _success      = result;
+        _selected     = _selected with { OutstandingDebt = result!.NewBalance };
+        _receivableId = Guid.NewGuid();
+    }
+
+    private sealed class OpeningForm
+    {
+        [Range(0.01, double.MaxValue, ErrorMessage = "Jumlah piutang harus lebih dari nol.")]
+        public decimal Amount { get; set; }
+
+        public DateTime IncurredAt { get; set; } = DateTime.Today;
+
+        [MaxLength(50, ErrorMessage = "No. referensi maksimal 50 karakter.")]
+        public string? ReferenceNo { get; set; }
+
+        [MaxLength(500, ErrorMessage = "Catatan maksimal 500 karakter.")]
+        public string? Notes { get; set; }
+    }
+}

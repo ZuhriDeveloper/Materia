@@ -133,6 +133,7 @@ public class CustomerRepository(AppDbContext context, ICurrentStore currentStore
                 CustomerDefaultAddressChanged e => e.UpdatedBy,
                 CustomerDebtIncurred e          => e.IncurredBy,
                 ReceivablePaymentRecorded e     => e.ReceivedBy,
+                OpeningReceivableRecorded e     => e.RecordedBy,
                 _                               => projection.UpdatedBy,
             };
             projection.UpdatedAt = newEvents.Last().OccurredAt;
