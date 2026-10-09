@@ -27,6 +27,19 @@ public class ReceivableApiClient(HttpClient http)
         return (result, null);
     }
 
+    public async Task<(RecordOpeningResult? Result, string? Error)> RecordOpeningAsync(
+        Guid customerId, Guid receivableId, decimal amount, DateTime incurredAt,
+        string? referenceNo, string? notes,
+        CancellationToken ct = default)
+    {
+        var response = await http.PostAsJsonAsync("api/receivables/opening",
+            new { customerId, receivableId, amount, incurredAt, referenceNo, notes }, ct);
+        if (!response.IsSuccessStatusCode)
+            return (null, await ReadErrorAsync(response));
+        var result = await response.Content.ReadFromJsonAsync<RecordOpeningResult>(cancellationToken: ct);
+        return (result, null);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static async Task<string> ReadErrorAsync(HttpResponseMessage r)

@@ -46,3 +46,7 @@ public record RecordPaymentResult(
     Guid                        PaymentId,
     decimal                     NewBalance,
     List<ReceivableAllocationDto> Allocations);
+
+public record RecordOpeningResult(
+    Guid    ReceivableId,
+    decimal NewBalance);

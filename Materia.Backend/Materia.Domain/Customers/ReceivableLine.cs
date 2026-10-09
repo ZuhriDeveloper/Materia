@@ -3,11 +3,16 @@ using Materia.Domain.Common;
 namespace Materia.Domain.Customers;
 
 /// <summary>
-/// A single open (or partially-paid) credit-sale receivable line on a customer account.
+/// A single open (or partially-paid) receivable line on a customer account: either a credit
+/// sale or an opening receivable (saldo awal) recorded without a sale.
 /// Insertion order is chronological (oldest first), which drives the FIFO allocation.
 /// </summary>
 public sealed class ReceivableLine
 {
+    /// <summary>
+    /// The credit sale's id, or the opening receivable's id for lines without a sale.
+    /// Name kept for compatibility with stored allocation events and payment history.
+    /// </summary>
     public Guid     SaleId          { get; }
     public string   ReferenceNo     { get; }
     public decimal  OriginalAmount  { get; }

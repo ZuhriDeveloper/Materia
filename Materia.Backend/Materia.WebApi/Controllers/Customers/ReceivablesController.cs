@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using FluentValidation;
+using Materia.Application.Commands.Customers.RecordOpeningReceivable;
 using Materia.Application.Commands.Customers.RecordReceivablePayment;
 using Materia.Application.Queries.Customers;
 using Materia.Domain.Sales;
@@ -13,8 +14,10 @@ namespace Materia.WebApi.Controllers.Customers;
 [Route("api/[controller]")]
 public sealed class ReceivablesController(
     RecordReceivablePaymentCommandHandler             recordHandler,
+    RecordOpeningReceivableCommandHandler             openingHandler,
     GetOutstandingReceivablesQueryHandler             getHandler,
-    IValidator<RecordReceivablePaymentCommand>        recordValidator) : ControllerBase
+    IValidator<RecordReceivablePaymentCommand>        recordValidator,
+    IValidator<RecordOpeningReceivableCommand>        openingValidator) : ControllerBase
 {
     private string CurrentUser =>
         User.FindFirstValue("fullName") is { Length: > 0 } fn ? fn :
@@ -73,6 +76,33 @@ public sealed class ReceivablesController(
             result.Allocations,
         });
     }
+
+    /// <summary>
+    /// Records a pre-existing debt (saldo awal piutang) without a sale, for customers who
+    /// already owed money before the application went live. Admin only: it creates debt
+    /// with no goods leaving the store. Combined with the class-level attribute, so only
+    /// users in the Admin role pass.
+    /// </summary>
+    [HttpPost("opening")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RecordOpening(
+        [FromBody] RecordOpeningReceivableRequest request, CancellationToken ct)
+    {
+        var command = new RecordOpeningReceivableCommand(
+            request.CustomerId, request.ReceivableId, request.Amount, request.IncurredAt,
+            request.ReferenceNo, request.Notes, CurrentUser);
+
+        var validation = await openingValidator.ValidateAsync(command, ct);
+        if (!validation.IsValid)
+            return BadRequest(new { errors = validation.Errors.Select(e => e.ErrorMessage) });
+
+        var result = await openingHandler.HandleAsync(command, ct);
+        return Ok(new
+        {
+            result.ReceivableId,
+            result.NewBalance,
+        });
+    }
 }
 
 public record RecordReceivablePaymentRequest(
@@ -85,3 +115,12 @@ public record RecordReceivablePaymentRequest(
     /// if supplied via the <c>Idempotency-Key</c> header instead; one of the two is required.
     /// </summary>
     Guid?         IdempotencyKey = null);
+
+public record RecordOpeningReceivableRequest(
+    Guid     CustomerId,
+    /// <summary>Client-generated id, one per entry; reusing it is rejected as a duplicate.</summary>
+    Guid     ReceivableId,
+    decimal  Amount,
+    DateTime IncurredAt,
+    string?  ReferenceNo,
+    string?  Notes);

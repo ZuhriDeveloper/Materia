@@ -63,6 +63,7 @@ public static class EventTypeRegistry
         [nameof(CustomerDefaultAddressChanged)] = typeof(CustomerDefaultAddressChanged),
         [nameof(CustomerDebtIncurred)]          = typeof(CustomerDebtIncurred),
         [nameof(ReceivablePaymentRecorded)]     = typeof(ReceivablePaymentRecorded),
+        [nameof(OpeningReceivableRecorded)]     = typeof(OpeningReceivableRecorded),
 
         // Supplier events
         [nameof(SupplierRegistered)]       = typeof(SupplierRegistered),
