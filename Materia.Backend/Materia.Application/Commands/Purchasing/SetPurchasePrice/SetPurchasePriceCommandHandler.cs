@@ -12,7 +12,8 @@ public sealed class SetPurchasePriceCommandHandler(ISupplierRepository repositor
         var supplier = await repository.GetByIdAsync(SupplierId.From(command.SupplierId), ct)
             ?? throw new DomainException($"Supplier {command.SupplierId} not found.");
 
-        var price = new PurchasePrice(command.Amount, command.Currency, command.Unit, command.EffectiveFrom);
+        var price = new PurchasePrice(
+            command.Amount, command.Currency, command.Unit, command.EffectiveFrom, command.Discounts);
         supplier.SetPurchasePrice(ProductId.From(command.ProductId), price, command.UpdatedBy);
 
         await repository.SaveAsync(supplier, ct);

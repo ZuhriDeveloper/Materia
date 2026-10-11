@@ -63,6 +63,59 @@ public class SupplierTests
     }
 
     [Fact]
+    public void SetPurchasePrice_WithStandingDiscount_CarriesChainToEventAndCatalog()
+    {
+        var supplier = Supplier.Register("PT Pipa Sentosa", null, null, null, null, "admin");
+        var productId = ProductId.New();
+        var price = new PurchasePrice(
+            120_000m, "IDR", "batang", DateTime.UtcNow, [12.5m, 7m, 5m]);
+
+        supplier.SetPurchasePrice(productId, price, "admin");
+
+        var evt = supplier.DomainEvents.OfType<SupplierPurchasePriceSet>().Single();
+        evt.Discounts.Should().Equal(12.5m, 7m, 5m);
+        supplier.Catalog[productId.Value].LatestPrice!.Discounts.Should().Equal(12.5m, 7m, 5m);
+    }
+
+    [Fact]
+    public void SetPurchasePrice_WithoutDiscount_LeavesEmptyChain()
+    {
+        // The Rucika/Onda case: products without a granted discount carry an empty chain.
+        var supplier = Supplier.Register("PT Pipa Sentosa", null, null, null, null, "admin");
+        var productId = ProductId.New();
+
+        supplier.SetPurchasePrice(productId,
+            new PurchasePrice(50_000m, "IDR", "pcs", DateTime.UtcNow), "admin");
+
+        supplier.Catalog[productId.Value].LatestPrice!.Discounts.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void PurchasePrice_WithInvalidDiscountChain_ThrowsDomainException()
+    {
+        Action act = () => new PurchasePrice(
+            100_000m, "IDR", "pcs", DateTime.UtcNow, [120m]);
+
+        act.Should().Throw<DomainException>();
+    }
+
+    [Fact]
+    public void Reconstitute_FromLegacyEventWithoutDiscounts_YieldsEmptyChain()
+    {
+        // Back-compat: an event persisted before the Discounts field (null) must replay cleanly.
+        var productId = ProductId.New();
+        var register = Supplier.Register("PT Pipa Sentosa", null, null, null, null, "admin")
+            .DomainEvents.Single();
+        var legacyPriceSet = new SupplierPurchasePriceSet(
+            (register as SupplierRegistered)!.SupplierId, productId,
+            45_000m, "IDR", "pcs", DateTime.UtcNow, "admin", DateTime.UtcNow, Discounts: null);
+
+        var reconstituted = Supplier.Reconstitute([register, legacyPriceSet]);
+
+        reconstituted.Catalog[productId.Value].LatestPrice!.Discounts.Should().BeEmpty();
+    }
+
+    [Fact]
     public void SetPurchasePrice_OnInactiveSupplier_ThrowsDomainException()
     {
         var supplier = Supplier.Register("PT Jaya Bahan", null, null, null, null, "admin");

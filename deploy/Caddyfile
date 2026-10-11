@@ -31,3 +31,7 @@ renovin.co.id {
 www.renovin.co.id {
     redir https://renovin.co.id{uri} permanent
 }
+
+# NOTE: This file is superseded by the shared edge-proxy stack (../../edge-proxy/Caddyfile),
+# which is now the authoritative routing config for all apps. After migrating to edge-proxy
+# (see edge-proxy/README.md), this file is unused and can be deleted.

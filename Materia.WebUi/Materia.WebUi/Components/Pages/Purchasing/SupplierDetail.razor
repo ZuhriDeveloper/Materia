@@ -138,11 +138,26 @@ else
                                         <strong>@ProductName(entry.ProductId)</strong>
                                         @if (latest is not null)
                                         {
+                                            var latestDiscounts = latest.Discounts ?? [];
                                             <div class="small mt-1">
-                                                <span class="fw-semibold text-success">
-                                                    Rp @latest.Amount.ToString("N0")
-                                                </span>
-                                                <span class="text-muted">/ @latest.Unit</span>
+                                                @if (latestDiscounts.Count > 0)
+                                                {
+                                                    <span class="fw-semibold text-success">
+                                                        Rp @DiscountInput.ComputeNet(latest.Amount, latestDiscounts).ToString("N0")
+                                                    </span>
+                                                    <span class="text-muted">/ @latest.Unit</span>
+                                                    <span class="text-muted ms-1">
+                                                        <s>Rp @latest.Amount.ToString("N0")</s>
+                                                    </span>
+                                                    <span class="badge text-bg-light border ms-1">@DiscountInput.Format(latestDiscounts)</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="fw-semibold text-success">
+                                                        Rp @latest.Amount.ToString("N0")
+                                                    </span>
+                                                    <span class="text-muted">/ @latest.Unit</span>
+                                                }
                                                 <span class="text-muted ms-1">
                                                     (berlaku @latest.EffectiveFrom.ToLocalTime().ToString("dd MMM yyyy"))
                                                 </span>
@@ -159,6 +174,10 @@ else
                                                     {
                                                         <li>
                                                             Rp @p.Amount.ToString("N0") / @p.Unit
+                                                            @if (p.Discounts is { Count: > 0 })
+                                                            {
+                                                                <span class="badge text-bg-light border ms-1">@DiscountInput.Format(p.Discounts)</span>
+                                                            }
                                                             — @p.EffectiveFrom.ToLocalTime().ToString("dd MMM yyyy")
                                                         </li>
                                                     }
@@ -244,6 +263,29 @@ else
                                 <input type="date" class="form-control form-control-sm"
                                        @bind="_priceForm.EffectiveFrom" />
                             </div>
+                            <div class="col-md-8">
+                                <label class="form-label small">
+                                    Diskon bertingkat (%)
+                                    <i class="bi bi-info-circle text-muted" title="mis. 12,5+7+5 — terisi otomatis saat order pembelian"></i>
+                                </label>
+                                <input type="text" class="form-control form-control-sm"
+                                       @bind="_priceForm.DiscountText" @bind:event="oninput"
+                                       placeholder="mis. 12,5+7+5 (kosongkan bila tanpa diskon)" />
+                            </div>
+                            @{
+                                var formDiscounts = DiscountInput.Parse(_priceForm.DiscountText);
+                            }
+                            @if (formDiscounts.Count > 0 && _priceForm.Amount > 0)
+                            {
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <span class="small">
+                                        Nett (@DiscountInput.Format(formDiscounts)):
+                                        <span class="fw-semibold text-success">
+                                            Rp @DiscountInput.ComputeNet(_priceForm.Amount, formDiscounts).ToString("N0")
+                                        </span>
+                                    </span>
+                                </div>
+                            }
                             <div class="col-12">
                                 <button class="btn btn-sm btn-primary"
                                         @onclick="HandleSetPrice"
@@ -378,17 +420,19 @@ else
         _saving = true;
         _error  = null;
         var effective = _priceForm.EffectiveFrom?.ToDateTime(TimeOnly.MinValue);
+        var discounts = DiscountInput.Parse(_priceForm.DiscountText);
         var error = await Api.SetPriceAsync(
             Id, _priceForm.ProductId, _priceForm.Amount,
-            "IDR", _priceForm.Unit, effective);
+            "IDR", _priceForm.Unit, effective, discounts.Count > 0 ? discounts : null);
         _saving = false;
         if (error is not null) { _error = error; return; }
 
         _notice = "Harga beli berhasil ditetapkan.";
-        _priceForm.Amount    = 0;
-        _priceForm.ProductId = Guid.Empty;
-        _priceForm.Unit      = "";
-        _selectedProduct     = null;
+        _priceForm.Amount       = 0;
+        _priceForm.ProductId    = Guid.Empty;
+        _priceForm.Unit         = "";
+        _priceForm.DiscountText = "";
+        _selectedProduct        = null;
         if (_productAutocomplete is not null)
             await _productAutocomplete.ClearAsync();
         await LoadAsync();
@@ -419,5 +463,8 @@ else
         public decimal   Amount        { get; set; }
         public string    Unit          { get; set; } = string.Empty;
         public DateOnly? EffectiveFrom { get; set; } = DateOnly.FromDateTime(DateTime.Today);
+
+        // Free-text chained discount, e.g. "12,5+7+5". Empty = supplier grants no discount.
+        public string    DiscountText  { get; set; } = string.Empty;
     }
 }

@@ -29,6 +29,7 @@ public record SupplierPriceDto(
     decimal Amount,
     string Currency,
     string Unit,
-    DateTime EffectiveFrom);
+    DateTime EffectiveFrom,
+    IReadOnlyList<decimal> Discounts);
 
 public record SupplierBestPriceResult(Guid SupplierId, string SupplierName, decimal UnitCost, string Unit);

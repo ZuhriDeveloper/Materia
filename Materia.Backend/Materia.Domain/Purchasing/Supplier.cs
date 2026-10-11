@@ -70,7 +70,7 @@ public sealed class Supplier : AggregateRoot<SupplierId>
 
         Raise(new SupplierPurchasePriceSet(
             Id, productId, price.Amount, price.Currency, price.Unit,
-            price.EffectiveFrom, updatedBy, DateTime.UtcNow));
+            price.EffectiveFrom, updatedBy, DateTime.UtcNow, price.Discounts));
     }
 
     public void Activate(string activatedBy)
@@ -115,7 +115,8 @@ public sealed class Supplier : AggregateRoot<SupplierId>
                     entry = new SupplierCatalogEntry(e.ProductId);
                     _catalog[e.ProductId.Value] = entry;
                 }
-                entry.AddPrice(new PurchasePrice(e.Amount, e.Currency, e.Unit, e.EffectiveFrom));
+                entry.AddPrice(new PurchasePrice(
+                    e.Amount, e.Currency, e.Unit, e.EffectiveFrom, e.Discounts ?? []));
                 break;
 
             case SupplierActivated:

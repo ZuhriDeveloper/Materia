@@ -97,7 +97,8 @@ public class SuppliersController(
     {
         var command = new SetPurchasePriceCommand(
             id, request.ProductId, request.Amount, request.Currency,
-            request.Unit, request.EffectiveFrom ?? DateTime.UtcNow, CurrentUser);
+            request.Unit, request.EffectiveFrom ?? DateTime.UtcNow, CurrentUser,
+            request.Discounts);
 
         var validation = await priceValidator.ValidateAsync(command, ct);
         if (!validation.IsValid)
@@ -120,4 +121,5 @@ public record SetPurchasePriceRequest(
     decimal   Amount,
     string    Currency,
     string    Unit,
-    DateTime? EffectiveFrom);
+    DateTime? EffectiveFrom,
+    IReadOnlyList<decimal>? Discounts = null);

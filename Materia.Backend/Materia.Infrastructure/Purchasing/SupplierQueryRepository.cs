@@ -94,7 +94,8 @@ public class SupplierQueryRepository(AppDbContext context) : ISupplierQueryRepos
             row.IsActive,
             catalog.Select(e => new SupplierCatalogEntryDto(
                 e.ProductId,
-                e.Prices.Select(p => new SupplierPriceDto(p.Amount, p.Currency, p.Unit, p.EffectiveFrom))
+                e.Prices.Select(p => new SupplierPriceDto(
+                            p.Amount, p.Currency, p.Unit, p.EffectiveFrom, p.Discounts ?? []))
                         .OrderByDescending(p => p.EffectiveFrom)
                         .ToList()))
                 .ToList());
@@ -106,5 +107,7 @@ public class SupplierQueryRepository(AppDbContext context) : ISupplierQueryRepos
            ?? [];
 
     private sealed record CatalogEntryJson(Guid ProductId, List<PriceJson> Prices);
-    private sealed record PriceJson(decimal Amount, string Currency, string Unit, DateTime EffectiveFrom);
+    private sealed record PriceJson(
+        decimal Amount, string Currency, string Unit, DateTime EffectiveFrom,
+        List<decimal>? Discounts = null);
 }

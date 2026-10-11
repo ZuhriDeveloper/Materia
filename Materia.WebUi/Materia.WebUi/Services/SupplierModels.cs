@@ -4,7 +4,9 @@ public record SupplierPriceDto(
     decimal  Amount,
     string   Currency,
     string   Unit,
-    DateTime EffectiveFrom);
+    DateTime EffectiveFrom,
+    // Standing chained trade discount on the list price (% per level), or null/empty when none.
+    List<decimal>? Discounts = null);
 
 public record SupplierCatalogEntryDto(
     Guid                      ProductId,

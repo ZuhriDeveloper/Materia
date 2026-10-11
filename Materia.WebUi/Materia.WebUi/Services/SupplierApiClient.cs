@@ -51,10 +51,11 @@ public class SupplierApiClient(HttpClient http)
     public async Task<string?> SetPriceAsync(
         Guid supplierId, Guid productId, decimal amount,
         string currency, string unit, DateTime? effectiveFrom,
+        IReadOnlyList<decimal>? discounts = null,
         CancellationToken ct = default)
     {
         var response = await http.PostAsJsonAsync($"api/suppliers/{supplierId}/prices",
-            new { productId, amount, currency, unit, effectiveFrom }, ct);
+            new { productId, amount, currency, unit, effectiveFrom, discounts }, ct);
         return response.IsSuccessStatusCode ? null : await ReadErrorAsync(response);
     }
 

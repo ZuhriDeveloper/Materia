@@ -44,11 +44,12 @@ public sealed class CreatePurchaseOrderCommandHandler(
                     $"No purchase price defined for product {input.ProductId}.");
 
             // The catalog price is the default list/base cost; the admin may override it per line,
-            // and the per-line chain (if any) discounts it down to the net.
+            // and the per-line chain discounts it down to the net. When no per-line discount is
+            // given, fall back to the supplier's standing catalog discount for this product.
             var listUnitCost = input.ListUnitCost ?? latestPrice.Amount;
             lines.Add((
                 ProductId.From(input.ProductId), input.Qty,
-                listUnitCost, input.Discounts ?? [], latestPrice.Unit));
+                listUnitCost, input.Discounts ?? latestPrice.Discounts, latestPrice.Unit));
         }
 
         return lines;

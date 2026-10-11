@@ -61,6 +61,7 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - materia-net
+      - edge   # reachable by the shared edge-proxy Caddy (see ../../edge-proxy)
 
   webui:
     image: ${GHCR_PREFIX}/materia-webui:latest
@@ -76,24 +77,11 @@ services:
       - "com.centurylinklabs.watchtower.enable=true"
     networks:
       - materia-net
+      - edge   # reachable by the shared edge-proxy Caddy (see ../../edge-proxy)
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    environment:
-      APP_DOMAIN: ${APP_DOMAIN}
-      API_DOMAIN: ${API_DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    networks:
-      - materia-net
-      - edge
+  # NOTE: The reverse proxy (Caddy) was moved OUT of this stack into the neutral shared
+  # `edge-proxy` stack (see ../../edge-proxy) so it no longer belongs to Materia. webui/webapi
+  # above join the `edge` network so that shared Caddy can reach them by service name.
 
   watchtower:
     image: containrrr/watchtower:latest
@@ -123,13 +111,12 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  caddy_data:
-  caddy_config:
+  # caddy_data/caddy_config removed: the reverse proxy now lives in the shared edge-proxy stack.
 
 networks:
   materia-net:
     driver: bridge
-  # Shared edge network so the separate Renovin stack (renovin-web) is reachable by this
-  # Caddy. Create once on the VPS:  docker network create edge
+  # Shared edge network so the neutral edge-proxy Caddy (and the Renovin/Aghnia stacks) can
+  # reach webui/webapi by service name. Create once on the VPS:  docker network create edge
   edge:
     external: true

@@ -351,10 +351,12 @@
         var latest = entry?.Prices.OrderByDescending(p => p.EffectiveFrom).FirstOrDefault();
         if (latest is null) return;
 
-        _lineProductId = pid;
-        _lineUnitCost  = latest.Amount;
-        _lineUnit      = latest.Unit;
-        _lineStock     = await InventoryApi.GetStockByProductIdAsync(pid);
+        _lineProductId    = pid;
+        _lineUnitCost     = latest.Amount;
+        _lineUnit         = latest.Unit;
+        // Pre-fill the supplier's standing discount for this product (admin can still edit it).
+        _lineDiscountText = DiscountInput.Format(latest.Discounts);
+        _lineStock        = await InventoryApi.GetStockByProductIdAsync(pid);
     }
 
     private void AddLine()

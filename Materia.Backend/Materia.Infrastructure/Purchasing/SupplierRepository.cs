@@ -92,6 +92,7 @@ public class SupplierRepository(AppDbContext context, ICurrentStore currentStore
                     currency = p.Currency,
                     unit = p.Unit,
                     effectiveFrom = p.EffectiveFrom,
+                    discounts = p.Discounts,
                 }),
             }));
 
