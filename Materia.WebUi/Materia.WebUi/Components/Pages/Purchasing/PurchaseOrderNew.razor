@@ -66,7 +66,7 @@
                             <label class="form-label small">Produk</label>
                             <select class="form-select form-select-sm" @onchange="OnProductChanged">
                                 <option value="">— pilih produk dari katalog —</option>
-                                @foreach (var entry in _selectedSupplier.Catalog)
+                                @foreach (var entry in _selectedSupplier.Catalog.OrderBy(c => ProductName(c.ProductId)))
                                 {
                                     <option value="@entry.ProductId">@ProductName(entry.ProductId)</option>
                                 }
@@ -286,8 +286,11 @@
 
 @code {
     private List<SupplierDto>? _suppliers;
-    private List<ProductDto>?  _products;
     private SupplierDto?       _selectedSupplier;
+
+    // Catalog entries only carry a ProductId; resolve display names per product
+    // (a bulk product list is paged and misses products beyond the first page).
+    private readonly Dictionary<Guid, string> _productNames = new();
 
     private Guid     _lineProductId;
     private decimal  _lineUnitCost;
@@ -325,9 +328,30 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var productsTask  = InventoryApi.GetProductsAsync(pageSize: 500, isActive: true);
         _suppliers = (await SupplierApi.GetSuppliersAsync(activeOnly: true, pageSize: 500))?.Items ?? [];
-        _products  = (await productsTask)?.Items ?? [];
+    }
+
+    private async Task LoadProductNamesAsync()
+    {
+        if (_selectedSupplier is null) return;
+
+        var missing = _selectedSupplier.Catalog
+            .Select(c => c.ProductId)
+            .Where(id => !_productNames.ContainsKey(id))
+            .Distinct()
+            .ToList();
+
+        var products = await Task.WhenAll(missing.Select(TryGetProductAsync));
+        foreach (var product in products)
+        {
+            if (product is not null) _productNames[product.Id] = product.Name;
+        }
+    }
+
+    private async Task<ProductDto?> TryGetProductAsync(Guid id)
+    {
+        try { return await InventoryApi.GetProductByIdAsync(id); }
+        catch (HttpRequestException) { return null; }
     }
 
     private async Task OnSupplierChanged(ChangeEventArgs e)
@@ -338,6 +362,8 @@
         _selectedSupplier = Guid.TryParse(e.Value?.ToString(), out var id)
             ? await SupplierApi.GetSupplierByIdAsync(id)
             : null;
+
+        await LoadProductNamesAsync();
     }
 
     private async Task OnProductChanged(ChangeEventArgs e)
@@ -410,7 +436,7 @@
     private bool HasLine(Guid productId) => _lines.Any(l => l.ProductId == productId);
 
     private string ProductName(Guid productId)
-        => _products?.FirstOrDefault(p => p.Id == productId)?.Name ?? productId.ToString()[..8];
+        => _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
 
     private void ResetLineForm()
     {

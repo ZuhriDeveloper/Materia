@@ -13,6 +13,9 @@ public interface IProductQueryRepository
     Task<IReadOnlyList<ProductDto>> GetAllAsync(
         bool? isActive, string? search = null, Guid? categoryId = null,
         CancellationToken ct = default);
+    /// <summary>Display names for the given product ids, in one lookup. Unknown ids are absent from the result.</summary>
+    Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken ct = default);
     Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null, CancellationToken ct = default);
     Task<bool> ExistsByBarcodeAsync(string barcode, Guid? excludeId = null, CancellationToken ct = default);
 }

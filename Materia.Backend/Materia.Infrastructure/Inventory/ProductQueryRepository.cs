@@ -244,6 +244,18 @@ public class ProductQueryRepository(AppDbContext context) : IProductQueryReposit
             id => (latestByProduct.TryGetValue(id, out var p) ? p.Amount : (decimal?)null, true));
     }
 
+    public async Task<IReadOnlyDictionary<Guid, string>> GetNamesAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken ct = default)
+    {
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+
+        return await context.ProductReadModels
+            .AsNoTracking()
+            .Where(p => ids.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name })
+            .ToDictionaryAsync(p => p.Id, p => p.Name, ct);
+    }
+
     public Task<bool> ExistsByNameAsync(string name, Guid? excludeId = null, CancellationToken ct = default)
     {
         var trimmed = name.Trim();

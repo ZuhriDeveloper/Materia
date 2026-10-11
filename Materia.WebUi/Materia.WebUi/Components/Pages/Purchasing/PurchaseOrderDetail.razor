@@ -348,7 +348,10 @@ else
     [Parameter] public Guid Id { get; set; }
 
     private PurchaseOrderDto?  _po;
-    private List<ProductDto>?  _products;
+
+    // PO lines only carry a ProductId; resolve display names per product
+    // (a bulk product list is paged and misses products beyond the first page).
+    private readonly Dictionary<Guid, string> _productNames = new();
 
     private bool _receiving;
     private bool _returning;
@@ -375,19 +378,50 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        var productsTask = InventoryApi.GetProductsAsync(pageSize: 500);
         await LoadAsync();
-        _products = (await productsTask)?.Items ?? [];
     }
 
     private async Task LoadAsync()
     {
         _po = await PoApi.GetByIdAsync(Id);
-        if (_po is null) Navigation.NavigateTo("/purchase-orders");
+        if (_po is null)
+        {
+            Navigation.NavigateTo("/purchase-orders");
+            return;
+        }
+
+        await LoadProductNamesAsync();
+    }
+
+    private async Task LoadProductNamesAsync()
+    {
+        foreach (var line in _po!.Lines)
+        {
+            if (!string.IsNullOrEmpty(line.ProductName))
+                _productNames[line.ProductId] = line.ProductName;
+        }
+
+        var missing = _po.Lines
+            .Select(l => l.ProductId)
+            .Where(id => !_productNames.ContainsKey(id))
+            .Distinct()
+            .ToList();
+
+        var products = await Task.WhenAll(missing.Select(TryGetProductAsync));
+        foreach (var product in products)
+        {
+            if (product is not null) _productNames[product.Id] = product.Name;
+        }
+    }
+
+    private async Task<ProductDto?> TryGetProductAsync(Guid id)
+    {
+        try { return await InventoryApi.GetProductByIdAsync(id); }
+        catch (HttpRequestException) { return null; }
     }
 
     private string ProductName(Guid productId)
-        => _products?.FirstOrDefault(p => p.Id == productId)?.Name ?? productId.ToString()[..8];
+        => _productNames.TryGetValue(productId, out var name) ? name : productId.ToString()[..8];
 
     private async Task HandleConfirm()
     {
